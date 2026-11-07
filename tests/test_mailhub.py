@@ -79,3 +79,51 @@ class MailhubTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClassifierRulesTest(unittest.TestCase):
+    def setUp(self):
+        from mailhub.classify import Classifier
+        cfg = load_config("none.toml")
+        cfg["me"] = {"addresses": ["230419@corp.com"], "names": ["이성욱"]}
+        self.c = Classifier(cfg)
+
+    def test_word_boundary_and_quote(self):
+        r = self.c.classify({"subject": "second sample", "body": "economy", "to_addr": "이성욱"})
+        self.assertNotIn("E.O", r["tags"])
+        r = self.c.classify({"subject": "ECO 적용", "body": "", "to_addr": "이성욱"})
+        self.assertIn("E.O", r["tags"])
+        r = self.c.classify({"subject": "RE: 공유", "body": "참고 바랍니다.\n보낸 사람: x\n일정 검토 부탁", "to_addr": "이성욱"})
+        self.assertNotIn("일정", r["tags"])
+        self.assertEqual(r["needs_action"], 0)
+
+    def test_action_rules(self):
+        base = {"subject": "RE: 금형 수정 검토 요청", "body": "검토 부탁드립니다."}
+        self.assertEqual(self.c.classify({**base, "to_addr": "이성욱/책임/개발3팀"})["needs_action"], 1)
+        self.assertEqual(self.c.classify({**base, "to_addr": "김동혁", "cc_addr": "이성욱"})["needs_action"], 0)
+        mine = self.c.classify({**base, "sender_email": "230419@corp.com", "to_addr": "x"})
+        self.assertEqual((mine["is_mine"], mine["needs_action"]), (1, 0))
+        self.assertEqual(mine["thread_key"], "금형 수정 검토 요청")
+        self.assertEqual(self.c.classify({"subject": "회신: 공유드립니다", "body": "", "to_addr": "이성욱"})["needs_action"], 0)
+
+
+class ReplyTrackingTest(unittest.TestCase):
+    def test_replied_thread_excluded(self):
+        from mailhub.classify import Classifier
+        from mailhub.search import todo
+        cfg = load_config("none.toml")
+        cfg["me"] = {"addresses": ["me@corp.com"], "names": ["나"]}
+        clf = Classifier(cfg)
+        with tempfile.TemporaryDirectory() as d:
+            conn = db.connect(Path(d) / "t.db")
+            def add(k, subj, sender, to, at, folder="받은 편지함"):
+                rec = {"subject": subj, "body": "검토 요청드립니다", "sender_email": sender, "to_addr": to,
+                       "sent_at": at, "folder": folder}
+                rec.update(clf.classify(rec))
+                db.insert_mail(conn, k, rec)
+            add("1", "A건 검토 요청", "c@oem.com", "나", "2026-11-01T09:00:00")
+            add("2", "B건 검토 요청", "c@oem.com", "나", "2026-11-01T09:00:00")
+            add("3", "RE: A건 검토 요청", "me@corp.com", "c@oem.com", "2026-11-02T09:00:00", "보낸 편지함")
+            self.assertEqual([r["subject"] for r in todo(conn, "2026-01-01")], ["B건 검토 요청"])
+            self.assertEqual(len(todo(conn, "2026-01-01", include_replied=True)), 2)
+            conn.close()

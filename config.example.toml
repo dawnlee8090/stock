@@ -7,8 +7,10 @@ msg_dir = "data/msg"               # --save-msg 원본 보관 위치
 attach_dir = "data/attachments"    # --save-attachments 첨부 보관 위치
 
 [me]
-# 내 메일 주소 (보낸 메일은 '조치 필요'에서 제외)
+# 내 메일 주소와 이름 (아웃룩 받는사람 칸은 이름으로 표시되므로 둘 다 입력)
+# → 내가 보낸 메일 구분, 참조(CC)로만 받은 메일·이미 회신한 건은 '조치필요'에서 제외
 addresses = ["my.name@company.com"]
+names = ["홍길동"]
 
 [tags]
 # 태그명 = [키워드...]  (대소문자 무시 / 제목·본문·첨부파일명에서 검색)
@@ -18,7 +20,8 @@ addresses = ["my.name@company.com"]
 "고객사-기아" = ["kia.com", "기아"]
 "금형업체" = ["@mold-vendor.co.kr", "OO정밀"]
 "검사구업체" = ["@cf-vendor.co.kr", "OO치공구"]
-"차종-XX1" = ["XX1", "XX1 PE"]
+# "차종-XX1" = ["XX1", "XX1 PE"]
+# 주의: 업체 태그에는 '금형', '검사구' 같은 일반 단어 대신 업체 메일 도메인·회사명만 넣으세요.
 
 [action]
 # 이 키워드가 제목/최신 본문에 있으면 ★조치필요 로 표시

@@ -103,3 +103,20 @@ def snippet(body: str, query: str, width: int = 70) -> str:
             s, e = max(0, i - width), min(len(body), i + len(t) + width)
             return ("…" if s else "") + body[s:e] + ("…" if e < len(body) else "")
     return body[: width * 2] + ("…" if len(body) > width * 2 else "")
+
+
+TODO_SQL = """
+SELECT m.* FROM mails m
+WHERE m.needs_action = 1 AND m.status NOT IN ('완료', '제외') AND m.sent_at >= ?
+  {replied}
+ORDER BY m.sent_at DESC LIMIT ?
+"""
+# 같은 건(스레드)에 내가 나중에 보낸 메일이 있으면 '회신함'으로 보고 제외
+NOT_REPLIED = """AND NOT EXISTS (SELECT 1 FROM mails r WHERE r.thread_key = m.thread_key AND r.thread_key != ''
+                    AND r.is_mine = 1 AND r.sent_at > m.sent_at)"""
+
+
+def todo(conn: sqlite3.Connection, since: str = "", limit: int = 50,
+         include_replied: bool = False) -> list[sqlite3.Row]:
+    sql = TODO_SQL.format(replied="" if include_replied else NOT_REPLIED)
+    return conn.execute(sql, (since or "", limit)).fetchall()

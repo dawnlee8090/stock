@@ -11,7 +11,7 @@ from datetime import datetime
 from . import db
 from .classify import Classifier
 from .config import load_config
-from .search import search, snippet
+from .search import search, snippet, todo
 
 LIST_COLS = ["id", "sent_at", "sender_name", "sender_email", "subject", "tags", "part_nos",
              "attachments", "needs_action", "status", "note", "folder"]
@@ -134,10 +134,13 @@ def cmd_open(args, cfg, conn):
 
 
 def cmd_todo(args, cfg, conn):
-    since = args.since or None
-    rows = search(conn, "", since=since, needs_action=True, limit=args.limit)
-    rows = [r for r in rows if r["status"] not in ("완료", "제외")]
+    from datetime import timedelta
+    since = "" if args.all else (args.since or (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d"))
+    rows = todo(conn, since, args.limit, include_replied=args.include_replied)
     _print_rows(rows, "", args.json)
+    if not args.json:
+        _out(f"기간: {since or '전체'} 이후 / 내가 이미 회신한 건{'도 포함' if args.include_replied else '은 제외'}"
+             "  (옵션: --days 60, --all, --include-replied)")
 
 
 def cmd_mark(args, cfg, conn):
@@ -156,11 +159,15 @@ def cmd_mark(args, cfg, conn):
 def cmd_retag(args, cfg, conn):
     clf = Classifier(cfg)
     n = 0
-    for r in conn.execute("SELECT id, subject, body, attachments, sender_name, sender_email, to_addr, cc_addr FROM mails").fetchall():
+    rows = conn.execute("SELECT id, subject, body, attachments, sender_name, sender_email, to_addr, cc_addr, "
+                        "folder FROM mails").fetchall()
+    for r in rows:
         c = clf.classify(dict(r))
-        conn.execute("UPDATE mails SET tags=?, part_nos=?, needs_action=? WHERE id=?",
-                     (c["tags"], c["part_nos"], c["needs_action"], r["id"]))
+        conn.execute("UPDATE mails SET tags=?, part_nos=?, needs_action=?, is_mine=?, thread_key=? WHERE id=?",
+                     (c["tags"], c["part_nos"], c["needs_action"], c["is_mine"], c["thread_key"], r["id"]))
         n += 1
+        if n % 5000 == 0:
+            _out(f"  ... {n:,}/{len(rows):,}")
     conn.commit()
     _out(f"{n}건 재분류 완료 (config.toml 의 태그/키워드 기준)")
 
@@ -184,8 +191,11 @@ def cmd_stats(args, cfg, conn):
     for n, e, c in conn.execute("SELECT sender_name, sender_email, COUNT(*) c FROM mails "
                                 "GROUP BY sender_email ORDER BY c DESC LIMIT 15"):
         _out(f"  {c:>6,}  {n} <{e}>")
-    todo = conn.execute("SELECT COUNT(*) FROM mails WHERE needs_action=1 AND status NOT IN ('완료','제외')").fetchone()[0]
-    _out(f"\n미처리 조치필요 메일: {todo:,}건  (python -m mailhub todo)")
+    from datetime import timedelta
+    since30 = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    n_all = len(todo(conn, "", 10**7))
+    n_30 = len(todo(conn, since30, 10**7))
+    _out(f"\n미회신 조치필요 메일: 최근 30일 {n_30:,}건 / 전체 {n_all:,}건  (python -m mailhub todo)")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -235,8 +245,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("id", type=int)
     s.set_defaults(func=cmd_open)
 
-    s = sp.add_parser("todo", help="검토/회신 필요 메일 목록 (미완료)")
-    s.add_argument("--since", help="YYYY-MM-DD")
+    s = sp.add_parser("todo", help="검토/회신 필요 메일 목록 (미완료·미회신)")
+    s.add_argument("--days", type=int, default=30, help="최근 며칠 (기본 30)")
+    s.add_argument("--since", help="YYYY-MM-DD (--days 대신)")
+    s.add_argument("--all", action="store_true", help="기간 제한 없이 전체")
+    s.add_argument("--include-replied", action="store_true", help="내가 이미 회신한 건도 표시")
     s.add_argument("--limit", type=int, default=50)
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_todo)

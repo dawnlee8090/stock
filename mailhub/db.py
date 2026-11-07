@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS mails (
     tags          TEXT DEFAULT '',           -- 자동 분류 태그 (쉼표 구분)
     part_nos      TEXT DEFAULT '',           -- 추출된 품번 (쉼표 구분)
     needs_action  INTEGER DEFAULT 0,         -- 1: 검토/회신 필요로 판단
+    is_mine       INTEGER DEFAULT 0,         -- 1: 내가 보낸 메일
+    thread_key    TEXT DEFAULT '',           -- RE:/FW: 뗀 제목 (같은 건 묶음)
     status        TEXT DEFAULT '',           -- 사용자가 관리: 진행중/완료/보류 ...
     note          TEXT DEFAULT '',
     ingested_at   TEXT DEFAULT ''
@@ -59,7 +61,7 @@ END;
 
 FIELDS = ["source", "folder", "subject", "sender_name", "sender_email", "to_addr", "cc_addr",
           "sent_at", "body", "attachments", "entry_id", "store_id", "file_path",
-          "tags", "part_nos", "needs_action"]
+          "tags", "part_nos", "needs_action", "is_mine", "thread_key"]
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
@@ -69,6 +71,13 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    # 이전 버전 DB 업그레이드 (새 열 추가 → 'retag' 로 값 채움)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(mails)")}
+    for col, ddl in (("is_mine", "INTEGER DEFAULT 0"), ("thread_key", "TEXT DEFAULT ''")):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE mails ADD COLUMN {col} {ddl}")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_mails_thread ON mails(thread_key, sent_at)")
+    conn.commit()
     return conn
 
 
@@ -108,7 +117,7 @@ def insert_mail(conn: sqlite3.Connection, key: str, rec: dict) -> int | None:
             conn.execute(f"UPDATE mails SET {sets} WHERE id=?", (*updates.values(), row["id"]))
         return None
     cols = ["msg_key", *FIELDS, "ingested_at"]
-    vals = [key, *[rec.get(f, 0 if f == "needs_action" else "") for f in FIELDS],
+    vals = [key, *[rec.get(f, 0 if f in ("needs_action", "is_mine") else "") for f in FIELDS],
             datetime.now().isoformat(timespec="seconds")]
     cur = conn.execute(
         f"INSERT INTO mails ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})", vals)
