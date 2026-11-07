@@ -30,6 +30,12 @@ DEFAULT_CONFIG: dict = {
     "action": {
         "keywords": ["요청", "검토 부탁", "검토부탁", "검토 바랍", "검토바랍", "회신", "확인 부탁", "확인부탁",
                      "확인 바랍", "확인바랍", "긴급", "ASAP", "URGENT", "협조 부탁", "의견 부탁", "제출 바랍"],
+        # 아래에 해당하면 조치필요에서 제외 (시스템 알림, 전사 공지, 단체 메일)
+        "ignore_senders": ["postmaster", "noreply", "no-reply", "donotreply", "mailer-daemon", "rpabot",
+                           "notification", "system"],
+        "ignore_subjects": ["[전사", "[공지", "공지]", "[안내]", "quota warning", "게시글이 등록", "게시글 등록",
+                            "자동 발송", "자동발송", "undeliverable", "배달되지 않음", "부재중", "out of office"],
+        "max_to": 10,   # 받는사람(To)이 이보다 많으면 단체 메일로 보고 제외
     },
     # 품번 추출 정규식 (기본: 현대/기아 형식 예) 84710-AA000)
     "part_number": {"patterns": [r"\b\d{5}-[A-Z0-9]{5}\b"]},

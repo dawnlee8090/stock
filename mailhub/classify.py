@@ -48,7 +48,11 @@ def _matcher(keywords):
 class Classifier:
     def __init__(self, cfg: dict):
         self.tags = {name: _matcher(kws) for name, kws in cfg.get("tags", {}).items()}
-        self.action = _matcher(cfg.get("action", {}).get("keywords", []))
+        act = cfg.get("action", {})
+        self.action = _matcher(act.get("keywords", []))
+        self.ignore_senders = [x.lower() for x in act.get("ignore_senders", [])]
+        self.ignore_subjects = [x.lower() for x in act.get("ignore_subjects", [])]
+        self.max_to = int(act.get("max_to", 0) or 0)
         self.part_res = [re.compile(p) for p in cfg.get("part_number", {}).get("patterns", [])]
         me = cfg.get("me", {})
         self.my_addrs = {a.lower() for a in me.get("addresses", []) if a and "company.com" not in a}
@@ -60,6 +64,17 @@ class Classifier:
             return True
         t = (to_addr or "").lower()
         return any(a in t for a in self.my_addrs) or any(n.lower() in t for n in self.my_names)
+
+    def _is_bulk(self, rec: dict) -> bool:
+        """시스템 알림 · 전사 공지 · 단체 메일 여부."""
+        who = f"{rec.get('sender_email') or ''} {rec.get('sender_name') or ''}".lower()
+        if any(x in who for x in self.ignore_senders):
+            return True
+        subj = (rec.get("subject") or "").lower()
+        if any(x in subj for x in self.ignore_subjects):
+            return True
+        to = [t for t in re.split(r"[;,]", rec.get("to_addr") or "") if t.strip()]
+        return bool(self.max_to and len(to) > self.max_to)
 
     def classify(self, rec: dict) -> dict:
         subject = rec.get("subject", "") or ""
@@ -84,10 +99,12 @@ class Classifier:
         folder = (rec.get("folder") or "").lower()
         is_mine = int(sender in self.my_addrs or any(f in folder for f in SENT_FOLDERS))
 
-        # 조치 필요: 내가 보낸 메일 X, 내가 받는사람(To)에 있음 (참조만이면 X), 제목/최신 본문에 요청 키워드
+        # 조치 필요: 내가 보낸 메일 X, 내가 받는사람(To)에 있음 (참조만이면 X), 공지·알림·단체메일 X,
+        #            제목/최신 본문에 요청 키워드
         tkey = thread_key(subject)  # '회신:' 같은 말머리는 빼고 판단
         latest_l = f"{tkey}\n{latest[:1500]}".lower()
-        needs = int(not is_mine and self._addressed_to_me(rec.get("to_addr", "")) and self.action(latest_l))
+        needs = int(not is_mine and self._addressed_to_me(rec.get("to_addr", ""))
+                    and not self._is_bulk(rec) and self.action(latest_l))
 
         return {"tags": ",".join(tags), "part_nos": ",".join(part_nos[:30]), "needs_action": needs,
                 "is_mine": is_mine, "thread_key": tkey}

@@ -105,6 +105,11 @@ class ClassifierRulesTest(unittest.TestCase):
         self.assertEqual((mine["is_mine"], mine["needs_action"]), (1, 0))
         self.assertEqual(mine["thread_key"], "금형 수정 검토 요청")
         self.assertEqual(self.c.classify({"subject": "회신: 공유드립니다", "body": "", "to_addr": "이성욱"})["needs_action"], 0)
+        # 시스템 알림 / 전사 공지 / 단체 메일
+        self.assertEqual(self.c.classify({**base, "to_addr": "이성욱", "sender_email": "postmaster@corp.com"})["needs_action"], 0)
+        self.assertEqual(self.c.classify({**base, "subject": "[전사 보안공지] 확인 요청", "to_addr": "이성욱"})["needs_action"], 0)
+        many = "; ".join(["이성욱"] + [f"사원{i}" for i in range(15)])
+        self.assertEqual(self.c.classify({**base, "to_addr": many})["needs_action"], 0)
 
 
 class ReplyTrackingTest(unittest.TestCase):
