@@ -132,3 +132,27 @@ class ReplyTrackingTest(unittest.TestCase):
             self.assertEqual([r["subject"] for r in todo(conn, "2026-01-01")], ["B건 검토 요청"])
             self.assertEqual(len(todo(conn, "2026-01-01", include_replied=True)), 2)
             conn.close()
+
+
+class ZipImportTest(unittest.TestCase):
+    def test_zip(self):
+        import zipfile
+        from tests_helpers import raw_mail
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            zp = d / "읽은메일.zip"
+            with zipfile.ZipFile(zp, "w") as z:
+                z.writestr("메일/A건 검토.eml", raw_mail("A건 검토 요청", "c@oem.com", "me@corp.com",
+                                                     "Mon, 02 Nov 2026 09:00:00 +0900", "<za@x>"))
+                z.writestr("../evil.eml", raw_mail("B", "c@oem.com", "me@corp.com",
+                                                   "Mon, 02 Nov 2026 09:00:00 +0900", "<zb@x>"))
+                z.writestr("readme.txt", "x")
+            cfg = load_config(d / "none.toml")
+            cfg["archive"]["eml_dir"] = str(d / "eml")
+            conn = db.connect(d / "t.db")
+            st = ingest_folder(conn, cfg, zp, log=lambda *_: None)
+            self.assertEqual(st["added"], 2)
+            self.assertFalse((d / "evil.eml").exists())
+            fp = conn.execute("SELECT file_path FROM mails WHERE subject LIKE 'A건%'").fetchone()[0]
+            self.assertTrue(Path(fp).exists())
+            conn.close()

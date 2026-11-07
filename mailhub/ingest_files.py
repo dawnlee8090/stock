@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import db
 from .classify import Classifier
-from .textutil import INLINE_IMAGE, clean_body, html_to_text, iso
+from .textutil import INLINE_IMAGE, clean_body, html_to_text, iso, safe_filename
 
 
 def parse_eml_bytes(data: bytes) -> tuple[str, dict]:
@@ -88,9 +88,37 @@ def parse_msg(path: Path) -> tuple[str, dict]:
         m.close()
 
 
+def extract_zip(zip_path: Path, out_root: Path, log=print) -> Path:
+    """그룹웨어에서 내려받은 메일 zip 의 .eml/.msg 를 원본 보관 폴더로 풀어놓는다."""
+    import zipfile
+    dest = out_root / "imported" / safe_filename(zip_path.stem)
+    dest.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zip_path) as z:
+        for info in z.infolist():
+            name = info.filename
+            if not info.flag_bits & 0x800:  # UTF-8 표시가 없으면 한글 윈도우(cp949) 파일명
+                try:
+                    name = name.encode("cp437").decode("cp949")
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    pass
+            base = safe_filename(Path(name.replace("\\", "/")).name, 150)  # 폴더 경로는 버리고 파일명만
+            if Path(base).suffix.lower() not in (".eml", ".msg") or info.is_dir():
+                continue
+            target = dest / base
+            n = 1
+            while target.exists():
+                target = dest / f"{Path(base).stem}_{n}{Path(base).suffix}"
+                n += 1
+            target.write_bytes(z.read(info))
+    log(f"  zip 풀기: {zip_path.name} → {dest}")
+    return dest
+
+
 def ingest_folder(conn, cfg: dict, root: str | Path, log=print) -> dict:
     clf = Classifier(cfg)
     root = Path(root)
+    if root.is_file() and root.suffix.lower() == ".zip":
+        root = extract_zip(root, Path(cfg["archive"].get("eml_dir", "data/eml")), log)
     files = [p for p in ([root] if root.is_file() else sorted(root.rglob("*")))
              if p.suffix.lower() in (".eml", ".msg")]
     stats = {"files": len(files), "added": 0, "skipped": 0, "errors": 0}

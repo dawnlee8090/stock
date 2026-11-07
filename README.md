@@ -50,6 +50,9 @@ python -m mailhub ingest-outlook --pst "D:\메일백업\2023.pst" "D:\메일백�
 
 # 폴더에 저장해 둔 .msg / .eml 파일
 python -m mailhub ingest-files "D:\프로젝트\XX1\메일"
+
+# 그룹웨어에서 내려받은 메일 zip 도 그대로 (원본은 data/eml/imported 에 보관)
+python -m mailhub ingest-files "D:\메일백업\읽은메일.zip"
 ```
 
 - 같은 메일이 서버와 PST 에 둘 다 있어도 **한 번만** 저장됩니다 (Message-ID 기준).
