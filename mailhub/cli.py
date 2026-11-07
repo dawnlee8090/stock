@@ -87,7 +87,7 @@ def cmd_ingest_pop(args, cfg, conn):
     from .ingest_pop import ingest_pop
     st = ingest_pop(conn, cfg, since=args.since, max_new=args.max, save_eml=args.save_eml,
                     interactive=not args.no_prompt, log=_out)
-    _out(f"\n완료: 서버 {st['total']:,} / 확인 {st['checked']:,} / 본문 받음 {st['fetched']:,} / 신규 {st['added']:,}"
+    _out(f"\n{'중단' if st.get('interrupted') else '완료'}: 서버 {st['total']:,} / 확인 {st['checked']:,} / 본문 받음 {st['fetched']:,} / 신규 {st['added']:,}"
          f" / 이미 있음 {st['skipped']:,} / 기간 밖 {st['old']:,} / 오류 {st['errors']}")
 
 

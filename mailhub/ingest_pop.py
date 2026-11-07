@@ -115,50 +115,64 @@ def ingest_pop(conn_db: sqlite3.Connection, cfg: dict, since: str | None = None,
         new.sort(reverse=True)  # 최신 메일부터
         log(f"받은편지함 {len(pairs):,}건 중 처음 보는 메일 {len(new):,}건")
 
-        for n, uid in new:
-            if max_new and stats["fetched"] >= max_new:
-                break
-            stats["checked"] += 1
-            try:
-                h = _header(pop, n)
-                if since_dt and h.get("Date"):
-                    try:
-                        d = parsedate_to_datetime(h["Date"])
-                        if datetime.fromisoformat(iso(d)) < since_dt:
-                            stats["old"] += 1
-                            conn_db.execute("INSERT OR IGNORE INTO pop_seen VALUES (?,?)", (account, uid))
-                            continue
-                    except (TypeError, ValueError):
-                        pass
-                mid = db.normalize_message_id(str(h.get("Message-ID", "")))
-                if mid and db.exists(conn_db, "mid:" + mid):  # 이미 PST 등으로 받은 메일 → 본문 생략
-                    stats["skipped"] += 1
+        import time
+        last_log = time.monotonic()
+
+        def one(n: int, uid: str) -> None:
+            h = _header(pop, n)
+            if since_dt and h.get("Date"):
+                try:
+                    d = parsedate_to_datetime(str(h["Date"]))
+                    if datetime.fromisoformat(iso(d)) < since_dt:
+                        stats["old"] += 1
+                        return
+                except (TypeError, ValueError):
+                    pass
+            mid = db.normalize_message_id(str(h.get("Message-ID", "")))
+            if mid and db.exists(conn_db, "mid:" + mid):  # 이미 PST 등으로 받은 메일 → 본문 생략
+                stats["skipped"] += 1
+                return
+            raw = _full(pop, n)
+            stats["fetched"] += 1
+            stats["bytes"] = stats.get("bytes", 0) + len(raw)
+            mid, rec = parse_eml_bytes(raw)
+            rec.update({"source": "pop3", "folder": "POP3/받은편지함"})
+            rec.update(clf.classify(rec))
+            key = db.make_key(mid, rec["sender_email"], rec["sent_at"], rec["subject"], rec["body"])
+            new_id = db.insert_mail(conn_db, key, rec)
+            if new_id is None:
+                stats["skipped"] += 1
+                return
+            stats["added"] += 1
+            if save_eml:
+                ym = (rec["sent_at"][:7] or "unknown").replace("-", "/")
+                p = eml_dir / ym / f"{new_id}_{safe_filename(rec['subject'])}.eml"
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(raw)
+                conn_db.execute("UPDATE mails SET file_path=? WHERE id=?", (str(p.resolve()), new_id))
+
+        try:
+            for n, uid in new:
+                if max_new and stats["fetched"] >= max_new:
+                    break
+                stats["checked"] += 1
+                try:
+                    one(n, uid)
                     conn_db.execute("INSERT OR IGNORE INTO pop_seen VALUES (?,?)", (account, uid))
-                    continue
-                raw = _full(pop, n)
-                stats["fetched"] += 1
-                mid, rec = parse_eml_bytes(raw)
-                rec.update({"source": "pop3", "folder": "POP3/받은편지함"})
-                rec.update(clf.classify(rec))
-                key = db.make_key(mid, rec["sender_email"], rec["sent_at"], rec["subject"], rec["body"])
-                new_id = db.insert_mail(conn_db, key, rec)
-                if new_id is None:
-                    stats["skipped"] += 1
-                else:
-                    stats["added"] += 1
-                    if save_eml:
-                        ym = (rec["sent_at"][:7] or "unknown").replace("-", "/")
-                        p = eml_dir / ym / f"{new_id}_{safe_filename(rec['subject'])}.eml"
-                        p.parent.mkdir(parents=True, exist_ok=True)
-                        p.write_bytes(raw)
-                        conn_db.execute("UPDATE mails SET file_path=? WHERE id=?", (str(p.resolve()), new_id))
-                conn_db.execute("INSERT OR IGNORE INTO pop_seen VALUES (?,?)", (account, uid))
-            except Exception as e:
-                stats["errors"] += 1
-                log(f"  [오류] {n}번 메일: {e}")
-            if stats["checked"] % 100 == 0:
-                conn_db.commit()
-                log(f"    ... {stats['checked']:,}/{len(new):,} 확인 (추가 {stats['added']:,})")
+                except Exception as e:
+                    stats["errors"] += 1
+                    log(f"  [오류] {n}번 메일: {e}")
+                # 20건마다 저장, 10초마다 진행 상황 표시
+                if stats["checked"] % 20 == 0:
+                    conn_db.commit()
+                if time.monotonic() - last_log >= 10:
+                    last_log = time.monotonic()
+                    log(f"    ... {stats['checked']:,}/{len(new):,} 확인 (신규 {stats['added']:,}, 이미 있음 "
+                        f"{stats['skipped']:,}, 기간 밖 {stats['old']:,}, 받은 용량 {stats.get('bytes', 0) / 1048576:,.0f}MB)")
+        except KeyboardInterrupt:
+            conn_db.commit()
+            log(f"\n[중단] {stats['checked']:,}건까지 저장했습니다. 같은 명령을 다시 실행하면 이어서 진행합니다.")
+            stats["interrupted"] = True
     finally:
         try:
             pop.quit()  # DELE 를 보내지 않았으므로 서버 메일은 그대로
