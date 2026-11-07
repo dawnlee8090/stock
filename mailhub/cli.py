@@ -78,6 +78,19 @@ def cmd_ingest_imap(args, cfg, conn):
          "\n(그룹웨어의 읽음/안읽음 상태는 바뀌지 않았습니다)")
 
 
+def cmd_pop_test(args, cfg, conn):
+    from .ingest_pop import pop_test
+    pop_test(cfg, "full" if args.full else "header", log=_out)
+
+
+def cmd_ingest_pop(args, cfg, conn):
+    from .ingest_pop import ingest_pop
+    st = ingest_pop(conn, cfg, since=args.since, max_new=args.max, save_eml=args.save_eml,
+                    interactive=not args.no_prompt, log=_out)
+    _out(f"\n완료: 서버 {st['total']:,} / 확인 {st['checked']:,} / 본문 받음 {st['fetched']:,} / 신규 {st['added']:,}"
+         f" / 이미 있음 {st['skipped']:,} / 기간 밖 {st['old']:,} / 오류 {st['errors']}")
+
+
 def cmd_ingest_files(args, cfg, conn):
     from .ingest_files import ingest_folder
     for p in args.paths:
@@ -236,6 +249,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--full", action="store_true", help="저장된 진행 위치 무시하고 다시 확인")
     s.add_argument("--no-prompt", action="store_true", help="비밀번호를 묻지 않음 (자동 실행용)")
     s.set_defaults(func=cmd_ingest_imap)
+
+    s = sp.add_parser("pop-test", help="POP3 미리보기로 최근 메일 1건 시험 (읽음 처리 여부 확인용)")
+    s.add_argument("--full", action="store_true", help="2단계: 본문 전체를 미리보기로 받아 시험")
+    s.set_defaults(func=cmd_pop_test)
+
+    s = sp.add_parser("ingest-pop", help="그룹웨어 메일 서버에서 POP3 미리보기로 수집 (IMAP 불가 시)")
+    s.add_argument("--since", help="이 날짜 이후 메일만 YYYY-MM-DD")
+    s.add_argument("--max", type=int, default=0, help="이번에 본문을 받을 최대 건수 (시험용)")
+    s.add_argument("--save-eml", action="store_true", help="원본을 data/eml 에 .eml 로 보관")
+    s.add_argument("--no-prompt", action="store_true", help="비밀번호를 묻지 않음 (자동 실행용)")
+    s.set_defaults(func=cmd_ingest_pop)
 
     s = sp.add_parser("ingest-files", help=".eml/.msg 파일 폴더 가져오기")
     s.add_argument("paths", nargs="+")
