@@ -1,0 +1,2 @@
+pywin32; sys_platform == "win32"   # 아웃룩 연동
+extract-msg                         # .msg 파일 읽기

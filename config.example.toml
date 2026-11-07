@@ -1,0 +1,30 @@
+# config.example.toml 을 config.toml 로 복사한 뒤 수정하세요.
+# 수정 후에는 `python -m mailhub retag` 로 기존 메일도 다시 분류됩니다.
+
+[archive]
+db_path = "data/mailhub.db"        # 검색 DB (메일 10만 건 ≈ 1~2GB)
+msg_dir = "data/msg"               # --save-msg 원본 보관 위치
+attach_dir = "data/attachments"    # --save-attachments 첨부 보관 위치
+
+[me]
+# 내 메일 주소 (보낸 메일은 '조치 필요'에서 제외)
+addresses = ["my.name@company.com"]
+
+[tags]
+# 태그명 = [키워드...]  (대소문자 무시 / 제목·본문·첨부파일명에서 검색)
+# 기본 태그(E.O, T/O, 금형수정, 검사구, 품질문제, 금형이관, 일정, 설계반영)는 그대로 있고,
+# 아래처럼 같은 이름을 쓰면 교체, 새 이름을 쓰면 추가됩니다.
+"고객사-현대" = ["hyundai.com", "현대자동차"]
+"고객사-기아" = ["kia.com", "기아"]
+"금형업체" = ["@mold-vendor.co.kr", "OO정밀"]
+"검사구업체" = ["@cf-vendor.co.kr", "OO치공구"]
+"차종-XX1" = ["XX1", "XX1 PE"]
+
+[action]
+# 이 키워드가 제목/최신 본문에 있으면 ★조치필요 로 표시
+keywords = ["요청", "검토 부탁", "검토부탁", "검토 바랍", "검토바랍", "회신", "확인 부탁", "확인부탁",
+            "확인 바랍", "확인바랍", "긴급", "ASAP", "URGENT", "협조 부탁", "의견 부탁", "제출 바랍"]
+
+[part_number]
+# 품번 정규식 (회사 품번 체계에 맞게 추가)
+patterns = ['\b\d{5}-[A-Z0-9]{5}\b']
