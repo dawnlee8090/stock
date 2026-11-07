@@ -74,10 +74,12 @@ python -m mailhub stats                                  # 보관 현황
 
 ## 4. 할 일(조치필요) 관리
 
-제목/최신 본문에 "검토 부탁, 회신, 요청, 긴급…" 등이 있으면 ★조치필요로 표시됩니다.
+내가 **받는사람(To)** 에 있고, 제목/최신 본문에 "검토 부탁, 요청, 긴급…" 등이 있으면 ★조치필요로 표시됩니다.
+참조(CC)로만 받은 메일, 같은 건에 **내가 이미 회신한 메일**은 할 일 목록에서 자동으로 빠집니다 (`config.toml` 의 `[me]` 에 주소·이름 입력 필요).
 
 ```powershell
-python -m mailhub todo                                   # 미완료 조치필요 메일
+python -m mailhub todo                                   # 최근 30일 미회신 조치필요 메일
+python -m mailhub todo --days 90 --include-replied       # 기간 늘리기, 회신한 건도 보기
 python -m mailhub mark 1234 --status 업체검토중 --note "금형업체 11/15 회신 예정"
 python -m mailhub mark 1234 1240 --status 완료
 python -m mailhub mark 1300 --action 0                   # 조치 불필요로 변경
