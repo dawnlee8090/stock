@@ -61,6 +61,8 @@ def cmd_ingest_outlook(args, cfg, conn):
                         save_msg=args.save_msg, save_attachments=args.save_attachments,
                         folder_filter=args.folder, log=_out)
     _out(f"\n완료: 폴더 {st['folders']} / 확인 {st['seen']} / 신규 {st['added']} / 중복 {st['skipped']} / 오류 {st['errors']}")
+    if st.get("save_failed"):
+        _out(f"원본 사본 저장 실패 {st['save_failed']}건 (메일 내용·검색은 정상, 원본은 아웃룩/PST 에서 'open' 으로 열 수 있음)")
 
 
 def cmd_ingest_files(args, cfg, conn):

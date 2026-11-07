@@ -17,7 +17,8 @@ from .classify import Classifier
 from .textutil import INLINE_IMAGE, clean_body, safe_filename
 
 OL_MAIL = 43            # olMail
-OL_MSG_UNICODE = 9      # olMSGUnicode
+# 원본 보관 형식: 회사 보안(DRM) 정책이나 아웃룩 버전에 따라 일부 형식이 막혀 있을 수 있어 차례로 시도
+SAVE_FORMATS = [(9, ".msg"), (3, ".msg"), (10, ".mht"), (5, ".html")]  # olMSGUnicode, olMSG, olMHTML, olHTML
 PR_MESSAGE_ID = "http://schemas.microsoft.com/mapi/proptag/0x1035001F"
 PR_SMTP = "http://schemas.microsoft.com/mapi/proptag/0x39FE001F"
 SKIP_FOLDERS = {"삭제된 항목", "deleted items", "정크 메일", "junk email", "junk e-mail",
@@ -34,6 +35,8 @@ def _get(obj, attr, default=""):
 
 def _dt(v) -> str:
     try:
+        if getattr(v, "tzinfo", None) is not None:  # pywin32 는 UTC 로 돌려줌 → PC 현지 시각으로 변환
+            v = v.astimezone()
         return datetime(v.year, v.month, v.day, v.hour, v.minute, v.second).isoformat()
     except Exception:
         return ""
@@ -88,7 +91,31 @@ def ingest_outlook(conn, cfg: dict, store_filter: str | None = None, pst_paths=(
         log(f"PST 연결: {p}")
         ns.AddStore(os.path.abspath(p))
 
-    stats = {"folders": 0, "seen": 0, "added": 0, "skipped": 0, "errors": 0}
+    stats = {"folders": 0, "seen": 0, "added": 0, "skipped": 0, "errors": 0, "save_failed": 0}
+    save_state = {"formats": list(SAVE_FORMATS), "fail_streak": 0, "enabled": save_msg}
+
+    def save_copy(item, base: Path) -> str:
+        """원본 사본 저장. 성공한 형식을 기억해 다음부터 그 형식을 먼저 쓴다."""
+        last_err = None
+        for fmt, ext in save_state["formats"]:
+            path = base.with_suffix(ext)
+            try:
+                item.SaveAs(str(path.resolve()), fmt)
+                save_state["formats"].remove((fmt, ext))
+                save_state["formats"].insert(0, (fmt, ext))
+                save_state["fail_streak"] = 0
+                return str(path.resolve())
+            except Exception as e:
+                last_err = e
+        stats["save_failed"] += 1
+        save_state["fail_streak"] += 1
+        if save_state["fail_streak"] == 1:
+            log(f"  [원본 저장 실패] 메일 내용은 정상 저장됨. 사유: {last_err}")
+        if save_state["fail_streak"] >= 20:
+            save_state["enabled"] = False
+            log("  [안내] 원본 저장이 20건 연속 실패해서 원본 보관을 끕니다 (회사 보안 정책으로 막힌 것으로 보임)."
+                " 메일 내용 수집과 검색은 계속 됩니다.")
+        return ""
 
     def handle(item, folder_path: str, store_id: str):
         if _get(item, "Class", 0) != OL_MAIL:
@@ -126,14 +153,12 @@ def ingest_outlook(conn, cfg: dict, store_filter: str | None = None, pst_paths=(
             return
         stats["added"] += 1
         ym = (sent_at[:7] or "unknown").replace("-", "/")
-        if save_msg:
-            path = msg_dir / ym / f"{new_id}_{safe_filename(subject)}.msg"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                item.SaveAs(str(path.resolve()), OL_MSG_UNICODE)
-                conn.execute("UPDATE mails SET file_path=? WHERE id=?", (str(path.resolve()), new_id))
-            except Exception as e:
-                log(f"  [msg 저장 실패] {subject}: {e}")
+        if save_state["enabled"]:
+            base = msg_dir / ym / f"{new_id}_{safe_filename(subject)}"
+            base.parent.mkdir(parents=True, exist_ok=True)
+            saved = save_copy(item, base)
+            if saved:
+                conn.execute("UPDATE mails SET file_path=? WHERE id=?", (saved, new_id))
         if save_attachments and att_names:
             d = att_dir / ym / str(new_id)
             d.mkdir(parents=True, exist_ok=True)
