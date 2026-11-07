@@ -12,6 +12,7 @@ import getpass
 import poplib
 import sqlite3
 from datetime import datetime
+from email import policy
 from email.parser import BytesHeaderParser
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -60,7 +61,7 @@ def connect(pcfg: dict, password: str) -> poplib.POP3:
 
 def _header(conn: poplib.POP3, n: int):
     resp, lines, _ = conn.top(n, 0)
-    return BytesHeaderParser().parsebytes(b"\r\n".join(lines))
+    return BytesHeaderParser(policy=policy.default).parsebytes(b"\r\n".join(lines))
 
 
 def _full(conn: poplib.POP3, n: int) -> bytes:
