@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-SENT_FOLDERS = ("보낸 편지함", "sent items", "sent mail", "보낸편지함")
+SENT_FOLDERS = ("보낸 편지함", "sent items", "sent mail", "보낸편지함", "[보낸메일]")
 QUOTE_MARKERS = [r"\n-+\s*Original Message\s*-+", r"\n-+\s*원본 메시지\s*-+",
                  r"\nFrom:\s.+\n(Sent|Date):", r"\n보낸 사람:\s", r"\n보낸사람:\s", r"\n발신:\s",
                  r"\n-+\s*Forwarded message\s*-+", r"\nOn .{5,80} wrote:"]

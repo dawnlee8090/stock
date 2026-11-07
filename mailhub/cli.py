@@ -65,6 +65,19 @@ def cmd_ingest_outlook(args, cfg, conn):
         _out(f"원본 사본 저장 실패 {st['save_failed']}건 (메일 내용·검색은 정상, 원본은 아웃룩/PST 에서 'open' 으로 열 수 있음)")
 
 
+def cmd_imap_setup(args, cfg, conn):
+    from .ingest_imap import setup
+    setup(cfg, log=_out)
+
+
+def cmd_ingest_imap(args, cfg, conn):
+    from .ingest_imap import ingest_imap
+    st = ingest_imap(conn, cfg, since=args.since, folder_filter=args.folder, save_eml=args.save_eml,
+                     full=args.full, interactive=not args.no_prompt, log=_out)
+    _out(f"\n완료: 폴더 {st['folders']} / 받음 {st['fetched']} / 신규 {st['added']} / 중복 {st['skipped']} / 오류 {st['errors']}"
+         "\n(그룹웨어의 읽음/안읽음 상태는 바뀌지 않았습니다)")
+
+
 def cmd_ingest_files(args, cfg, conn):
     from .ingest_files import ingest_folder
     for p in args.paths:
@@ -212,6 +225,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--save-msg", action="store_true", help="원본을 .msg 로 따로 보관 (서버 삭제 대비)")
     s.add_argument("--save-attachments", action="store_true", help="첨부파일을 data/attachments 에 저장")
     s.set_defaults(func=cmd_ingest_outlook)
+
+    s = sp.add_parser("imap-setup", help="그룹웨어 메일 서버(IMAP) 접속 확인 + 비밀번호 저장")
+    s.set_defaults(func=cmd_imap_setup)
+
+    s = sp.add_parser("ingest-imap", help="그룹웨어 메일 서버에서 직접 수집 (읽음 표시 안 바뀜)")
+    s.add_argument("--since", help="처음 수집 시작일 YYYY-MM-DD (이후 실행은 새 메일만 자동)")
+    s.add_argument("--folder", help="이 이름이 포함된 폴더만")
+    s.add_argument("--save-eml", action="store_true", help="원본을 data/eml 에 .eml 로 보관")
+    s.add_argument("--full", action="store_true", help="저장된 진행 위치 무시하고 다시 확인")
+    s.add_argument("--no-prompt", action="store_true", help="비밀번호를 묻지 않음 (자동 실행용)")
+    s.set_defaults(func=cmd_ingest_imap)
 
     s = sp.add_parser("ingest-files", help=".eml/.msg 파일 폴더 가져오기")
     s.add_argument("paths", nargs="+")

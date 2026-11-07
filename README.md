@@ -57,6 +57,25 @@ python -m mailhub ingest-files "D:\프로젝트\XX1\메일"
 - `--save-attachments` : 첨부파일도 `data/attachments/` 에 저장.
 - 삭제된 항목 · 정크 메일 폴더는 건너뜁니다.
 
+## 2-1. 그룹웨어 메일 서버에서 직접 가져오기 (권장, 매일 자동화용)
+
+그룹웨어 웹메일을 쓰는 경우, 아웃룩 백업 없이 메일 서버(IMAP)에서 바로 가져옵니다.
+**폴더를 읽기 전용으로 열고 미리보기 방식으로 가져오기 때문에 그룹웨어의 '안 읽음' 표시가 바뀌지 않습니다.**
+
+1. 그룹웨어 **환경설정 → 메일 → POP3/IMAP 설정**에서 IMAP 사용을 켜고 서버 주소·포트를 확인
+2. `config.toml` 의 `[imap]` 에 `host`, `user` 입력 (비밀번호는 적지 않음)
+3. 접속 확인 + 비밀번호 저장 (Windows 자격 증명 관리자에 저장됨):
+   ```powershell
+   python -m mailhub imap-setup
+   ```
+4. 첫 수집 (PST 로 이미 가져온 기간은 Message-ID 로 자동 중복 제거):
+   ```powershell
+   python -m mailhub ingest-imap --since 2026-10-01 --save-eml
+   ```
+5. 이후에는 옵션 없이 실행하면 **새 메일만** 가져옵니다: `python -m mailhub ingest-imap --save-eml`
+
+받은 메일과 **보낸 메일**이 함께 들어오므로 "이미 회신한 건"이 할 일 목록에서 자동으로 빠집니다.
+
 ## 3. 검색
 
 ```powershell
@@ -102,8 +121,8 @@ python -m mailhub search --todo --tag E.O                # E.O 관련 미결
 
 ## 6. 매일 자동 수집
 
-`scripts/daily_sync.bat` 을 Windows **작업 스케줄러**에 등록 (예: 매일 08:00, 아웃룩 실행 중).
-최근 7일 메일을 다시 확인해 새 메일만 추가하고 `data/sync.log` 에 할 일 목록을 남깁니다.
+`scripts/daily_sync.bat` 을 Windows **작업 스케줄러**에 등록 (예: 매일 08:00 / 12:00 / 17:00).
+그룹웨어 메일 서버에서 새 메일만 가져오고 `data/sync.log` 에 할 일 목록을 남깁니다 (먼저 `imap-setup` 필요).
 
 ## 7. 분류 기준 수정
 

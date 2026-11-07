@@ -11,7 +11,10 @@ DEFAULT_CONFIG: dict = {
         "db_path": "data/mailhub.db",
         "msg_dir": "data/msg",
         "attach_dir": "data/attachments",
+        "eml_dir": "data/eml",
     },
+    # 그룹웨어 메일 서버 (IMAP). 비밀번호는 여기 적지 않음 → imap-setup 으로 저장
+    "imap": {"host": "", "port": 993, "ssl": True, "user": "", "folders": []},
     # 내 메일 주소 (보낸 메일은 '조치 필요' 판정에서 제외)
     "me": {"addresses": [], "names": []},
     # 태그명 = 키워드 목록 (대소문자 무시, 제목/본문/첨부파일명 대상)

@@ -6,6 +6,15 @@ db_path = "data/mailhub.db"        # 검색 DB (메일 10만 건 ≈ 1~2GB)
 msg_dir = "data/msg"               # --save-msg 원본 보관 위치
 attach_dir = "data/attachments"    # --save-attachments 첨부 보관 위치
 
+[imap]
+# 그룹웨어 메일 서버 정보 (그룹웨어 환경설정 > 메일 > POP3/IMAP 설정 화면 참고)
+# 비밀번호는 여기 적지 마세요. `python -m mailhub imap-setup` 실행 시 안전하게 저장됩니다.
+host = "imap.company.com"
+port = 993
+ssl = true
+user = "my.id"            # 아이디 또는 메일 주소 (그룹웨어 안내대로)
+# folders = ["INBOX", "Sent"]   # 일부 폴더만 수집할 때 (기본: 휴지통·스팸·임시보관 제외 전체)
+
 [me]
 # 내 메일 주소와 이름 (아웃룩 받는사람 칸은 이름으로 표시되므로 둘 다 입력)
 # → 내가 보낸 메일 구분, 참조(CC)로만 받은 메일·이미 회신한 건은 '조치필요'에서 제외

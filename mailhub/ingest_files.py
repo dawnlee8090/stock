@@ -11,35 +11,55 @@ from .classify import Classifier
 from .textutil import INLINE_IMAGE, clean_body, html_to_text, iso
 
 
-def parse_eml(path: Path) -> tuple[str, dict]:
-    with open(path, "rb") as f:
-        msg = email.message_from_binary_file(f, policy=policy.default)
-    name, addr = parseaddr(str(msg.get("From", "")))
+def parse_eml_bytes(data: bytes) -> tuple[str, dict]:
+    """메일 원문(RFC822 바이트) → (Message-ID, 레코드). .eml 파일과 IMAP 수집에서 공통 사용."""
+    msg = email.message_from_bytes(data, policy=policy.default)
+
+    def header(h: str) -> str:
+        try:
+            return str(msg.get(h, "") or "")
+        except Exception:  # 깨진 헤더
+            return ""
+
+    name, addr = parseaddr(header("From"))
     try:
-        sent = iso(parsedate_to_datetime(str(msg.get("Date")))) if msg.get("Date") else ""
-    except (TypeError, ValueError):
+        sent = iso(parsedate_to_datetime(header("Date"))) if header("Date") else ""
+    except (TypeError, ValueError, IndexError):
         sent = ""
     body = ""
-    part = msg.get_body(preferencelist=("plain", "html"))
-    if part is not None:
-        try:
-            content = part.get_content()
-        except (LookupError, UnicodeDecodeError):
-            content = part.get_payload(decode=True).decode("utf-8", "replace")
-        body = html_to_text(content) if part.get_content_type() == "text/html" else content
-    attachments = [a.get_filename() or "" for a in msg.iter_attachments()]
+    try:
+        part = msg.get_body(preferencelist=("plain", "html"))
+        if part is not None:
+            try:
+                content = part.get_content()
+            except (LookupError, UnicodeDecodeError, AssertionError):
+                content = (part.get_payload(decode=True) or b"").decode("utf-8", "replace")
+            body = html_to_text(content) if part.get_content_type() == "text/html" else content
+    except Exception:
+        body = ""
+    try:
+        attachments = [a.get_filename() or "" for a in msg.iter_attachments()]
+    except Exception:
+        attachments = []
 
     def addrs(h: str) -> str:
-        return "; ".join(f"{n} <{a}>" if n else a for n, a in getaddresses(msg.get_all(h, [])))
+        try:
+            return "; ".join(f"{n} <{a}>" if n else a for n, a in getaddresses([str(v) for v in msg.get_all(h, [])]))
+        except Exception:
+            return ""
 
     rec = {
-        "source": "eml", "folder": str(path.parent), "subject": str(msg.get("Subject", "")),
-        "sender_name": name, "sender_email": addr.lower(), "to_addr": addrs("To"), "cc_addr": addrs("Cc"),
-        "sent_at": sent, "body": clean_body(body),
+        "subject": header("Subject"), "sender_name": name, "sender_email": addr.lower(),
+        "to_addr": addrs("To"), "cc_addr": addrs("Cc"), "sent_at": sent, "body": clean_body(body),
         "attachments": "\n".join(a for a in attachments if a and not INLINE_IMAGE.match(a)),
-        "file_path": str(path.resolve()),
     }
-    return str(msg.get("Message-ID", "")), rec
+    return header("Message-ID"), rec
+
+
+def parse_eml(path: Path) -> tuple[str, dict]:
+    mid, rec = parse_eml_bytes(path.read_bytes())
+    rec.update({"source": "eml", "folder": str(path.parent), "file_path": str(path.resolve())})
+    return mid, rec
 
 
 def parse_msg(path: Path) -> tuple[str, dict]:

@@ -1,8 +1,10 @@
 @echo off
 REM 매일 자동 수집 - Windows 작업 스케줄러에 등록해서 사용
-REM 최근 7일 메일만 다시 확인 (중복은 자동으로 건너뜀) + 원본 .msg 보관
+REM 그룹웨어 메일 서버에서 새 메일만 가져옴 (읽음 표시 안 바뀜) + 원본 .eml 보관
+REM 먼저 'python -m mailhub imap-setup' 으로 비밀번호를 저장해 두어야 함
 chcp 65001 > nul
 cd /d "%~dp0.."
-for /f %%i in ('powershell -NoProfile -Command "(Get-Date).AddDays(-7).ToString('yyyy-MM-dd')"') do set SINCE=%%i
-python -m mailhub ingest-outlook --since %SINCE% --save-msg >> data\sync.log 2>&1
+if not exist data mkdir data
+echo ===== %date% %time% ===== >> data\sync.log
+python -m mailhub ingest-imap --save-eml --no-prompt >> data\sync.log 2>&1
 python -m mailhub todo >> data\sync.log 2>&1
