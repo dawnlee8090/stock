@@ -117,7 +117,18 @@ def connect(icfg: dict, password: str):
         conn = imaplib.IMAP4(host, port)
         if icfg.get("starttls"):
             conn.starttls()
-    conn.login(icfg["user"], password)
+    try:
+        conn.login(icfg["user"], password)
+    except imaplib.IMAP4.error as e:
+        msg = str(e)
+        low = msg.lower()
+        if "permission" in low or "not allowed" in low or "disabled" in low:
+            hint = ("서버 접속은 됐지만 이 계정에 IMAP 사용 권한이 없습니다.\n"
+                    "  → 전산팀(그룹웨어 관리자)에 '내 계정 IMAP 사용 허용'을 요청하세요.\n"
+                    "  → 또는 config.toml 의 user 를 사번만(예: 230419) 으로 바꿔 한 번 더 시도해 보세요.")
+        else:
+            hint = "아이디(user) 형식 또는 비밀번호를 확인하세요. (메일 주소 / 사번만 둘 다 시도)"
+        raise SystemExit(f"[IMAP 로그인 실패] 서버 응답: {msg}\n  {hint}") from None
     return conn
 
 
