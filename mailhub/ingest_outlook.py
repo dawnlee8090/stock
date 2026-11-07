@@ -184,8 +184,10 @@ def ingest_outlook(conn, cfg: dict, store_filter: str | None = None, pst_paths=(
                     except Exception as e:
                         stats["errors"] += 1
                         log(f"  [오류] {path}: {e}")
-                    if stats["seen"] % 200 == 0:
+                    if stats["seen"] and stats["seen"] % 500 == 0 and stats["seen"] != save_state.get("last_log"):
+                        save_state["last_log"] = stats["seen"]
                         conn.commit()
+                        log(f"    ... {path}: 진행 중 (전체 {stats['seen']:,}건 확인, 추가 {stats['added']:,})")
             except Exception as e:
                 log(f"  [폴더 읽기 실패] {path}: {e}")
             if stats["seen"] > n_before:
