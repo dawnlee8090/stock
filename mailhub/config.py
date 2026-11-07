@@ -50,5 +50,15 @@ def load_config(path: str | os.PathLike | None = None) -> dict:
     path = Path(path or os.environ.get("MAILHUB_CONFIG", "config.toml"))
     if not path.exists():
         return copy.deepcopy(DEFAULT_CONFIG)
-    with open(path, "rb") as f:
-        return _merge(DEFAULT_CONFIG, tomllib.load(f))
+    try:
+        with open(path, "rb") as f:
+            return _merge(DEFAULT_CONFIG, tomllib.load(f))
+    except tomllib.TOMLDecodeError as e:
+        hint = ""
+        if "overwrite" in str(e):
+            hint = ("\n  → 같은 이름이 두 번 있습니다. 한 이름에 여러 키워드는 쉼표로 이어 쓰세요."
+                    '\n    예) "금형업체" = ["@a-mold.co.kr", "A정밀", "@b-mold.co.kr"]')
+        elif "Unclosed" in str(e) or "Expected" in str(e) or "Invalid" in str(e):
+            hint = ('\n  → 따옴표("")나 대괄호([])가 빠졌는지, 쉼표가 맞는지 확인하세요.'
+                    "\n    정규식 패턴은 작은따옴표(')로 감싸세요.")
+        raise SystemExit(f"[설정 오류] {path} 파일 {e}{hint}") from None
