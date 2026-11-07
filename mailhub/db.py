@@ -7,6 +7,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from .textutil import fix_text
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS mails (
     id            INTEGER PRIMARY KEY,
@@ -77,7 +79,7 @@ def normalize_message_id(mid: str | None) -> str:
 def make_key(message_id: str | None, sender: str, sent_at: str, subject: str, body: str) -> str:
     """Message-ID 가 있으면 그대로, 없으면 내용 해시로 중복을 판정한다.
     서버 사서함과 PST 백업에 같은 메일이 있어도 한 번만 저장된다."""
-    mid = normalize_message_id(message_id)
+    mid = normalize_message_id(fix_text(message_id))
     if mid:
         return "mid:" + mid
     norm_body = re.sub(r"\s+", " ", body or "")[:500]
@@ -91,6 +93,8 @@ def exists(conn: sqlite3.Connection, key: str) -> bool:
 
 def insert_mail(conn: sqlite3.Connection, key: str, rec: dict) -> int | None:
     """새 메일이면 id 반환, 이미 있으면 None (빈 원본 링크 정보만 보충)."""
+    rec = {k: fix_text(v) for k, v in rec.items()}
+    key = fix_text(key)
     row = conn.execute("SELECT id, entry_id, file_path FROM mails WHERE msg_key=?", (key,)).fetchone()
     if row:
         updates = {}

@@ -5,6 +5,17 @@ import re
 from datetime import datetime
 
 
+def fix_text(s):
+    """깨진 유니코드(짝이 안 맞는 서로게이트, 이모지 조각 등)를 저장 가능한 글자로 바로잡는다."""
+    if not isinstance(s, str):
+        return s
+    try:
+        s.encode("utf-8")
+        return s
+    except UnicodeEncodeError:
+        return s.encode("utf-16", "surrogatepass").decode("utf-16", "replace").replace("\x00", "")
+
+
 def html_to_text(s: str) -> str:
     s = re.sub(r"(?is)<(script|style|head)[^>]*>.*?</\1>", " ", s or "")
     s = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>|</li>", "\n", s)
