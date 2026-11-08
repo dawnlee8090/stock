@@ -176,6 +176,13 @@ h2 { font-size: 14px; margin: 0; font-weight: 600; }
 .mrow .subj { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrow .snip { font-size: 12px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrow .star { position: absolute; left: 5px; top: 14px; width: 5px; height: 5px; border-radius: 50%; background: var(--crit); }
+.mrow .pick, .bulk-h .pick { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; flex: none; align-self: center; }
+.mrow.picked { background: var(--accent-weak); }
+.bulk-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 28px; font-size: 12.5px; color: var(--fg-2); }
+.bulk-h label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.bulk-h .bulk-acts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.bulk-h .bulk-acts[hidden] { display: none; }
+.bulk-h .cnt { font-weight: 600; color: var(--accent); }
 .reader { overflow-y: auto; padding: 22px 28px 40px; padding-right: max(28px, env(safe-area-inset-right, 0px)); min-width: 0; }
 .reader h1 { font-size: 18px; line-height: 1.4; }
 .meta { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 10px; font-size: 13px; margin: 14px 0; }
@@ -507,6 +514,7 @@ async function demoApi(path, body) {
     return r;
   }
   if (parts[0] === 'mail' && parts.length === 2) return D.mails.find(m => m.id === +parts[1]);
+  if (base === 'mails/mark') { body.ids.forEach(i => { const m = D.mails.find(x => x.id === i); if (m) { m.status = body.status; if (body.status === '완료') m.needs_action = 0; } }); return { ok: true, count: body.ids.length }; }
   if (parts[0] === 'mail' && parts[2] === 'mark') { const m = D.mails.find(x => x.id === +parts[1]); m.status = body.status; if (body.status === '완료') m.needs_action = 0; return { ok: true }; }
   if (base === 'reqs') return D.reqs.map(r => ({ ...r, state: reqState(r) }));
   if (parts[0] === 'req' && parts.length === 2 && body) { const r = D.reqs.find(x => x.id === +parts[1]); if (body.status) r.status = body.status; if (body.extend) { const d = new Date(r.due_date); d.setDate(d.getDate() + 2); r.due_date = iso(d); } return { ok: true }; }
@@ -738,9 +746,14 @@ async function viewMail(V) {
       <div style="display:flex;justify-content:space-between;align-items:baseline"><h1>${q ? '검색 결과' : esc(folderTitle(mailState.filter))}</h1><span class="sub num">${rows.length >= 150 ? '최근 150건' : rows.length + '건'}</span></div>
       ${q ? `<div class="chips"><span class="chip acc">"${esc(q)}"</span><button class="btn sm" id="clear-q" type="button">검색 지우기</button></div>` : `<div class="filters mob">${folders().filter(f => Array.isArray(f)).map(f => {
         const c = folderCount(f); return `<button class="filter" type="button" data-f="${f[0]}" aria-pressed="${mailState.filter === f[2]}">${f[1]}${c ? ` <b class="num">${c}</b>` : ''}</button>`; }).join('')}</div>`}
+      ${rows.length ? `<div class="bulk-h"><label><input type="checkbox" class="pick" id="pick-all" aria-label="전체 선택"><span id="pick-lbl">전체 선택</span></label>
+        <div class="bulk-acts" id="bulk-acts" hidden>
+          ${[['완료', '처리 완료'], ['진행중', '진행중'], ['업체검토중', '업체 검토중'], ['', '상태 해제']].map(([v, l]) =>
+            `<button class="btn sm${v === '완료' ? ' primary' : ''}" type="button" data-bulk="${v}">${l}</button>`).join('')}
+          <button class="btn sm" type="button" id="pick-clear">선택 해제</button></div></div>` : ''}
     </div><div class="list-scroll">${rows.length ? rows.map(m => `
-      <div class="mrow" data-id="${m.id}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
-        <div class="l1"><span class="from">${esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
+      <div class="mrow" data-id="${m.id}" data-tags="${esc(m.tags || '')}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
+        <div class="l1"><input type="checkbox" class="pick" data-pick="${m.id}" aria-label="선택" title="선택 (Shift+클릭: 범위 선택)"><span class="from">${esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
         <div class="subj">${esc(m.subject)}</div><div class="snip">${esc(m.snippet || '')}</div>
         <div class="chips row-chips"${(m.tags || m.status) ? '' : ' hidden'}>${rowChips(m)}</div>
       </div>`).join('') : '<div class="empty">조건에 맞는 메일이 없습니다</div>'}</div></section>
@@ -748,6 +761,7 @@ async function viewMail(V) {
   V.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { mailState.sel = null; location.hash = '#' + b.dataset.f; }));
   const cq = $('#clear-q', V); if (cq) cq.addEventListener('click', () => { mailState.q = ''; $('#q').value = ''; route(); });
   V.querySelectorAll('.mrow').forEach(el => el.addEventListener('click', () => openMail(+el.dataset.id, V)));
+  setupBulk(V);
   if (mailState.sel) {
     const row = V.querySelector(`.mrow[data-id="${mailState.sel}"]`);
     if (row) row.scrollIntoView({ block: 'center' });
@@ -756,6 +770,61 @@ async function viewMail(V) {
 }
 function readerChips(m, tags) {
   return `${m.needs_action && m.status !== '완료' ? '<span class="chip crit">회신 필요</span>' : ''}${m.status ? pill(m.status) : ''}${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}`;
+}
+// 목록·본문에서 상태가 바뀐 곳만 고침 (화면 전체를 다시 그리지 않아 스크롤 위치 유지)
+function paintRow(V, id, status) {
+  const row = V.querySelector(`.mrow[data-id="${id}"]`);
+  if (!row) return;
+  const rc = row.querySelector('.row-chips');
+  const tags = row.dataset.tags || '';
+  rc.innerHTML = rowChips({ status, tags }); rc.hidden = !(tags || status);
+  const star = row.querySelector('.star');
+  if (star && status === '완료') star.remove();
+}
+function paintReader(R, m, tags) {
+  R.querySelectorAll('[data-mark]').forEach(x => {
+    const on = x.dataset.mark === m.status;
+    x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); x.textContent = (on ? '✓ ' : '') + x.dataset.label;
+  });
+  $('#rd-chips', R).innerHTML = readerChips(m, tags);
+}
+let readerMail = null;   // 지금 열려 있는 메일 {m, tags, R} (여러 통 처리할 때 본문 표시도 맞춤)
+// 목록 여러 통 선택 → 한 번에 처리 완료 / 진행중 / 업체 검토중 / 상태 해제
+function setupBulk(V) {
+  const all = $('#pick-all', V); if (!all) return;
+  const boxes = [...V.querySelectorAll('.mrow .pick')];
+  const acts = $('#bulk-acts', V), lbl = $('#pick-lbl', V);
+  let last = -1;
+  const sync = () => {
+    const n = boxes.filter(b => b.checked).length;
+    boxes.forEach(b => b.closest('.mrow').classList.toggle('picked', b.checked));
+    all.checked = n > 0 && n === boxes.length; all.indeterminate = n > 0 && n < boxes.length;
+    acts.hidden = !n;
+    lbl.innerHTML = n ? `<span class="cnt num">${n}</span>통 선택` : '전체 선택';
+  };
+  boxes.forEach((b, i) => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();   // 체크만 하고 메일은 열지 않음
+      if (e.shiftKey && last >= 0) { const [a, z] = [Math.min(last, i), Math.max(last, i)]; for (let k = a; k <= z; k++) boxes[k].checked = b.checked; }
+      last = i; sync();
+    });
+  });
+  all.addEventListener('change', () => { boxes.forEach(b => { b.checked = all.checked; }); last = -1; sync(); });
+  $('#pick-clear', V).addEventListener('click', () => { boxes.forEach(b => { b.checked = false; }); last = -1; sync(); });
+  V.querySelectorAll('[data-bulk]').forEach(btn => btn.addEventListener('click', async () => {
+    const ids = boxes.filter(b => b.checked).map(b => +b.dataset.pick);
+    if (!ids.length) return;
+    const st = btn.dataset.bulk;
+    acts.querySelectorAll('button').forEach(x => { x.disabled = true; });
+    try { await api('mails/mark', { ids, status: st }); }
+    catch (err) { toast('기록 실패: ' + err.message); acts.querySelectorAll('button').forEach(x => { x.disabled = false; }); return; }
+    acts.querySelectorAll('button').forEach(x => { x.disabled = false; });
+    ids.forEach(id => paintRow(V, id, st));
+    if (readerMail && ids.includes(readerMail.m.id) && V.contains(readerMail.R)) { readerMail.m.status = st; paintReader(readerMail.R, readerMail.m, readerMail.tags); }
+    boxes.forEach(b => { b.checked = false; }); last = -1; sync();
+    toast(!LIVE ? '예시 화면이라 저장되지 않습니다' : (st ? `${ids.length}통을 '${btn.textContent}'로 표시했습니다` : `${ids.length}통의 상태를 해제했습니다`));
+    refreshSummary();   // 왼쪽 폴더 건수만 새로
+  }));
 }
 function rowChips(m) {
   return `${m.status ? pill(m.status) : ''}${(m.tags || '').split(',').filter(Boolean).slice(0, 4).map(t => `<span class="tag">${esc(t)}</span>`).join('')}`;
@@ -767,6 +836,7 @@ async function openMail(id, V) {
   const m = await api('mail/' + id);
   const R = $('#reader', V);
   const tags = (m.tags || '').split(',').filter(Boolean);
+  readerMail = { m, tags, R };
   const isEO = tags.includes('E.O'), isTO = tags.includes('T/O') || tags.includes('품질문제'), isMold = tags.includes('금형이관');
   R.innerHTML = `
     <button class="btn sm back" id="back" type="button">← 목록</button>
@@ -799,21 +869,9 @@ async function openMail(id, V) {
     try { await api(`mail/${id}/mark`, { status: off ? '' : v }); } catch (err) { return toast('기록 실패: ' + err.message); }
     const where = { '진행중': '메일함 [진행중]', '업체검토중': '메일함 [업체 검토중]', '완료': '메일함 [처리 완료]' }[v];
     toast(!LIVE ? '예시 화면이라 저장되지 않습니다' : (off ? '상태를 해제했습니다' : `'${b.dataset.label}'로 표시했습니다 · ${where} 과 [오늘] 화면에서 볼 수 있습니다`));
-    // 화면 전체를 다시 그리지 않고 바뀐 곳만 고침 (목록·본문 스크롤 위치 유지)
     m.status = off ? '' : v;
-    R.querySelectorAll('[data-mark]').forEach(x => {
-      const on = x.dataset.mark === m.status;
-      x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); x.textContent = (on ? '✓ ' : '') + x.dataset.label;
-    });
-    $('#rd-chips', R).innerHTML = readerChips(m, tags);
-    const row = V.querySelector(`.mrow[data-id="${id}"]`);
-    if (row) {
-      const rc = row.querySelector('.row-chips');
-      const listM = { ...m, tags: m.tags };
-      rc.innerHTML = rowChips(listM); rc.hidden = !(m.tags || m.status);
-      const star = row.querySelector('.star');
-      if (star && m.status === '완료') star.remove();
-    }
+    paintReader(R, m, tags);
+    paintRow(V, id, m.status);
     refreshSummary();   // 왼쪽 폴더 건수만 새로
   }));
   const oo = $('#open-orig', R); if (oo) oo.addEventListener('click', async () => {
@@ -1168,7 +1226,7 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-08.6';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-08.7';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');

@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-08.6"
+APP_VERSION = "2026-11-08.7"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -395,6 +395,13 @@ class Data:
     # ---- 쓰기 ----
     def post(self, c, path: list[str], body: dict) -> dict:
         from . import eo as E, followup as F, mold as M, to as T
+        if path[0] == "mails" and path[1] == "mark":   # 여러 통 한 번에 (목록에서 선택)
+            st = str(body.get("status", ""))[:20]
+            ids = [int(i) for i in (body.get("ids") or [])[:500]]
+            if ids:
+                c.execute(f"UPDATE mails SET status=? WHERE id IN ({','.join('?' * len(ids))})", (st, *ids))
+                c.commit()
+            return {"ok": True, "count": len(ids)}
         if path[0] == "mail" and path[2] == "mark":
             st = str(body.get("status", ""))[:20]
             c.execute("UPDATE mails SET status=? WHERE id=?", (st, int(path[1])))

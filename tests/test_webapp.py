@@ -116,6 +116,11 @@ class WebAppTest(unittest.TestCase):
         self.assertEqual((s["counts"]["mail_vendor"], [m["id"] for m in s["progress"]]), (1, [1]))
         self.post("/api/mail/1/mark", {"status": ""})                       # 해제
         self.assertEqual(self.get("/api/summary")["progress"], [])
+        r = self.post("/api/mails/mark", {"ids": [1, 99999], "status": "진행중"})   # 목록에서 여러 통 선택
+        self.assertEqual((r["count"], self.get("/api/mail/1")["status"]), (2, "진행중"))
+        self.post("/api/mails/mark", {"ids": [1], "status": ""})
+        self.assertEqual(self.get("/api/mail/1")["status"], "")
+        self.assertEqual(self.post("/api/mails/mark", {"ids": [], "status": "완료"})["count"], 0)
         self.post("/api/mail/1/mark", {"status": "완료"})
         self.assertEqual(self.get("/api/mail/1")["status"], "완료")
         self.post(f"/api/eo/{self.eid}", {"status": "검토중", "note": "업체 검토 요청"})
