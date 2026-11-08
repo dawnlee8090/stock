@@ -26,11 +26,16 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   `to similar <T번호>` 또는 `to similar --defect .. --part-name .. --resin ..`, `to guide <불량유형>`(원인·대책 가이드),
   `to inbox`, `to check`, `to add --defect .. --phenomenon .. --part-no ..`, `to set <T번호> --status 발생|원인분석|대책수립|대책적용|효과확인|종결|보류 ..`,
   `to img`, `to export data/TO_ISSUES.xlsx`. 절차는 `/to-update`, 개선 조언은 `/to-advice`
+  T/O 운영 규칙은 `docs/TO_관리가이드.md`, 주간 점검은 `/to-weekly`
+- 금형 이관 종합장: `mold list [--dest] [--q] [--json]`, `mold show <M번호> [--json]`, `mold inbox`, `mold check`,
+  `mold add --mold-no .. --part-name .. --dest ..`, `mold doc <M번호> <금형사양서|성형조건표|부품리스트|선적일정|KD리스트|원소재리스트|기타> --mail N --attach "파일명 일부" [--status 확정]`,
+  `mold items <M번호> --type KD|원소재|부품 --mail N --attach ..`(첨부 엑셀 불러오기), `mold ship <M번호> --etd .. --eta .. --atd .. --ata .. --bl ..`,
+  `mold set <M번호> --status ..`, `mold export data/MOLD_TRANSFER.xlsx`. 메일 반영 절차는 `/mold-update`
 - 결과가 적으면 동의어/영문 표기(E.O ↔ EO ↔ 설계변경, T/O ↔ TRY OUT ↔ 트라이)와 품번으로 다시 검색한다.
 
 ## 원칙
 - 메일 내용은 회사 기밀이다. 외부 서비스로 보내거나 저장소에 커밋하지 않는다 (`data/` 는 gitignore).
 - 메일 발송/전달은 하지 않는다. 회신·전달은 **초안만** 작성하고 사용자가 직접 보낸다.
   자동 발송 기능은 없다. 재요청은 `req remind <R번호>`(아웃룩 창) 또는 `--ask`(확인 창)로만 하고, 발송은 사용자가 창에서 결정한다.
-- `req add`, `mark`, `req update`, `eo add/set/link/import`, `to add/set/link/import` 처럼 기록을 바꾸는 명령은 사용자 확인 후 실행한다.
+- `req add`, `mark`, `req update`, `eo add/set/link/import`, `to add/set/link/import`, `mold add/set/doc/ship/items/link` 처럼 기록을 바꾸는 명령은 사용자 확인 후 실행한다.
 - 답변에는 근거 메일 번호(#id)와 날짜를 함께 적는다.

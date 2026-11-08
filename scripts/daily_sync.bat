@@ -11,4 +11,5 @@ python -m mailhub ingest-pop --save-eml --no-prompt >> data\sync.log 2>&1
 python -m mailhub req check --notify --ask >> data\sync.log 2>&1
 python -m mailhub eo check --notify >> data\sync.log 2>&1
 python -m mailhub to check --notify >> data\sync.log 2>&1
+python -m mailhub mold check --notify >> data\sync.log 2>&1
 python -m mailhub todo >> data\sync.log 2>&1

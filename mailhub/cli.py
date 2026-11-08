@@ -644,6 +644,168 @@ def cmd_to(args, cfg, conn):
         return
 
 
+def _mold_line(conn, m) -> str:
+    from . import mold as M
+    done, total = M.progress(conn, m["id"])
+    chk = " ".join(f"{d['section']}{M.SYMBOL.get(d['status'], '?')}" for d in M.docs(conn, m["id"]))
+    s = M.ship(conn, m["id"])
+    ship = ""
+    if s and (s["etd"] or s["plan_date"]):
+        ship = f"  ETD {(s['etd'] or s['plan_date'])[5:]}" + (f" ETA {s['eta'][5:]}" if s["eta"] else "") + \
+               (" 출항✓" if s["atd"] else "") + (" 도착✓" if s["ata"] else "")
+    al = M.alerts(conn, m)
+    nm = M.new_mail_count(conn, m)
+    name = " ".join(x for x in (m["mold_no"], m["car"], m["part_no"], m["part_name"]) if x)
+    return (f"M{m['id']:<4} [{m['status']}] {name[:56]}  → {m['dest'] or '?'}{ship}"
+            f"{'  ✉새 메일 ' + str(nm) if nm else ''}\n       서류 {done}/{total}: {chk}"
+            + ("".join(f"\n       ⚠ {a}" for a in al)))
+
+
+def _mold_fields(args) -> dict:
+    from . import mold as M
+    return {k: getattr(args, k) for k in M.MOLD_FIELDS if getattr(args, k, None) is not None}
+
+
+def cmd_mold(args, cfg, conn):
+    from . import mold as M
+    M.ensure(conn)
+    a = args.mold_cmd
+    if a == "add":
+        mid = M.add(conn, status=args.status or "이관준비", mail_id=args.mail, **_mold_fields(args))
+        _out("금형 등록:\n" + _mold_line(conn, M.get(conn, mid)))
+        return
+    if a == "set":
+        m = M.update(conn, args.id, status=args.status, note=args.note, mail_id=args.mail, **_mold_fields(args))
+        _out(_mold_line(conn, m))
+        return
+    if a == "doc":
+        d = M.set_doc(conn, cfg, args.id, args.section, status=args.status, mail_id=args.mail, attach=args.attach,
+                      files=args.file, doc_date=args.date, version=args.version, due=args.due, note=args.note,
+                      use_outlook=args.outlook)
+        files = [f for f in (d["files"] or "").split("\n") if f]
+        _out(f"M{args.id} {d['section']}: {M.SYMBOL.get(d['status'], '')} {d['status']}  접수일 {d['doc_date'] or '-'}"
+             f"  파일 {len(files)}개" + ("\n  " + "\n  ".join(files) if files else ""))
+        return
+    if a == "ship":
+        kw = {k: getattr(args, k) for k in M.SHIP_FIELDS if getattr(args, k, None) is not None}
+        M.set_ship(conn, args.id, mail_id=args.mail, **kw)
+        _out(_mold_line(conn, M.get(conn, args.id)))
+        return
+    if a == "items":
+        if args.file or args.mail:
+            n, name = M.import_items(conn, cfg, args.id, args.type, path=args.file, mail_id=args.mail, attach=args.attach or "",
+                                     replace=not args.append, use_outlook=args.outlook)
+            _out(f"M{args.id} {args.type} 리스트 {n}건 불러옴 ({name}){' - 기존 목록에 추가' if args.append else ' - 기존 목록 교체'}")
+        rows = M.items(conn, args.id, args.type)
+        for r in rows[:args.limit]:
+            _out(f"  {r['part_no']:<14} {r['name'][:28]:<28} {r['spec'][:18]:<18} {r['qty']:>6} {r['unit']:<4} "
+                 f"{r['supply']:<3} {r['maker'][:14]}")
+        _out(f"M{args.id} {args.type} 리스트 {len(rows)}건" + (f" (앞 {args.limit}건만 표시)" if len(rows) > args.limit else ""))
+        return
+    if a == "link":
+        for x in args.mails:
+            M.link(conn, args.id, x, "수동")
+        conn.commit()
+        _out(f"M{args.id} 에 메일 {', '.join('#' + str(x) for x in args.mails)} 연결")
+        return
+    if a == "list":
+        rows = M.listing(conn, args.status, dest=args.dest, car=args.car, q=args.q)
+        if args.json:
+            out = []
+            for m in rows:
+                d = dict(m)
+                d.update(docs=[dict(x) for x in M.docs(conn, m["id"])], ship=dict(M.ship(conn, m["id"]) or {}),
+                         alerts=M.alerts(conn, m), new_mails=M.new_mail_count(conn, m))
+                out.append(d)
+            _out(json.dumps(out, ensure_ascii=False, indent=1))
+            return
+        for m in rows:
+            _out(_mold_line(conn, m))
+        _out(f"\n총 {len(rows)}벌 / 확인 필요 {sum(1 for m in rows if M.alerts(conn, m))}벌   "
+             "(● 확정 ◐ 접수·검토중 ○ 요청 ✕ 미접수 － 해당없음)")
+        return
+    if a == "show":
+        m = M.get(conn, args.id)
+        dd = M.docs(conn, m["id"])
+        sh = M.ship(conn, m["id"])
+        mails = conn.execute("SELECT x.mail_id, x.how, ml.sent_at, ml.sender_name, ml.subject FROM mold_mails x "
+                             "JOIN mails ml ON ml.id=x.mail_id WHERE x.mold_id=? ORDER BY ml.sent_at", (m["id"],)).fetchall()
+        logs = conn.execute("SELECT * FROM mold_log WHERE mold_id=? ORDER BY id", (m["id"],)).fetchall()
+        if args.json:
+            _out(json.dumps({"mold": dict(m), "docs": [dict(x) for x in dd], "ship": dict(sh) if sh else None,
+                             "items": {lt: len(M.items(conn, m["id"], lt)) for lt in M.LIST_TYPES},
+                             "alerts": M.alerts(conn, m), "mails": [dict(x) for x in mails],
+                             "log": [dict(x) for x in logs]}, ensure_ascii=False, indent=1))
+        else:
+            _out(_mold_line(conn, m))
+            for k in M.MOLD_FIELDS:
+                if m[k] and k != "note":
+                    _out(f"  {k:<12}: {m[k]}")
+            _out("\n[서류]")
+            for d in dd:
+                files = [f for f in (d["files"] or "").split("\n") if f]
+                _out(f"  {M.SYMBOL.get(d['status'], '?')} {d['section']:<8} {d['status']:<5} {d['doc_date'] or '':<10} "
+                     f"{('v' + d['version']) if d['version'] else '':<6} {('기한 ' + d['due']) if d['due'] else ''}"
+                     f"{'  #' + str(d['mail_id']) if d['mail_id'] else ''}  {', '.join(Path(f).name for f in files)}")
+            if sh:
+                _out("\n[선적] " + "  ".join(f"{k}={sh[k]}" for k in M.SHIP_FIELDS if sh[k]))
+            _out("\n[리스트] " + "  ".join(f"{lt} {len(M.items(conn, m['id'], lt))}건" for lt in M.LIST_TYPES))
+            _out("\n[이력]")
+            for x in logs:
+                _out(f"  {x['at'][:16].replace('T', ' ')}  {x['what']}  {x['note'] or ''}")
+            _out("\n[관련 메일]")
+            seen = m["seen_mail_max"] or 0
+            for x in mails:
+                _out(f"  {'★' if x['mail_id'] > seen else ' '}#{x['mail_id']:<6} {x['sent_at'][:10]}  {x['sender_name'][:14]:<14} "
+                     f"| {x['subject'][:60]}  ({x['how']})")
+        M.mark_seen(conn, m["id"])
+        return
+    if a == "inbox":
+        from datetime import timedelta
+        since = args.since or (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d")
+        rows = M.inbox(conn, since, args.limit)
+        if args.json:
+            _out(json.dumps([_row_dict(r) for r in rows], ensure_ascii=False, indent=1))
+            return
+        _print_rows(rows, "")
+        _out(f"↑ 금형이관 관련인데 아직 종합장에 연결되지 않은 메일 ({since} 이후)")
+        return
+    if a == "sync":
+        added = M.sync(conn)
+        for mid, x, how in added:
+            _out(f"M{mid} ← #{x} ({how})")
+        _out(f"새로 연결된 메일 {len(added)}건")
+        return
+    if a == "check":
+        M.sync(conn)
+        rows = M.listing(conn, "open")
+        hits = [(m, M.alerts(conn, m)) for m in rows]
+        hits = [(m, al) for m, al in hits if al]
+        for m, al in hits:
+            _out(f"! M{m['id']} {m['mold_no']} {m['part_name'] or m['part_no']} → {m['dest']}: " + " / ".join(al))
+        for m in rows:
+            nm = M.new_mail_count(conn, m)
+            if nm:
+                _out(f"✉ M{m['id']} {m['mold_no']} {m['part_name'] or m['part_no']}: 새 관련 메일 {nm}건 (mold show {m['id']})")
+        if not hits:
+            _out("금형 이관: 확인 필요 항목 없음")
+        n_inbox = len(M.inbox(conn, datetime.now().strftime("%Y-%m-01"), 200))
+        if n_inbox:
+            _out(f"? 미등록 금형이관 메일 {n_inbox}건 (이번 달) → python -m mailhub mold inbox")
+        if args.notify and hits:
+            from .followup import notify
+            m0, al0 = hits[0]
+            notify(f"금형 이관 확인 필요 {len(hits)}벌", f"M{m0['id']} {m0['part_name'] or m0['mold_no']}: {al0[0]}")
+        return
+    if a == "export":
+        from . import mold_excel
+        p = mold_excel.build(conn, M, M.listing(conn, args.status, dest=args.dest), Path(args.path))
+        _out(f"금형 이관 종합장 저장: {p.resolve()}")
+        if args.open and os.name == "nt":
+            os.startfile(str(p.resolve()))  # type: ignore[attr-defined]
+        return
+
+
 def cmd_ingest_files(args, cfg, conn):
     from .ingest_files import ingest_folder
     for p in args.paths:
@@ -1022,6 +1184,96 @@ def build_parser() -> argparse.ArgumentParser:
     t = ts.add_parser("import", help="CSV(UTF-8) 가져오기 (열 이름은 export 와 동일)")
     t.add_argument("path")
     s.set_defaults(func=cmd_to)
+
+    s = sp.add_parser("mold", help="금형 이관 종합장 (사양서·성형조건·부품·선적·KD·원소재 체크, 엑셀)")
+    ms = s.add_subparsers(dest="mold_cmd", required=True)
+
+    def mold_field_args(p):
+        p.add_argument("--mold-no", dest="mold_no", help="금형번호")
+        p.add_argument("--car", help="차종")
+        p.add_argument("--part-no", dest="part_no", help="품번")
+        p.add_argument("--part-name", dest="part_name", help="품명")
+        p.add_argument("--mold-vendor", dest="mold_vendor", help="금형업체")
+        p.add_argument("--dest", help="이관 법인 (멕시코, 인도, 체코 ...)")
+        p.add_argument("--local-molder", dest="local_molder", help="현지 성형처")
+        p.add_argument("--cavity", help="캐비티 (1x1, 2CAV ...)")
+        p.add_argument("--tonnage", help="성형기 톤수")
+        p.add_argument("--size", dest="mold_size", help="금형 크기 (WxLxH)")
+        p.add_argument("--weight", dest="mold_weight", help="금형 중량")
+        p.add_argument("--hot-runner", dest="hot_runner", help="핫런너 (사양/메이커/점수)")
+        p.add_argument("--resin", help="재질")
+        p.add_argument("--target", dest="target_date", help="이관 목표일")
+        p.add_argument("--status", help="제작중/T/O/이관준비/선적대기/선적/현지도착/현지T/O/이관완료/보류")
+        p.add_argument("--note", help="메모")
+        p.add_argument("--mail", type=int, help="관련 메일 번호")
+
+    x = ms.add_parser("add", help="금형 등록 (기본 6개 서류 항목 자동 생성)")
+    mold_field_args(x)
+    x = ms.add_parser("set", help="금형 정보·상태 변경")
+    x.add_argument("id", type=int)
+    mold_field_args(x)
+    x = ms.add_parser("doc", help="서류 항목 갱신 (메일 첨부를 그대로 보관)")
+    x.add_argument("id", type=int)
+    x.add_argument("section", help="금형사양서 / 성형조건표 / 부품리스트 / 선적일정 / KD리스트 / 원소재리스트 (다른 이름도 가능)")
+    x.add_argument("--status", help="미접수 / 요청 / 접수 / 검토중 / 확정 / 해당없음 (메일·파일을 붙이면 자동 '접수')")
+    x.add_argument("--mail", type=int, help="받은 메일 번호")
+    x.add_argument("--attach", help="저장할 첨부파일 이름 일부 (빈 문자열이면 첨부 전부)")
+    x.add_argument("--file", nargs="+", help="PC 의 파일을 직접 보관")
+    x.add_argument("--date", help="접수일 (기본: 메일 날짜)")
+    x.add_argument("--version", help="버전/Rev")
+    x.add_argument("--due", help="회신(제출) 기한")
+    x.add_argument("--note", help="메모")
+    x.add_argument("--outlook", action="store_true", help="PST(아웃룩) 메일 첨부 읽기 [Windows]")
+    x = ms.add_parser("ship", help="선적 일정 (ETD/ETA/출항/도착/BL ...)")
+    x.add_argument("id", type=int)
+    x.add_argument("--plan", dest="plan_date", help="선적 계획일")
+    x.add_argument("--etd")
+    x.add_argument("--eta")
+    x.add_argument("--atd", help="실제 출항일 → 상태 '선적'")
+    x.add_argument("--ata", help="실제 도착일 → 상태 '현지도착'")
+    x.add_argument("--bl", dest="bl_no", help="B/L 번호")
+    x.add_argument("--vessel", help="선박명")
+    x.add_argument("--from", dest="port_from", help="출발항")
+    x.add_argument("--to", dest="port_to", help="도착항")
+    x.add_argument("--forwarder", help="포워더")
+    x.add_argument("--container", help="컨테이너 번호")
+    x.add_argument("--note")
+    x.add_argument("--mail", type=int)
+    x = ms.add_parser("items", help="부품 / KD / 원소재 리스트 (엑셀·CSV 또는 메일 첨부에서 불러오기)")
+    x.add_argument("id", type=int)
+    x.add_argument("--type", required=True, choices=["부품", "KD", "원소재"])
+    x.add_argument("--file", help="엑셀(.xlsx)/CSV 파일")
+    x.add_argument("--mail", type=int, help="첨부 엑셀이 있는 메일 번호")
+    x.add_argument("--attach", help="첨부파일 이름 일부 (예: KD)")
+    x.add_argument("--append", action="store_true", help="기존 목록을 지우지 않고 추가")
+    x.add_argument("--outlook", action="store_true")
+    x.add_argument("--limit", type=int, default=30, help="화면에 보여줄 줄 수")
+    x = ms.add_parser("link", help="메일 연결")
+    x.add_argument("id", type=int)
+    x.add_argument("mails", type=int, nargs="+")
+    x = ms.add_parser("list", help="금형별 현황 (서류 체크·선적)")
+    x.add_argument("--status", default="open", help="open(기본: 이관완료 제외) / all / 특정 상태")
+    x.add_argument("--dest", help="이관 법인")
+    x.add_argument("--car")
+    x.add_argument("--q", help="금형번호·품번·품명·업체 검색")
+    x.add_argument("--json", action="store_true")
+    x = ms.add_parser("show", help="금형 상세 (서류·선적·리스트·이력·관련 메일)")
+    x.add_argument("id", type=int)
+    x.add_argument("--json", action="store_true")
+    x = ms.add_parser("inbox", help="종합장에 아직 없는 금형이관 메일")
+    x.add_argument("--days", type=int, default=60)
+    x.add_argument("--since")
+    x.add_argument("--limit", type=int, default=50)
+    x.add_argument("--json", action="store_true")
+    ms.add_parser("sync", help="관련 메일 자동 연결")
+    x = ms.add_parser("check", help="선적 전 미완료 서류·기한·도착 확인 (매일 자동)")
+    x.add_argument("--notify", action="store_true")
+    x = ms.add_parser("export", help="금형 이관 종합장 엑셀")
+    x.add_argument("path", nargs="?", default="data/MOLD_TRANSFER.xlsx")
+    x.add_argument("--status", default="all")
+    x.add_argument("--dest", help="이관 법인만")
+    x.add_argument("--open", action="store_true")
+    s.set_defaults(func=cmd_mold)
 
     s = sp.add_parser("ingest-files", help=".eml/.msg 파일 폴더 가져오기")
     s.add_argument("paths", nargs="+")

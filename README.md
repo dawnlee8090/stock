@@ -19,7 +19,7 @@
 | 5. 첨부파일 내용 검색 | 엑셀/워드/PPT/PDF 첨부 안의 글자·품번까지 검색 (E.O 리스트, T/O 보고서) | ✅ `index-attachments` |
 | 6-1. E.O 리스트 관리 | 접수→검토→금형수정→검증 단계·기한·지연 알림, 미등록 E.O 메일 표시, 관련 메일 자동 연결, 엑셀 | ✅ `eo`, `/eo-update` |
 | 6-2. T/O 문제점·개선 이력 DB | 문제점→원인→대책→효과 이력, 재발 감지, 유사 사례, 불량별 대책 가이드, 조언 | ✅ `to`, `/to-update`, `/to-advice` |
-| 6-3. 금형 이관 체크리스트 | 현지 법인 이관 금형별 사양·서류·선적 준비 상태 관리 | ⏳ 예정 |
+| 6-3. 금형 이관 종합장 | 금형별 사양서·성형조건표·부품·선적·KD·원소재(KD/LP) 체크, 첨부 보관·엑셀 불러오기, 선적 전 알림 | ✅ `mold`, `/mold-update` |
 | 7. 초안 자동 생성 → 아웃룩 임시보관함 | 새 메일 도착 시 검토 초안을 아웃룩 **임시보관함**에 만들어 두기 (발송은 본인이 확인 후) | ⏳ 예정 |
 
 자동 발송은 의도적으로 하지 않습니다. 고객사/업체 대응은 **초안까지 자동, 발송은 사람 확인** 이 원칙입니다.
@@ -223,9 +223,40 @@ python -m mailhub to export data\TO_ISSUES.xlsx --collect --open   # 문제점 �
 - **유사 사례**: 불량 유형·품번·품명·재질·부위가 비슷한 과거 사례를 점수순으로, **효과가 확인된 대책**을 우선 보여줍니다.
 - **Claude Code** `/to-update`: T/O 결과 메일·보고서에서 문제점 등록안, 새 메일 기준 원인·대책·결과 갱신안 제안.
   `/to-advice 2`: 과거 개선 이력 + 유사 사례 + 가이드를 근거로 **조건 → 금형 → 설계 → 재질 순 개선안**(비용·부작용·검증 방법 포함).
+- 운영 규칙(입력·종결 기준, 재발 대응): [docs/TO_관리가이드.md](docs/TO_관리가이드.md), 주간 점검: Claude `/to-weekly`
 - 엑셀: `TO 문제점`(사진 썸네일, 재발 강조) · `불량 통계`(유형·원인·금형업체·성형처별 건수, 재발, 지연) · `T번호` 상세(이전 발생 비교, 이력, 사진).
 
-## 11. 분류 기준 수정
+## 11. 금형 이관 종합장
+
+현지 법인으로 이관하는 금형별로 **금형사양서 · 성형조건표 · 부품리스트 · 선적일정 · KD리스트 · 원소재리스트(KD/LP)** 를
+체크리스트로 관리합니다 (● 확정 ◐ 접수·검토중 ○ 요청 ✕ 미접수 － 해당없음). 메일로 받을 때마다 하나씩 반영합니다.
+
+```powershell
+python -m mailhub mold add --mold-no MD-001 --car "BC4t CUV" --part-no 86511-BN200 --part-name "FR BUMPER UPR" --mold-vendor A금형 --dest 멕시코
+
+# 메일로 받은 서류: 첨부를 data\molds\M1\항목\ 에 보관하고 자동 '접수'
+python -m mailhub mold doc 1 금형사양서 --mail 21345 --attach 사양서
+python -m mailhub mold doc 1 금형사양서 --status 확정 --version Rev1
+
+# KD / 원소재 / 부품 리스트: 첨부 엑셀을 바로 불러오기 (머리글 자동 인식, KD/LP 구분)
+python -m mailhub mold items 1 --type KD --mail 21350 --attach KD
+python -m mailhub mold items 1 --type 원소재 --file "D:\자료\원소재 리스트.xlsx"
+
+# 선적: 출항(--atd) 입력 시 상태 '선적', 도착(--ata) 시 '현지도착' 자동
+python -m mailhub mold ship 1 --etd 11/18 --eta 12/20 --from 부산 --to Manzanillo --bl HDMU1234567
+
+python -m mailhub mold list                  # 금형별 서류 체크·선적·확인 필요
+python -m mailhub mold export data\MOLD_TRANSFER.xlsx --open
+```
+
+- **확인 필요 알림** (매일 아침): 선적 2주 이내인데 미완료 서류, 서류 기한 지남, ETD 지났는데 출항 미확인, ETA 지났는데 도착 미확인.
+- **누락 방지**: 금형이관 메일 중 종합장에 연결 안 된 메일은 `mold inbox`, 금형번호·품번·같은 건 회신은 자동 연결.
+- 기본 6개 외 항목도 이름만 주면 추가됩니다: `mold doc 1 도면·3D --mail ..`, `mold doc 1 검사구·지그 --status 해당없음`
+- **엑셀**: `이관 종합`(금형별 체크 매트릭스, 칸 클릭 시 보관 파일 열림) · `선적 일정`(ETD 순, D-day) ·
+  `부품/KD/원소재 리스트`(전 금형 통합, KD/LP 색 구분) · `M번호` 상세(사양·서류·선적·이력).
+- **Claude Code** `/mold-update`: 받은 메일이 어느 금형의 어느 항목인지 판단해서 반영 명령을 제안 (승인한 것만 실행).
+
+## 12. 분류 기준 수정
 
 `config.toml` 의 `[tags]`, `[action]`, `[part_number]` 를 고친 뒤:
 ```powershell
