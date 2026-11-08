@@ -63,3 +63,39 @@ class FollowupTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AskTest(unittest.TestCase):
+    def test_popup_decisions(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = load_config(Path(d) / "none.toml")
+            conn = db.connect(Path(d) / "t.db")
+            t0, today = date(2026, 11, 2), date(2026, 11, 9)
+            ids = [fu.add(conn, f"a{i}@v.co.kr", f"요청 {i}", "11/4", today=t0) for i in range(4)]
+            targets = fu.check(conn, cfg, today=today)["remind"]
+            self.assertEqual(len(targets), 4)
+            answers = iter(["send", "outlook", "extend", "skip"])
+            sent = []
+
+            def asker(r, subject, body, i, n):
+                return next(answers), body + "\n(수정함)"
+
+            def sender(to, cc, subject, body, send, draft_dir):
+                sent.append((to, send, body.endswith("(수정함)")))
+
+            res = fu.ask_reminders(conn, cfg, targets, asker=asker, sender=sender, today=today, log=lambda *_: None)
+            self.assertEqual(res, {"send": 1, "outlook": 1, "extend": 1, "skip": 1, "error": 0})
+            self.assertEqual(sent, [("a0@v.co.kr", True, True), ("a1@v.co.kr", False, True)])
+            rows = {r["id"]: r for r in conn.execute("SELECT * FROM requests")}
+            self.assertEqual(rows[ids[0]]["remind_count"], 1)
+            self.assertEqual(rows[ids[2]]["due_date"], "2026-11-11")   # +2영업일
+            self.assertEqual(rows[ids[3]]["remind_count"], 0)
+            # 같은 날 다시 확인해도 묻지 않음
+            again = fu.check(conn, cfg, today=today)["remind"]
+            res2 = fu.ask_reminders(conn, cfg, again, asker=lambda *a: self.fail("다시 물으면 안 됨"),
+                                    sender=sender, today=today, log=lambda *_: None)
+            self.assertEqual(sum(res2.values()), 0)
+            # 다음 날에는 건너뛴 건을 다시 물음
+            nxt = fu.check(conn, cfg, today=date(2026, 11, 10))["remind"]
+            self.assertIn(ids[3], [r["id"] for r in nxt])
+            conn.close()

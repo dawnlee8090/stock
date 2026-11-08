@@ -15,7 +15,7 @@ DEFAULT_CONFIG: dict = {
         "draft_dir": "data/drafts",
     },
     # 업체 요청 재요청 메일
-    "reminder": {"auto_send": False, "interval_days": 2, "max_count": 3, "subject_prefix": "[재요청]"},
+    "reminder": {"interval_days": 2, "max_count": 3, "subject_prefix": "[재요청]"},
     # 그룹웨어 메일 서버 (IMAP). 비밀번호는 여기 적지 않음 → imap-setup 으로 저장
     "imap": {"host": "", "port": 993, "ssl": True, "user": "", "folders": []},
     # 내 메일 주소 (보낸 메일은 '조치 필요' 판정에서 제외)

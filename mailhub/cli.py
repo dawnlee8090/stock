@@ -142,7 +142,7 @@ def cmd_req(args, cfg, conn):
     if a == "add":
         rid = fu.add(conn, args.to, args.subject, args.due, cc=args.cc or "", vendor=args.vendor or "",
                      req_type=args.type or "", part_no=args.part or "", mail_id=args.mail, note=args.note or "",
-                     requested=args.requested, auto=args.auto)
+                     requested=args.requested)
         r = conn.execute("SELECT * FROM requests WHERE id=?", (rid,)).fetchone()
         _out("요청 등록:\n  " + _req_line(r))
         return
@@ -166,22 +166,21 @@ def cmd_req(args, cfg, conn):
             _out("- 기한 임박 " + _req_line(r))
         if not any(res.values()):
             _out("기한이 지났거나 임박한 요청이 없습니다.")
-        rc = cfg.get("reminder", {})
-        sent = 0
-        for r in res["remind"]:
-            if rc.get("auto_send") and r["auto_remind"] and args.auto_send:
-                subj, body = fu.reminder_mail(r, cfg)
+        if res["remind"] and args.ask:
+            lock = Path(cfg["archive"]["db_path"]).parent / ".req_popup.lock"
+            import time as _t
+            if lock.exists() and _t.time() - lock.stat().st_mtime < 6 * 3600:
+                _out("(다른 재요청 확인 창이 열려 있어 이번에는 묻지 않습니다)")
+            else:
+                lock.write_text(str(os.getpid()))
                 try:
-                    fu.open_draft(r["to_addrs"], r["cc_addrs"], subj, body, send=True,
-                                  draft_dir=Path(cfg["archive"].get("draft_dir", "data/drafts")))
-                    fu.mark_reminded(conn, r["id"])
-                    sent += 1
-                    _out(f"→ 재요청 자동 발송: R{r['id']} {r['to_addrs']}")
-                except Exception as e:
-                    _out(f"→ 재요청 자동 발송 실패: R{r['id']} {e}")
-        manual = [r for r in res["remind"] if not (rc.get("auto_send") and r["auto_remind"] and args.auto_send)]
-        if manual:
-            _out("\n재요청 메일 띄우기: " + "  ".join(f"python -m mailhub req remind {r['id']}" for r in manual))
+                    r2 = fu.ask_reminders(conn, cfg, res["remind"], log=_out)
+                finally:
+                    lock.unlink(missing_ok=True)
+                _out(f"재요청 확인: 발송 {r2['send']} / 아웃룩 창 {r2['outlook']} / 기한 연장 {r2['extend']} / 건너뜀 {r2['skip']}")
+        elif res["remind"]:
+            _out("\n재요청 메일 띄우기: " + "  ".join(f"python -m mailhub req remind {r['id']}" for r in res["remind"])
+                 + "\n(확인 창으로 하나씩 결정하려면: python -m mailhub req check --ask)")
         if args.notify and (res["overdue"] or res["soon"] or res["replied"]):
             parts = []
             if res["overdue"]:
@@ -201,7 +200,20 @@ def cmd_req(args, cfg, conn):
         if args.preview:
             _out(f"받는사람: {r['to_addrs']}\n참조: {r['cc_addrs']}\n제목: {subj}\n\n{body}")
             return
-        res = fu.open_draft(r["to_addrs"], r["cc_addrs"], subj, body, send=args.send,
+        if args.ask:
+            action, body = fu.ask_popup(r, subj, body, 1, 1)
+            if action == "skip":
+                _out(f"R{r['id']} 건너뜀")
+                return
+            if action == "extend":
+                conn.execute("UPDATE requests SET due_date=? WHERE id=?", (fu.parse_due("+2영업일"), r["id"]))
+                conn.commit()
+                _out(_req_line(conn.execute("SELECT * FROM requests WHERE id=?", (r["id"],)).fetchone()))
+                return
+            send = action == "send"
+        else:
+            send = False
+        res = fu.open_draft(r["to_addrs"], r["cc_addrs"], subj, body, send=send,
                             draft_dir=Path(cfg["archive"].get("draft_dir", "data/drafts")))
         fu.mark_reminded(conn, r["id"])
         _out(f"R{r['id']} 재요청: {res}")
@@ -420,17 +432,16 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--mail", type=int, help="관련 메일 번호 (고객사 요청 메일 등)")
     r.add_argument("--note", help="메모")
     r.add_argument("--requested", help="요청한 날 (기본: 오늘)")
-    r.add_argument("--auto", action="store_true", help="기한 지나면 재요청 자동 발송 대상 (config 에서 auto_send=true 필요)")
     r = rs.add_parser("list", help="진행 중인 요청 목록")
     r.add_argument("--all", action="store_true", help="완료·회신받음 포함 전체")
     r.add_argument("--json", action="store_true")
     r = rs.add_parser("check", help="업체 회신 자동 확인 + 기한 지남/임박 표시")
     r.add_argument("--notify", action="store_true", help="윈도우 알림 띄우기")
-    r.add_argument("--auto-send", action="store_true", help="자동 발송 허용 (config auto_send=true 이고 --auto 등록 건만)")
+    r.add_argument("--ask", action="store_true", help="기한 지난 건마다 확인 창 (발송/아웃룩/기한연장/건너뛰기) [Windows]")
     r = rs.add_parser("remind", help="재요청 메일을 아웃룩 작성 창에 띄우기")
     r.add_argument("id", type=int)
     r.add_argument("--preview", action="store_true", help="화면에 내용만 보기")
-    r.add_argument("--send", action="store_true", help="창을 띄우지 않고 바로 발송")
+    r.add_argument("--ask", action="store_true", help="확인 창에서 내용 수정 후 발송 여부 결정 [Windows]")
     r = rs.add_parser("update", help="기한·상태·메모 변경")
     r.add_argument("id", type=int)
     r.add_argument("--due")

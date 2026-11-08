@@ -4,8 +4,9 @@
   1) 요청 등록   : req add --to 업체주소 --subject "보낸 메일 제목" --due 11/12
   2) 회신 자동확인: 매일 수집 후 req check → 같은 제목(RE:)으로 그 업체에서 메일이 오면 '회신받음'
   3) 알림       : 기한 지남 / 오늘·내일 기한 → 윈도우 알림 + 목록
-  4) 재요청     : req remind 번호 → 아웃룩 새 메일 창에 재요청 메일을 띄움 (확인 후 직접 보내기)
-                 config.toml [reminder] auto_send = true 이고 등록 시 --auto 를 준 건만 자동 발송
+  4) 재요청     : 매일 확인 시 기한 지난 건마다 확인 팝업 (내용 수정 가능)
+                 [발송] [아웃룩에서 열기] [기한 연장] [건너뛰기] 중 사용자가 결정. 자동 발송은 없음.
+                 req remind 번호 → 아웃룩 새 메일 창에 바로 띄우기
 """
 from __future__ import annotations
 
@@ -41,7 +42,8 @@ CREATE TABLE IF NOT EXISTS requests (
     replied_at      TEXT,
     remind_count    INTEGER DEFAULT 0,
     last_reminded_at TEXT,
-    auto_remind     INTEGER DEFAULT 0
+    auto_remind     INTEGER DEFAULT 0,  -- (사용 안 함, 이전 버전 호환)
+    last_asked_at   TEXT               -- 팝업으로 물어본 날 (같은 날 다시 묻지 않음)
 );
 """
 
@@ -51,6 +53,10 @@ WEEKDAYS = "월화수목금토일"
 
 def ensure(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(requests)")}
+    if "last_asked_at" not in cols:
+        conn.execute("ALTER TABLE requests ADD COLUMN last_asked_at TEXT")
+        conn.commit()
 
 
 # ---------- 날짜 ----------
@@ -102,17 +108,16 @@ def _domains(addrs: str) -> list[str]:
 
 def add(conn, to: str, subject: str, due: str, cc: str = "", vendor: str = "", req_type: str = "",
         part_no: str = "", mail_id: int | None = None, note: str = "", requested: str | None = None,
-        auto: bool = False, today: date | None = None) -> int:
+        today: date | None = None) -> int:
     ensure(conn)
     today = today or date.today()
     if not _domains(to):
         raise ValueError("--to 에 업체 담당자 메일 주소를 넣어 주세요 (예: kim@abc-mold.co.kr)")
     cur = conn.execute(
         "INSERT INTO requests (created_at, requested_at, due_date, to_addrs, cc_addrs, vendor, subject, thread_key, "
-        "req_type, part_no, mail_id, note, auto_remind) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "req_type, part_no, mail_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (datetime.now().isoformat(timespec="seconds"), parse_due(requested, today) if requested else today.isoformat(),
-         parse_due(due, today), to, cc, vendor, subject, thread_key(subject), req_type, part_no, mail_id, note,
-         int(auto)))
+         parse_due(due, today), to, cc, vendor, subject, thread_key(subject), req_type, part_no, mail_id, note))
     conn.commit()
     return cur.lastrowid
 
@@ -245,3 +250,121 @@ $app = '{{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}}\\WindowsPowerShell\\v1.0\\power
         return r.returncode == 0
     except Exception:
         return False
+
+
+# ---------- 재요청 확인 팝업 ----------
+POPUP_PS = r"""
+Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+[System.Windows.Forms.Application]::EnableVisualStyles()
+$bodyPath = '__BODY__'
+$info = [IO.File]::ReadAllText('__INFO__', [Text.Encoding]::UTF8)
+$f = New-Object Windows.Forms.Form
+$f.Text = '__TITLE__'
+$f.Size = New-Object Drawing.Size(820, 660)
+$f.StartPosition = 'CenterScreen'
+$f.TopMost = $true
+$f.Font = New-Object Drawing.Font('Malgun Gothic', 10)
+$lbl = New-Object Windows.Forms.Label
+$lbl.Text = $info
+$lbl.Dock = 'Top'
+$lbl.Height = 130
+$lbl.Padding = New-Object Windows.Forms.Padding(10, 10, 10, 0)
+$tb = New-Object Windows.Forms.TextBox
+$tb.Multiline = $true
+$tb.ScrollBars = 'Vertical'
+$tb.AcceptsReturn = $true
+$tb.Dock = 'Fill'
+$tb.Text = [IO.File]::ReadAllText($bodyPath, [Text.Encoding]::UTF8)
+$panel = New-Object Windows.Forms.FlowLayoutPanel
+$panel.Dock = 'Bottom'
+$panel.Height = 54
+$panel.FlowDirection = 'RightToLeft'
+$panel.Padding = New-Object Windows.Forms.Padding(10, 8, 10, 8)
+foreach ($b in @(@('건너뛰기', 'skip'), @('기한 연장 (+2영업일)', 'extend'), @('아웃룩에서 열기', 'outlook'), @('발송', 'send'))) {
+    $btn = New-Object Windows.Forms.Button
+    $btn.Text = $b[0]
+    $btn.Tag = $b[1]
+    $btn.Width = 170
+    $btn.Height = 34
+    $btn.Add_Click({
+        $frm = $this.FindForm()
+        if ($this.Tag -eq 'send') {
+            $ok = [Windows.Forms.MessageBox]::Show($frm, '이 내용으로 업체에 재요청 메일을 발송할까요?', '발송 확인', 'YesNo', 'Question')
+            if ($ok -ne 'Yes') { return }
+        }
+        $frm.Tag = $this.Tag
+        $frm.Close()
+    })
+    $panel.Controls.Add($btn)
+}
+$f.Controls.Add($tb)
+$f.Controls.Add($lbl)
+$f.Controls.Add($panel)
+$tb.BringToFront()
+[void]$f.ShowDialog()
+[IO.File]::WriteAllText($bodyPath, $tb.Text, [Text.Encoding]::UTF8)
+if ($f.Tag) { Write-Output ('ACTION=' + $f.Tag) } else { Write-Output 'ACTION=skip' }
+"""
+
+
+def ask_popup(r: sqlite3.Row, subject: str, body: str, idx: int, total: int) -> tuple[str, str]:
+    """재요청 확인 창 → (action, 수정된 본문). action: send / outlook / extend / skip / error"""
+    import tempfile
+    if os.name != "nt":
+        return "error", body
+    info = (f"업체: {r['vendor'] or '-'}\n받는사람: {r['to_addrs']}\n참조: {r['cc_addrs'] or '-'}\n"
+            f"요청: {r['requested_at']}  /  기한: {dday(r['due_date'])}  /  재요청 {(r['remind_count'] or 0) + 1}회째\n"
+            f"제목: {subject}")
+    with tempfile.TemporaryDirectory(prefix="mailhub_popup_") as td:
+        bp, ip = Path(td) / "body.txt", Path(td) / "info.txt"
+        bp.write_text(body.replace("\r\n", "\n").replace("\n", "\r\n"), encoding="utf-8")
+        ip.write_text(info.replace("\n", "\r\n"), encoding="utf-8")
+        ps = (POPUP_PS.replace("__BODY__", str(bp).replace("'", "''"))
+              .replace("__INFO__", str(ip).replace("'", "''"))
+              .replace("__TITLE__", f"업체 재요청 확인 ({idx}/{total}) - R{r['id']}"))
+        enc = base64.b64encode(ps.encode("utf-16-le")).decode()
+        try:
+            out = subprocess.run(["powershell", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass",
+                                  "-EncodedCommand", enc], capture_output=True, text=True, timeout=6 * 3600)
+        except Exception:
+            return "error", body
+        m = re.search(r"ACTION=(\w+)", out.stdout or "")
+        new_body = bp.read_text(encoding="utf-8-sig").replace("\r\n", "\n") if bp.exists() else body
+        return (m.group(1) if m else "error"), new_body
+
+
+def ask_reminders(conn, cfg: dict, targets: list, asker=ask_popup, sender=None, today: date | None = None,
+                  log=print) -> dict:
+    """기한 지난 건마다 팝업으로 물어보고 결정대로 처리. 같은 날 이미 물어본 건은 다시 묻지 않는다."""
+    today = today or date.today()
+    sender = sender or open_draft
+    draft_dir = Path(cfg["archive"].get("draft_dir", "data/drafts"))
+    todo_ = [r for r in targets if (r["last_asked_at"] or "")[:10] != today.isoformat()]
+    res = {"send": 0, "outlook": 0, "extend": 0, "skip": 0, "error": 0}
+    for i, r in enumerate(todo_, 1):
+        subject, body = reminder_mail(r, cfg)
+        action, body = asker(r, subject, body, i, len(todo_))
+        conn.execute("UPDATE requests SET last_asked_at=? WHERE id=?", (today.isoformat(), r["id"]))
+        try:
+            if action == "send":
+                sender(r["to_addrs"], r["cc_addrs"], subject, body, True, draft_dir)
+                mark_reminded(conn, r["id"])
+                log(f"→ R{r['id']} 재요청 발송 (사용자 확인)")
+            elif action in ("outlook", "error"):
+                # 팝업을 못 띄운 경우에도 안전하게 아웃룩 창으로 (발송은 사용자가)
+                sender(r["to_addrs"], r["cc_addrs"], subject, body, False, draft_dir)
+                mark_reminded(conn, r["id"])
+                log(f"→ R{r['id']} 재요청 메일을 아웃룩 창에 띄움")
+            elif action == "extend":
+                new_due = parse_due("+2영업일", today)
+                conn.execute("UPDATE requests SET due_date=? WHERE id=?", (new_due, r["id"]))
+                log(f"→ R{r['id']} 기한 연장 → {new_due}")
+            else:
+                log(f"→ R{r['id']} 건너뜀 (내일 다시 확인)")
+        except Exception as e:
+            action = "error"
+            log(f"→ R{r['id']} 처리 실패: {e}")
+        res[action if action in res else "error"] += 1
+        conn.commit()
+    return res
+
