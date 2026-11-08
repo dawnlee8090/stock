@@ -111,9 +111,9 @@ WHERE m.needs_action = 1 AND m.status NOT IN ('완료', '제외') AND m.sent_at 
   {replied}
 ORDER BY m.sent_at DESC LIMIT ?
 """
-# 같은 건(스레드)에 내가 나중에 보낸 메일이 있으면 '회신함'으로 보고 제외
+# 같은 건(스레드)에 내가 나중에 보낸 메일이 있거나, 나중에 온 메일이 '내 회신에 대한 답장'이면 회신한 것으로 보고 제외
 NOT_REPLIED = """AND NOT EXISTS (SELECT 1 FROM mails r WHERE r.thread_key = m.thread_key AND r.thread_key != ''
-                    AND r.is_mine = 1 AND r.sent_at > m.sent_at)"""
+                    AND (r.is_mine = 1 OR r.quotes_me = 1) AND r.sent_at > m.sent_at)"""
 
 
 def todo(conn: sqlite3.Connection, since: str = "", limit: int = 50,

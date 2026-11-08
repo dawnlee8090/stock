@@ -156,3 +156,34 @@ class ZipImportTest(unittest.TestCase):
             fp = conn.execute("SELECT file_path FROM mails WHERE subject LIKE 'A건%'").fetchone()[0]
             self.assertTrue(Path(fp).exists())
             conn.close()
+
+
+class QuotedReplyTest(unittest.TestCase):
+    def test_reply_to_my_reply_closes_request(self):
+        from mailhub.classify import Classifier
+        from mailhub.search import todo
+        cfg = load_config("none.toml")
+        cfg["me"] = {"addresses": ["230419@corp.com"], "names": ["이성욱"]}
+        clf = Classifier(cfg)
+        with tempfile.TemporaryDirectory() as d:
+            conn = db.connect(Path(d) / "t.db")
+
+            def add(k, subj, body, at):
+                rec = {"subject": subj, "body": body, "sender_email": "c@oem.com", "to_addr": "이성욱",
+                       "sent_at": at, "folder": "POP3/받은편지함"}
+                rec.update(clf.classify(rec))
+                db.insert_mail(conn, k, rec)
+                return rec
+
+            add("1", "A건 검토 요청", "검토 부탁드립니다.", "2026-11-01T09:00:00")
+            add("2", "B건 검토 요청", "검토 부탁드립니다.", "2026-11-01T09:00:00")
+            # 고객이 '내 회신'에 답장 (인용 첫 머리글이 나)
+            r = add("3", "RE: A건 검토 요청", "감사합니다. 확인했습니다.\n\n-----Original Message-----\n"
+                    "From: 이성욱 <230419@corp.com>\nSent: ...\n회신드립니다.\n\n"
+                    "-----Original Message-----\nFrom: 고객 <c@oem.com>\n검토 부탁", "2026-11-03T09:00:00")
+            self.assertEqual(r["quotes_me"], 1)
+            # 다른 사람 메일을 인용한 경우는 아님
+            r2 = add("4", "RE: B건 검토 요청", "참고\n보낸 사람: 김동혁 <k@corp.com>\n...", "2026-11-03T09:00:00")
+            self.assertEqual(r2["quotes_me"], 0)
+            self.assertEqual([x["subject"] for x in todo(conn, "2026-01-01")], ["B건 검토 요청"])
+            conn.close()

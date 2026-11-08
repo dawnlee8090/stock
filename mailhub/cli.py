@@ -189,8 +189,9 @@ def cmd_retag(args, cfg, conn):
                         "folder FROM mails").fetchall()
     for r in rows:
         c = clf.classify(dict(r))
-        conn.execute("UPDATE mails SET tags=?, part_nos=?, needs_action=?, is_mine=?, thread_key=? WHERE id=?",
-                     (c["tags"], c["part_nos"], c["needs_action"], c["is_mine"], c["thread_key"], r["id"]))
+        conn.execute("UPDATE mails SET tags=?, part_nos=?, needs_action=?, is_mine=?, thread_key=?, quotes_me=? "
+                     "WHERE id=?", (c["tags"], c["part_nos"], c["needs_action"], c["is_mine"], c["thread_key"],
+                                    c["quotes_me"], r["id"]))
         n += 1
         if n % 5000 == 0:
             _out(f"  ... {n:,}/{len(rows):,}")

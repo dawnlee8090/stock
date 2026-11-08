@@ -7,6 +7,9 @@ SENT_FOLDERS = ("보낸 편지함", "sent items", "sent mail", "보낸편지함"
 QUOTE_MARKERS = [r"\n-+\s*Original Message\s*-+", r"\n-+\s*원본 메시지\s*-+",
                  r"\nFrom:\s.+\n(Sent|Date):", r"\n보낸 사람:\s", r"\n보낸사람:\s", r"\n발신:\s",
                  r"\n-+\s*Forwarded message\s*-+", r"\nOn .{5,80} wrote:"]
+# 인용된 이전 메일의 머리글 줄 (From: / 보낸 사람: / 발신: ...)
+QUOTED_FROM = re.compile(r"^[\s>]*(?:from|sender|보낸\s*사람|발신자?|보낸이)\s*:\s*(.+)$",
+                         re.IGNORECASE | re.MULTILINE)
 SUBJECT_PREFIX = re.compile(r"^\s*((re|fw|fwd|회신|답장|전달|\[ext\]|\[외부\])\s*(\[\d+\])?\s*[:：]?\s*)+",
                             re.IGNORECASE)
 
@@ -76,6 +79,17 @@ class Classifier:
         to = [t for t in re.split(r"[;,]", rec.get("to_addr") or "") if t.strip()]
         return bool(self.max_to and len(to) > self.max_to)
 
+    def _quotes_me(self, body: str) -> int:
+        """바로 앞 인용 메일(첫 번째 인용 머리글)이 내가 보낸 것이면 1 → 상대가 '내 회신'에 답한 메일.
+        보낸메일함을 못 가져와도(POP3) 이것으로 '이미 회신한 건'을 알 수 있다."""
+        if not (self.my_addrs or self.my_names):
+            return 0
+        m = QUOTED_FROM.search(body or "")
+        if not m:
+            return 0
+        who = m.group(1).lower()
+        return int(any(a in who for a in self.my_addrs) or any(n.lower() in who for n in self.my_names))
+
     def classify(self, rec: dict) -> dict:
         subject = rec.get("subject", "") or ""
         body = rec.get("body", "") or ""
@@ -102,9 +116,12 @@ class Classifier:
         # 조치 필요: 내가 보낸 메일 X, 내가 받는사람(To)에 있음 (참조만이면 X), 공지·알림·단체메일 X,
         #            제목/최신 본문에 요청 키워드
         tkey = thread_key(subject)  # '회신:' 같은 말머리는 빼고 판단
-        latest_l = f"{tkey}\n{latest[:1500]}".lower()
+        is_reply = bool(SUBJECT_PREFIX.match(subject or ""))
+        # 답장/전달 메일은 제목이 처음 요청 그대로 반복되므로 새로 쓴 본문만 본다
+        latest_l = (latest[:1500] if is_reply else f"{tkey}\n{latest[:1500]}").lower()
         needs = int(not is_mine and self._addressed_to_me(rec.get("to_addr", ""))
                     and not self._is_bulk(rec) and self.action(latest_l))
 
         return {"tags": ",".join(tags), "part_nos": ",".join(part_nos[:30]), "needs_action": needs,
-                "is_mine": is_mine, "thread_key": tkey}
+                "is_mine": is_mine, "thread_key": tkey,
+                "quotes_me": 0 if is_mine else self._quotes_me(body)}
