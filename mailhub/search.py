@@ -22,7 +22,7 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
            has_attach: bool = False, attach_name: str | None = None, subject_only: bool = False,
            needs_action: bool = False, status: str | None = None, part_no: str | None = None,
            sort: str = "date", limit: int = 50, mine: bool = False,
-           to: str | None = None) -> list[sqlite3.Row]:
+           to: str | None = None, cars: list[str] | None = None) -> list[sqlite3.Row]:
     where, params = [], []
     use_fts = False
     for raw in split_terms(query):
@@ -64,6 +64,9 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
     if part_no:
         where.append("(m.part_nos LIKE ? OR m.subject LIKE ? OR m.body LIKE ?)")
         params += [f"%{part_no}%"] * 3
+    if cars:   # 차종 폴더: 같은 차종의 여러 표기(BC4t, BC4 ...) 중 하나라도
+        where.append("(" + " OR ".join("(',' || m.cars || ',') LIKE ?" for _ in cars) + ")")
+        params += [f"%,{c},%" for c in cars]
     if mine:
         where.append("m.is_mine = 1")
     if to:

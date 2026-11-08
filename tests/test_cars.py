@@ -1,0 +1,66 @@
+import json
+import tempfile
+import threading
+import unittest
+import urllib.request
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+
+from mailhub import db
+from mailhub.classify import Classifier, car_key, find_cars
+from mailhub.config import load_config
+from mailhub.webapp import Data, make_handler
+
+
+class CarTest(unittest.TestCase):
+    def test_find(self):
+        cases = {
+            "BC4t CUV 차종 범퍼 금형 검토 요청": ["BC4t"], "RE: [BC4 HEV N] 카울탑커버 EO": ["BC4"],
+            "Re: NX4a SBC CONSOLE 최신 EO": ["NX4a"], "GN7 PE EO 적용시점 통보": ["GN7"],
+            "(Warning_Threat)RE: BC4t CUV 문제점 송부 件": ["BC4t"], "[매우 중요]Re: BC4t CUV PV 신뢰성": ["BC4t"],
+            "[긴급] LP2 이벤트 TD20 재질 PP20": [], "[전사 보안공지] 해킹": [], "RE: MD-2611 금형 이관 KD LIST": [],
+            "BC4t / GN7 공용 부품 검토": ["BC4t", "GN7"],
+        }
+        for subj, want in cases.items():
+            self.assertEqual(find_cars(subj), want, subj)
+        self.assertEqual(find_cars("공유드립니다", "BC4t 5DR 범퍼 관련하여 문의드립니다"), ["BC4t"])   # 본문 앞부분
+        self.assertEqual(find_cars("공유드립니다", "BC4t 관련하여"), [])                                # 본문은 엄격하게
+        self.assertEqual(find_cars("XX1 부품 리스트", known={"XX1"}), ["XX1"])
+        self.assertEqual(car_key("BC4t"), car_key("BC4b"))
+        cfg = load_config("none.toml")
+        self.assertEqual(Classifier(cfg).classify({"subject": "[GN7 PE] 범퍼", "body": ""})["cars"], "GN7")
+
+    def test_folders_and_filter(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = load_config(Path(d) / "x.toml")
+            cfg["archive"]["db_path"] = str(Path(d) / "m.db")
+            c = db.connect(cfg["archive"]["db_path"])
+            clf = Classifier(cfg)
+            subjects = ["BC4t CUV 범퍼 1", "BC4t CUV 범퍼 2", "[BC4 HEV N] 카울", "BC4b/t ARM REST", "GN7 PE EO 1",
+                        "GN7 PE EO 2", "GN7 PE EO 3", "NX4a SBC CONSOLE", "공지"]
+            for i, sub in enumerate(subjects):
+                rec = {"subject": sub, "body": "", "sent_at": f"2026-11-0{1 + i % 8}T09:00:00"}
+                rec.update(clf.classify(rec))
+                db.insert_mail(c, f"k{i}", rec)
+            c.commit()
+            c.close()
+            srv = ThreadingHTTPServer(("127.0.0.1", 0), None)
+            port = srv.server_address[1]
+            srv.RequestHandlerClass = make_handler(Data(cfg), port)
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            try:
+                def get(p):
+                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/{p}") as r:
+                        return json.loads(r.read())
+                cars = get("mailcounts")["cars"]
+                # BC4t·BC4·BC4b → 한 폴더(이름은 가장 많이 쓴 BC4t), NX4a 는 1건이라 폴더 없음
+                self.assertEqual([(x["key"], x["name"], x["count"]) for x in cars], [("BC4", "BC4t", 4), ("GN7", "GN7", 3)])
+                self.assertEqual(len(get("mails?car=BC4")), 4)
+                self.assertEqual(len(get("mails?car=GN7")), 3)
+            finally:
+                srv.shutdown()
+                srv.server_close()
+
+
+if __name__ == "__main__":
+    unittest.main()

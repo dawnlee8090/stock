@@ -943,9 +943,9 @@ def cmd_retag(args, cfg, conn):
             r = dict(r) | {"body": body}
             fixed += 1
         c = clf.classify(dict(r))
-        conn.execute("UPDATE mails SET tags=?, part_nos=?, needs_action=?, is_mine=?, thread_key=?, quotes_me=? "
+        conn.execute("UPDATE mails SET tags=?, part_nos=?, needs_action=?, is_mine=?, thread_key=?, quotes_me=?, cars=? "
                      "WHERE id=?", (c["tags"], c["part_nos"], c["needs_action"], c["is_mine"], c["thread_key"],
-                                    c["quotes_me"], r["id"]))
+                                    c["quotes_me"], c["cars"], r["id"]))
         n += 1
         if n % 5000 == 0:
             _out(f"  ... {n:,}/{len(rows):,}")

@@ -139,9 +139,13 @@ class Data:
     def mails(self, c, q: dict) -> list:
         from .search import search, todo
         query = (q.get("q") or [""])[0]
-        limit = int((q.get("limit") or ["60"])[0])
+        limit = min(int((q.get("limit") or ["150"])[0]), 500)
         status = (q.get("status") or [""])[0]
-        if status:   # 내가 표시한 진행 상태 (진행중 / 업체검토중 / 완료)
+        car = (q.get("car") or [""])[0]
+        if car:      # 차종 폴더
+            g = self.car_groups(c).get(car)
+            rows = search(c, query, cars=(g["variants"] if g else [car]), limit=limit, sort="date")
+        elif status:   # 내가 표시한 진행 상태 (진행중 / 업체검토중 / 완료)
             rows = search(c, query, status=status, limit=limit, sort="date")
         elif (q.get("todo") or [""])[0] == "1" and not query:
             rows = todo(c, _iso(date.today() - timedelta(days=30)), limit)
@@ -149,6 +153,37 @@ class Data:
             rows = search(c, query, tag=(q.get("tag") or [None])[0], limit=limit,
                           sort="relevance" if query else "date")
         return [self.mail_row(r, query) for r in rows]
+
+    def car_groups(self, c) -> dict:
+        """차종 폴더: {키: {name, count, variants}}. 표기가 다른 같은 차종(BC4t/BC4/BC4b)은 한 폴더."""
+        from collections import Counter
+        from .classify import car_key
+        cars_cfg = self.cfg.get("cars", {})
+        alias = {v: k for k, vs in (cars_cfg.get("aliases") or {}).items() for v in [k, *vs]}
+        var_n: Counter = Counter()
+        mails_n: Counter = Counter()
+        for cars, n in c.execute("SELECT cars, COUNT(*) FROM mails WHERE cars != '' GROUP BY cars"):
+            seen = set()
+            for v in cars.split(","):
+                var_n[v] += n
+                k = car_key(alias.get(v, v))
+                if k not in seen:
+                    mails_n[k] += n
+                    seen.add(k)
+        groups: dict = {}
+        for v, n in var_n.items():
+            k = car_key(alias.get(v, v))
+            g = groups.setdefault(k, {"key": k, "variants": [], "count": mails_n[k], "_best": ("", -1)})
+            g["variants"].append(v)
+            name = alias.get(v, v)
+            if n > g["_best"][1]:
+                g["_best"] = (name, n)
+        min_n = int(cars_cfg.get("min_mails", 3))
+        out = {}
+        for k, g in groups.items():
+            if g["count"] >= min_n:
+                out[k] = {"key": k, "name": g["_best"][0], "count": g["count"], "variants": sorted(g["variants"])}
+        return out
 
     def mailcounts(self, c) -> dict:
         """왼쪽 메일함 폴더별 건수."""
@@ -160,7 +195,9 @@ class Data:
                 "todo": len(todo(c, _iso(date.today() - timedelta(days=30)), 10 ** 6)),
                 "progress": one("SELECT COUNT(*) FROM mails WHERE status='진행중'"),
                 "vendor": one("SELECT COUNT(*) FROM mails WHERE status='업체검토중'"),
-                "done": one("SELECT COUNT(*) FROM mails WHERE status='완료'"), "tags": tags}
+                "done": one("SELECT COUNT(*) FROM mails WHERE status='완료'"), "tags": tags,
+                "cars": sorted(({"key": g["key"], "name": g["name"], "count": g["count"]} for g in self.car_groups(c).values()),
+                               key=lambda g: -g["count"])}
 
     def mail(self, c, mid: int) -> dict:
         r = c.execute("SELECT * FROM mails WHERE id=?", (mid,)).fetchone()

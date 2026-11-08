@@ -45,7 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_mails_sender ON mails(sender_email);
 
 FIELDS = ["source", "folder", "subject", "sender_name", "sender_email", "to_addr", "cc_addr",
           "sent_at", "body", "attachments", "entry_id", "store_id", "file_path",
-          "tags", "part_nos", "needs_action", "is_mine", "thread_key", "quotes_me", "att_text", "att_indexed"]
+          "tags", "part_nos", "needs_action", "is_mine", "thread_key", "quotes_me", "att_text", "att_indexed", "cars"]
 
 # 전문 검색 대상 열 (바뀌면 connect() 가 검색 인덱스를 자동으로 다시 만든다)
 FTS_COLS = ["subject", "sender_name", "sender_email", "to_addr", "cc_addr", "body", "attachments",
@@ -97,7 +97,7 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     # 이전 버전 DB 업그레이드 (새 열 추가 → 'retag' 로 값 채움)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(mails)")}
     for col, ddl in (("is_mine", "INTEGER DEFAULT 0"), ("thread_key", "TEXT DEFAULT ''"),
-                     ("quotes_me", "INTEGER DEFAULT 0"), ("att_text", "TEXT DEFAULT ''"),
+                     ("quotes_me", "INTEGER DEFAULT 0"), ("att_text", "TEXT DEFAULT ''"), ("cars", "TEXT DEFAULT ''"),
                      ("att_indexed", "INTEGER DEFAULT 0")):
         if col not in cols:
             conn.execute(f"ALTER TABLE mails ADD COLUMN {col} {ddl}")

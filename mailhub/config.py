@@ -16,6 +16,8 @@ DEFAULT_CONFIG: dict = {
     },
     # 업체 요청 재요청 메일
     "reminder": {"interval_days": 2, "max_count": 3, "subject_prefix": "[재요청]"},
+    # 차종 폴더: 메일 제목에서 차종 코드 자동 인식. 표기가 다른 같은 차종은 aliases 로 묶기 (BC4/BC4b → BC4t 등은 자동)
+    "cars": {"aliases": {}, "known": [], "ignore": [], "min_mails": 3},
     # 퇴근 전 알림: 그룹웨어 보낸편지함 → 받은편지함 옮기기 (앱이 켜져 있을 때, 평일)
     "sent_move": {"enabled": True, "times": ["19:00", "20:00", "21:00", "22:00"], "weekdays": [0, 1, 2, 3, 4]},
     # 그룹웨어 메일 서버 (IMAP). 비밀번호는 여기 적지 않음 → imap-setup 으로 저장

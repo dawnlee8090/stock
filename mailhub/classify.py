@@ -14,6 +14,46 @@ SUBJECT_PREFIX = re.compile(r"^\s*((re|fw|fwd|회신|답장|전달|\[ext\]|\[외
                             re.IGNORECASE)
 
 
+# 차종 코드: 영문 대문자 2 + 숫자 1~2 + (소문자 1)  예) BC4t, BC4, GN7, NX4a, SG2
+CAR_RE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2}\d{1,2}[a-z]?)(?![A-Za-z0-9])")
+CAR_NEXT = re.compile(r"\s*(?:CUV|SUV|[2-5]DR|HEV|PHEV|EV|N|N-LINE|NLINE|PE|FL|HB|CKD|ICE|차종|차량|파생|프로젝트)(?![A-Za-z0-9])",
+                      re.IGNORECASE)
+# 차종이 아닌 2글자 약어 (이벤트·재질·부서 등)
+CAR_IGNORE = {"LP", "SP", "AP", "PP", "TD", "GF", "CF", "KD", "EO", "TO", "PV", "DV", "MP", "PR", "QA", "QC", "RR", "FR",
+              "LH", "RH", "MS", "ES", "TS", "IP", "DR", "CP", "PC", "PA", "PE", "UV", "EV", "BL", "PO", "SR", "NG", "OK"}
+
+
+def car_key(code: str) -> str:
+    """BC4t / BC4b / BC4 → BC4 (끝 소문자만 다른 표기는 같은 차종으로)."""
+    return re.sub(r"[a-z]+$", "", code).upper()
+
+
+def find_cars(subject: str, body: str = "", known: set[str] | None = None, ignore: set[str] | None = None) -> list[str]:
+    """제목(없으면 본문 앞부분)에서 차종 코드. 대괄호 안·제목 맨 앞·차종 단어(CUV/5DR/HEV/PE/차종…) 앞일 때만 인정."""
+    known = known or set()
+    ignore = (ignore or set()) | CAR_IGNORE
+
+    def scan(text: str, strict: bool) -> list[str]:
+        out = []
+        for m in CAR_RE.finditer(text):
+            code = m.group(1)
+            if code[:2] in ignore or code in ignore:
+                continue
+            pre = text[:m.start()]
+            ok = (code in known or car_key(code) in known or CAR_NEXT.match(text[m.end():])
+                  or (not strict and (pre.rstrip().endswith(("[", "(", "【")) or not pre.strip(" [(【-_")))
+                  or (out and pre.rstrip().endswith(("/", ",", "·", "&"))))   # BC4t / GN7 처럼 이어 쓴 차종
+            if ok and code not in out:
+                out.append(code)
+        return out
+
+    s = SUBJECT_PREFIX.sub("", subject or "")
+    s = re.sub(r"^\s*(\[[^\]]*(?:공지|긴급|중요|요청|update|협조|정정|reminder|warning)[^\]]*\]|\([^)]*warning[^)]*\))\s*", "",
+               s, flags=re.I)
+    s = SUBJECT_PREFIX.sub("", s)
+    return scan(s, False) or scan((body or "")[:300], True)
+
+
 def thread_key(subject: str) -> str:
     """RE:/FW:/전달: 등을 떼어낸 제목 → 같은 건(스레드) 묶음 키."""
     s = subject or ""
@@ -60,6 +100,10 @@ class Classifier:
         me = cfg.get("me", {})
         self.my_addrs = {a.lower() for a in me.get("addresses", []) if a and "company.com" not in a}
         self.my_names = [n for n in me.get("names", []) if n]
+        cars = cfg.get("cars", {})
+        self.car_known = {k for k, v in (cars.get("aliases") or {}).items()} | \
+            {x for v in (cars.get("aliases") or {}).values() for x in v} | set(cars.get("known", []))
+        self.car_ignore = set(cars.get("ignore", []))
 
     def _addressed_to_me(self, to_addr: str) -> bool:
         """받는사람(To)에 내가 있는지. 설정이 없으면 판단 불가 → True."""
@@ -124,4 +168,5 @@ class Classifier:
 
         return {"tags": ",".join(tags), "part_nos": ",".join(part_nos[:30]), "needs_action": needs,
                 "is_mine": is_mine, "thread_key": tkey,
-                "quotes_me": 0 if is_mine else self._quotes_me(body)}
+                "quotes_me": 0 if is_mine else self._quotes_me(body),
+                "cars": ",".join(find_cars(subject, latest, self.car_known, self.car_ignore))}

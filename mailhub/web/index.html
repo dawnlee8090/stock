@@ -66,6 +66,8 @@ button { cursor: pointer; }
 .nav .cnt { margin-left: auto; font-size: 11.5px; color: var(--side-fg-2); font-variant-numeric: tabular-nums; }
 .nav .cnt.hot { color: #ffb4ab; font-weight: 600; }
 .sub-sep { height: 1px; background: #2a3a4c; margin: 5px 8px; }
+.sub-label { font-size: 10.5px; letter-spacing: .08em; color: var(--side-fg-2); padding: 2px 8px 0; opacity: .8; }
+.subnav { max-height: 52vh; overflow-y: auto; }
 .filters.mob { display: none; }
 .side-foot { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid #243242; font-size: 12px; color: var(--side-fg-2);
   display: grid; gap: 6px; }
@@ -366,6 +368,7 @@ function buildDemo() {
     { id: 30398, sent_at: T(-1, 17, 12), sender_name: '박성민 과장 (한빛정밀)', sender_email: 'sm.park@hanbit-mold.example', subject: 'RE: [NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청', tags: 'E.O,금형수정', part_nos: '86511-NX200', attachments: '금형수정 검토서_86511.pdf', needs_action: 0, status: '업체검토중', snippet: '검토서 송부드립니다. 육성 후 재가공, 수정 기간 7일, 비용 180만원입니다.', body: '안녕하십니까. 한빛정밀 박성민입니다.\n\n요청하신 보스 높이 2mm 상향 건 검토서 송부드립니다.\n- 수정 방식: 코어측 육성 후 재가공\n- 수정 기간: 착수 후 7일\n- 비용: 180만원 (VAT 별도)\n- 검사구 영향: 보스 체크핀 위치 수정 필요\n\n확인 부탁드립니다.', att_text: '[첨부: 금형수정 검토서_86511.pdf]\n수정 부위 보스 4EA / 육성 2.0mm / 재가공 / 일정 7일' },
     { id: 30377, sent_at: T(-1, 10, 5), sender_name: '최유진 대리 (MSV설계)', sender_email: 'yj.choi@design-example.com', subject: '[NX5 HEV] 콘솔 브라켓 E.O 통보 (EO26-0871)', tags: 'E.O,설계반영', part_nos: '84634-NX100', attachments: 'EO26-0871.pdf, EO LIST.xlsx', needs_action: 1, status: '', snippet: '콘솔 CTR MTG 브라켓 볼트 형상 변경 E.O 통보드립니다. 금형 수정 가능 여부와 일정 회신 부탁드립니다.', body: '안녕하세요. MSV설계 최유진입니다.\n\nEO26-0871 통보드립니다.\n- 품번: 84634-NX100 BRKT ASSY-CONSOLE CTR MTG\n- 변경: IN-LINE 볼트 형상 변경, PAD 32x12 → 40x25x0.5t\n\n금형 수정 가능 여부와 일정을 11/14까지 회신 부탁드립니다.', att_text: '[첨부: EO LIST.xlsx]\nEO26-0871 / 84634-NX100 / BRKT ASSY-CONSOLE CTR MTG / PAD 형상 변경' },
     { id: 30350, sent_at: T(-2, 15, 30), sender_name: 'Daniel Ruiz (멕시코 법인)', sender_email: 'd.ruiz@mx-plant.example', subject: 'RE: MD-2611 금형 이관 KD LIST 확인 요청', tags: '금형이관', part_nos: '', attachments: 'KD LIST_MD-2611.xlsx', needs_action: 1, status: '', snippet: 'Please confirm KD list. Hot runner nozzle will be LP. Need final list by Nov 14.', body: 'Hello,\n\nPlease find attached the KD list for MD-2611.\nHot runner nozzle will be locally procured (LP).\nWe need the final list by Nov 14 for customs.\n\nBest regards,\nDaniel', att_text: '[첨부: KD LIST_MD-2611.xlsx]\nINSERT NUT M6 KD 4EA / HOT RUNNER NOZZLE LP 2EA' },
+    { id: 30341, sent_at: T(-2, 9, 10), sender_name: '오세훈 책임 (고객사 설계)', sender_email: 'sh.oh@oem-example.com', subject: '[AB3 PE] 크래쉬패드 그레인 변경 E.O 사전 검토 요청', tags: 'E.O,설계반영', part_nos: '84710-AB300', attachments: 'AB3 PE 그레인 변경안.pdf', needs_action: 1, status: '', snippet: 'AB3 PE 크래쉬패드 그레인 사양 변경 사전 검토 부탁드립니다.', body: '안녕하십니까. AB3 PE 크래쉬패드 그레인 사양 변경(H-112 → H-118) 사전 검토 부탁드립니다.\n금형 재부식 가능 여부와 일정 11/13까지 회신 부탁드립니다.', att_text: '' },
     { id: 30333, sent_at: T(-3, 11, 0), sender_name: '정다은 사원 (생산기술)', sender_email: 'de.jung@example-corp.com', subject: '[공유] 11월 금형 정기 점검 일정', tags: '일정', part_nos: '', attachments: '', needs_action: 0, status: '', snippet: '11월 금형 정기 점검 일정 공유드립니다.', body: '11월 금형 정기 점검 일정 공유드립니다.\n- 11/18~19 프레스동\n- 11/20 사출동', att_text: '' },
     { id: 30310, sent_at: T(-4, 9, 20), sender_name: '김태현 차장 (누리검사구)', sender_email: 'th.kim@nuri-cf.example', subject: 'RE: 헤드라이닝 검사구 수정 일정', tags: '검사구,일정', part_nos: '85310-NX000', attachments: '', needs_action: 0, status: '진행중', snippet: '검사구 수정 11/15 완료 예정입니다.', body: '검사구 수정 11/15 완료 예정입니다. 완료 후 R&R 결과 같이 송부드리겠습니다.', att_text: '' },
   ];
@@ -478,9 +481,11 @@ async function demoApi(path, body) {
   if (base === 'summary') return demoSummary();
   if (base === 'eo/add') return { ok: true, ids: [] };
   if (base === 'mailcounts') {
+    const carOf = (m) => (m.subject.match(/\[(NX5|AB3|BC4t?)\b/) || [])[1] || '';
     const tg = (t) => D.mails.filter(m => (',' + m.tags + ',').includes(',' + t + ',')).length, st = (v) => D.mails.filter(m => m.status === v).length;
     return { all: D.mails.length, todo: D.mails.filter(m => m.needs_action && m.status !== '완료').length, progress: st('진행중'), vendor: st('업체검토중'), done: st('완료'),
-      tags: Object.fromEntries(['E.O', 'T/O', '금형수정', '검사구', '품질문제', '금형이관'].map(t => [t, tg(t)])) };
+      tags: Object.fromEntries(['E.O', 'T/O', '금형수정', '검사구', '품질문제', '금형이관'].map(t => [t, tg(t)])),
+      cars: [['NX5', D.mails.filter(m => carOf(m) === 'NX5').length], ['AB3', 1]].map(([key, count]) => ({ key, name: key, count })) };
   }
   if (base === 'mails') {
     let r = D.mails.slice();
@@ -489,6 +494,7 @@ async function demoApi(path, body) {
     if (p.get('todo') === '1') r = r.filter(m => m.needs_action && m.status !== '완료');
     if (p.get('tag')) r = r.filter(m => (',' + m.tags + ',').includes(',' + p.get('tag') + ','));
     if (p.get('status')) r = r.filter(m => m.status === p.get('status'));
+    if (p.get('car')) r = r.filter(m => m.subject.includes('[' + p.get('car')) || m.subject.includes(p.get('car') + ' '));
     return r;
   }
   if (parts[0] === 'mail' && parts.length === 2) return D.mails.find(m => m.id === +parts[1]);
@@ -590,9 +596,24 @@ const FOLDERS = [['mail', '전체 메일', '', 'all'], ['mail-todo', '회신 필
   ['mail-vendor', '업체 검토중', '@업체검토중', 'vendor'], ['mail-done', '처리 완료', '@완료', 'done'], null,
   ['mail-eo', 'E.O', 'E.O', 'E.O'], ['mail-to', 'T/O', 'T/O', 'T/O'], ['mail-fix', '금형수정', '금형수정', '금형수정'],
   ['mail-cf', '검사구', '검사구', '검사구'], ['mail-quality', '품질문제', '품질문제', '품질문제'], ['mail-transfer', '금형이관', '금형이관', '금형이관']];
-const folderOf = (hash) => FOLDERS.find(f => f && f[0] === hash) || FOLDERS[0];
-const folderForFilter = (flt) => (FOLDERS.find(f => f && f[2] === flt) || FOLDERS[0])[0];
-function folderCount(f) { const mc = window.__mailcounts || {}; return f[3] in (mc.tags || {}) ? mc.tags[f[3]] : mc[f[3]]; }
+// 차종 폴더는 메일에서 자동으로 생김 (/api/mailcounts 의 cars)
+const carFolders = () => ((window.__mailcounts || {}).cars || []).map(c => ['mail-car-' + c.key, c.name, 'car:' + c.key, 'car:' + c.key]);
+function folders() {
+  const cf = carFolders();
+  return [...FOLDERS.slice(0, 5), ...(cf.length ? [null, '차종', ...cf] : []), null, '분류', ...FOLDERS.slice(6)];
+}
+function folderOf(hash) {
+  const f = folders().find(x => Array.isArray(x) && x[0] === hash);
+  if (f) return f;
+  if (hash.startsWith('mail-car-')) { const k = hash.slice(9); return [hash, k, 'car:' + k, 'car:' + k]; }
+  return FOLDERS[0];
+}
+const folderForFilter = (flt) => flt.startsWith('car:') ? 'mail-car-' + flt.slice(4) : (folders().find(f => Array.isArray(f) && f[2] === flt) || FOLDERS[0])[0];
+function folderCount(f) {
+  const mc = window.__mailcounts || {};
+  if (f[3].startsWith('car:')) return ((mc.cars || []).find(c => 'car:' + c.key === f[3]) || {}).count;
+  return f[3] in (mc.tags || {}) ? mc.tags[f[3]] : mc[f[3]];
+}
 function renderNav(counts = {}) {
   const badge = { req: [counts.req_late, counts.req_late > 0], eo: [counts.eo_late, counts.eo_late > 0], to: [counts.to_late, counts.to_late > 0], mold: [counts.mold_alert, counts.mold_alert > 0] };
   const cur = (location.hash || '#today').slice(1);
@@ -601,8 +622,9 @@ function renderNav(counts = {}) {
     const inMail = k === 'mail' && cur.startsWith('mail');
     const link = `<a href="#${k}" ${cur === k ? 'aria-current="page"' : (inMail ? 'class="open"' : '')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>${l}${n ? `<span class="badge ${b[1] ? 'crit' : ''}">${n}</span>` : ''}</a>`;
     if (k !== 'mail') return link;
-    const sub = FOLDERS.slice(1).map(f => {
+    const sub = folders().slice(1).map(f => {
       if (!f) return '<span class="sub-sep" aria-hidden="true"></span>';
+      if (typeof f === 'string') return `<span class="sub-label">${f}</span>`;
       const c = folderCount(f);
       const hot = f[0] === 'mail-todo' && c;
       return `<a href="#${f[0]}" class="sub-a" ${cur === f[0] ? 'aria-current="page"' : ''}>${f[1]}${c ? `<span class="cnt${hot ? ' hot' : ''}">${c.toLocaleString()}</span>` : ''}</a>`;
@@ -665,16 +687,17 @@ let mailState = { filter: '', q: '', sel: null };
 async function viewMail(V) {
   V.className = 'view split';
   const q = mailState.q;
-  const params = new URLSearchParams({ limit: 60 });
+  const params = new URLSearchParams({ limit: 150 });
   if (q) params.set('q', q);
-  if (mailState.filter.startsWith('@')) params.set('status', mailState.filter.slice(1));
+  if (mailState.filter.startsWith('car:')) params.set('car', mailState.filter.slice(4));
+  else if (mailState.filter.startsWith('@')) params.set('status', mailState.filter.slice(1));
   else if (mailState.filter === 'todo' && !q) params.set('todo', '1'); else if (mailState.filter && mailState.filter !== 'todo') params.set('tag', mailState.filter);
   const rows = await api('mails?' + params);
   if (PENDING && PENDING.view === 'mail') { mailState.sel = PENDING.id; PENDING = null; }
   V.innerHTML = `
     <section class="list-pane"><div class="pane-h">
-      <div style="display:flex;justify-content:space-between;align-items:baseline"><h1>${q ? '검색 결과' : esc(folderOf(folderForFilter(mailState.filter))[1])}</h1><span class="sub num">${rows.length >= 60 ? '최근 60건' : rows.length + '건'}</span></div>
-      ${q ? `<div class="chips"><span class="chip acc">"${esc(q)}"</span><button class="btn sm" id="clear-q" type="button">검색 지우기</button></div>` : `<div class="filters mob">${FOLDERS.filter(Boolean).map(f => {
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h1>${q ? '검색 결과' : esc(folderOf(folderForFilter(mailState.filter))[1])}</h1><span class="sub num">${rows.length >= 150 ? '최근 150건' : rows.length + '건'}</span></div>
+      ${q ? `<div class="chips"><span class="chip acc">"${esc(q)}"</span><button class="btn sm" id="clear-q" type="button">검색 지우기</button></div>` : `<div class="filters mob">${folders().filter(f => Array.isArray(f)).map(f => {
         const c = folderCount(f); return `<button class="filter" type="button" data-f="${f[0]}" aria-pressed="${mailState.filter === f[2]}">${f[1]}${c ? ` <b class="num">${c}</b>` : ''}</button>`; }).join('')}</div>`}
     </div><div class="list-scroll">${rows.length ? rows.map(m => `
       <div class="mrow" data-id="${m.id}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
@@ -686,7 +709,11 @@ async function viewMail(V) {
   V.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { mailState.sel = null; location.hash = '#' + b.dataset.f; }));
   const cq = $('#clear-q', V); if (cq) cq.addEventListener('click', () => { mailState.q = ''; $('#q').value = ''; route(); });
   V.querySelectorAll('.mrow').forEach(el => el.addEventListener('click', () => openMail(+el.dataset.id, V)));
-  if (mailState.sel && rows.some(r => r.id === mailState.sel)) openMail(mailState.sel, V);
+  if (mailState.sel) {
+    const row = V.querySelector(`.mrow[data-id="${mailState.sel}"]`);
+    if (row) row.scrollIntoView({ block: 'center' });
+    openMail(mailState.sel, V);          // 목록(최근 150건)에 없어도 메일은 연다
+  }
 }
 async function openMail(id, V) {
   mailState.sel = id;
