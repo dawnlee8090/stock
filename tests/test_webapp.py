@@ -105,6 +105,8 @@ class WebAppTest(unittest.TestCase):
         self.assertEqual(len(self.get("/api/eos")), 1)
         self.assertEqual(len(self.get("/api/tos")), 1)
         self.assertEqual(len(self.get("/api/molds")), 1)
+        mc = self.get("/api/mailcounts")
+        self.assertEqual((mc["all"], mc["todo"], mc["tags"]["E.O"]), (1, 1, 1))
 
     def test_writes(self):
         self.post("/api/mail/1/mark", {"status": "업체검토중"})

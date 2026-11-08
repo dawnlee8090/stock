@@ -75,7 +75,7 @@ class Data:
         from .search import todo
         today = date.today()
         since30 = _iso(today - timedelta(days=30))
-        todo_rows = todo(c, since30, 200)
+        todo_rows = todo(c, since30, 10 ** 6)
         reqs = c.execute("SELECT * FROM requests WHERE status='요청' ORDER BY due_date").fetchall()
         req_late = [r for r in reqs if r["due_date"] <= _iso(today)]
         eos = E.listing(c, "open")
@@ -149,6 +149,18 @@ class Data:
             rows = search(c, query, tag=(q.get("tag") or [None])[0], limit=limit,
                           sort="relevance" if query else "date")
         return [self.mail_row(r, query) for r in rows]
+
+    def mailcounts(self, c) -> dict:
+        """왼쪽 메일함 폴더별 건수."""
+        from .search import todo
+        one = lambda sql, *a: c.execute(sql, a).fetchone()[0]  # noqa: E731
+        tags = {t: one("SELECT COUNT(*) FROM mails WHERE (',' || tags || ',') LIKE ?", f"%,{t},%")
+                for t in ("E.O", "T/O", "금형수정", "검사구", "품질문제", "금형이관")}
+        return {"all": one("SELECT COUNT(*) FROM mails"),
+                "todo": len(todo(c, _iso(date.today() - timedelta(days=30)), 10 ** 6)),
+                "progress": one("SELECT COUNT(*) FROM mails WHERE status='진행중'"),
+                "vendor": one("SELECT COUNT(*) FROM mails WHERE status='업체검토중'"),
+                "done": one("SELECT COUNT(*) FROM mails WHERE status='완료'"), "tags": tags}
 
     def mail(self, c, mid: int) -> dict:
         r = c.execute("SELECT * FROM mails WHERE id=?", (mid,)).fetchone()
@@ -456,6 +468,8 @@ def make_handler(data: Data, port: int):
                     if parts == ["sentmove"]:
                         from . import sentmove
                         return self._json(sentmove.status(c, data.cfg))
+                    if parts == ["mailcounts"]:
+                        return self._json(data.mailcounts(c))
                     if parts == ["summary"]:
                         return self._json(data.summary(c))
                     if parts == ["mails"]:

@@ -58,6 +58,15 @@ button { cursor: pointer; }
 .nav .badge { margin-left: auto; font-size: 11px; font-weight: 600; min-width: 20px; text-align: center; padding: 1px 6px;
   border-radius: 10px; background: #2c3c4e; color: #dfe7f0; }
 .nav .badge.crit { background: #8f2a22; color: #fff; }
+.nav a.open { color: #fff; }
+.subnav { display: grid; gap: 1px; margin: 2px 0 8px 22px; padding-left: 10px; border-left: 1px solid #2a3a4c; }
+.nav a.sub-a { padding: 5px 8px; font-size: 13px; font-weight: 400; color: var(--side-fg-2); border-radius: 5px; }
+.nav a.sub-a:hover { color: var(--side-fg); }
+.nav a.sub-a[aria-current="page"] { color: #fff; background: var(--side-active); box-shadow: none; font-weight: 600; }
+.nav .cnt { margin-left: auto; font-size: 11.5px; color: var(--side-fg-2); font-variant-numeric: tabular-nums; }
+.nav .cnt.hot { color: #ffb4ab; font-weight: 600; }
+.sub-sep { height: 1px; background: #2a3a4c; margin: 5px 8px; }
+.filters.mob { display: none; }
 .side-foot { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid #243242; font-size: 12px; color: var(--side-fg-2);
   display: grid; gap: 6px; }
 .mode { display: inline-flex; align-items: center; gap: 6px; }
@@ -286,6 +295,8 @@ table.matrix td.doc { text-align: center; font-weight: 600; font-size: 12.5px; w
   .nav a { padding: 7px 10px; white-space: nowrap; } .nav a svg { display: none; }
   .nav a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--accent); }
   .side-foot { display: none; }
+  .subnav { display: none; }
+  .filters.mob { display: flex; }
   .top { padding: 10px 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); flex-wrap: wrap; }
   .top .sync-time { display: none; }
   .view { padding: 16px 16px 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -466,6 +477,11 @@ async function demoApi(path, body) {
   await new Promise(r => setTimeout(r, 60));
   if (base === 'summary') return demoSummary();
   if (base === 'eo/add') return { ok: true, ids: [] };
+  if (base === 'mailcounts') {
+    const tg = (t) => D.mails.filter(m => (',' + m.tags + ',').includes(',' + t + ',')).length, st = (v) => D.mails.filter(m => m.status === v).length;
+    return { all: D.mails.length, todo: D.mails.filter(m => m.needs_action && m.status !== '완료').length, progress: st('진행중'), vendor: st('업체검토중'), done: st('완료'),
+      tags: Object.fromEntries(['E.O', 'T/O', '금형수정', '검사구', '품질문제', '금형이관'].map(t => [t, tg(t)])) };
+  }
   if (base === 'mails') {
     let r = D.mails.slice();
     const q = (p.get('q') || '').trim().toLowerCase();
@@ -569,12 +585,29 @@ const ICONS = {
   mold: '<rect x="3" y="7" width="18" height="12" rx="1"/><path d="M7 7V4h10v3M3 12h18"/>',
 };
 const NAV = [['today', '오늘'], ['mail', '메일함'], ['req', '업체 요청'], ['eo', 'E.O 리스트'], ['to', 'T/O 문제점'], ['mold', '금형 이관']];
+// 메일함 폴더: [주소, 이름, 필터, 건수 키]
+const FOLDERS = [['mail', '전체 메일', '', 'all'], ['mail-todo', '회신 필요', 'todo', 'todo'], ['mail-progress', '진행중', '@진행중', 'progress'],
+  ['mail-vendor', '업체 검토중', '@업체검토중', 'vendor'], ['mail-done', '처리 완료', '@완료', 'done'], null,
+  ['mail-eo', 'E.O', 'E.O', 'E.O'], ['mail-to', 'T/O', 'T/O', 'T/O'], ['mail-fix', '금형수정', '금형수정', '금형수정'],
+  ['mail-cf', '검사구', '검사구', '검사구'], ['mail-quality', '품질문제', '품질문제', '품질문제'], ['mail-transfer', '금형이관', '금형이관', '금형이관']];
+const folderOf = (hash) => FOLDERS.find(f => f && f[0] === hash) || FOLDERS[0];
+const folderForFilter = (flt) => (FOLDERS.find(f => f && f[2] === flt) || FOLDERS[0])[0];
+function folderCount(f) { const mc = window.__mailcounts || {}; return f[3] in (mc.tags || {}) ? mc.tags[f[3]] : mc[f[3]]; }
 function renderNav(counts = {}) {
-  const badge = { mail: [counts.todo, false], req: [counts.req_late, counts.req_late > 0], eo: [counts.eo_late, counts.eo_late > 0], to: [counts.to_late, counts.to_late > 0], mold: [counts.mold_alert, counts.mold_alert > 0] };
+  const badge = { req: [counts.req_late, counts.req_late > 0], eo: [counts.eo_late, counts.eo_late > 0], to: [counts.to_late, counts.to_late > 0], mold: [counts.mold_alert, counts.mold_alert > 0] };
   const cur = (location.hash || '#today').slice(1);
   $('#nav').innerHTML = NAV.map(([k, l]) => {
     const b = badge[k]; const n = b && b[0];
-    return `<a href="#${k}" ${cur === k ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>${l}${n ? `<span class="badge ${b[1] ? 'crit' : ''}">${n}</span>` : ''}</a>`;
+    const inMail = k === 'mail' && cur.startsWith('mail');
+    const link = `<a href="#${k}" ${cur === k ? 'aria-current="page"' : (inMail ? 'class="open"' : '')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>${l}${n ? `<span class="badge ${b[1] ? 'crit' : ''}">${n}</span>` : ''}</a>`;
+    if (k !== 'mail') return link;
+    const sub = FOLDERS.slice(1).map(f => {
+      if (!f) return '<span class="sub-sep" aria-hidden="true"></span>';
+      const c = folderCount(f);
+      const hot = f[0] === 'mail-todo' && c;
+      return `<a href="#${f[0]}" class="sub-a" ${cur === f[0] ? 'aria-current="page"' : ''}>${f[1]}${c ? `<span class="cnt${hot ? ' hot' : ''}">${c.toLocaleString()}</span>` : ''}</a>`;
+    }).join('');
+    return link + `<div class="subnav">${sub}</div>`;
   }).join('');
 }
 
@@ -603,7 +636,7 @@ async function viewToday(V) {
     <div class="grid2">
       <section class="panel"><div class="panel-h"><h2>지금 처리할 일</h2><span class="sub">급한 순서 · 클릭하면 해당 화면으로</span></div>
         <ul class="rows">${s.priority.length ? s.priority.map(p => `
-          <li class="row" data-go="${p.go}" data-id="${p.id}"><span class="sev ${p.sev}"></span>
+          <li class="row" data-go="${p.go}" data-id="${p.id}" data-kind="${esc(p.kind)}"><span class="sev ${p.sev}"></span>
             <div style="min-width:0"><div class="kind">${esc(p.kind)}</div><div class="t">${esc(p.title)}</div><div class="m"><span class="clip">${esc(p.sub || '')}</span></div></div>
             <div class="r"><span class="chip ${p.sev === 'info' ? 'info' : p.sev}">${esc(p.alert)}</span></div></li>`).join('') : '<li class="empty">급한 일이 없습니다</li>'}</ul></section>
       <div class="stack">
@@ -620,15 +653,15 @@ async function viewToday(V) {
             <div style="min-width:0"><div class="t">${esc(m.subject)}</div><div class="m">${esc(m.sender_name)}</div></div><div class="r"><span class="sub num">${ago(m.sent_at)}</span></div></li>`).join('')}</ul></section>
       </div></div>`;
   V.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => {
-    PENDING = { view: el.dataset.go.slice(1), id: +el.dataset.id };
-    if (el.dataset.go === '#mail') mailState.filter = el.dataset.st ? '@' + el.dataset.st : '';
-    location.hash = el.dataset.go; if (location.hash === el.dataset.go) route(); }));
+    let go = el.dataset.go;
+    PENDING = { view: go.slice(1), id: +el.dataset.id };
+    if (go === '#mail') go = '#' + (el.dataset.st ? folderForFilter('@' + el.dataset.st) : (el.dataset.kind === '메일' ? 'mail-todo' : 'mail'));
+    location.hash = go; if (location.hash === go) route(); }));
 }
 let PENDING = null;
 
 // ================= 화면: 메일함 =================
-const MAIL_FILTERS = [['todo', '회신 필요'], ['@진행중', '진행중'], ['@업체검토중', '업체 검토중'], ['', '전체'], ['E.O', 'E.O'], ['T/O', 'T/O'], ['금형수정', '금형수정'], ['검사구', '검사구'], ['품질문제', '품질문제'], ['금형이관', '금형이관'], ['@완료', '처리 완료']];
-let mailState = { filter: 'todo', q: '', sel: null };
+let mailState = { filter: '', q: '', sel: null };
 async function viewMail(V) {
   V.className = 'view split';
   const q = mailState.q;
@@ -640,9 +673,9 @@ async function viewMail(V) {
   if (PENDING && PENDING.view === 'mail') { mailState.sel = PENDING.id; PENDING = null; }
   V.innerHTML = `
     <section class="list-pane"><div class="pane-h">
-      <div style="display:flex;justify-content:space-between;align-items:baseline"><h1>${q ? '검색 결과' : '메일함'}</h1><span class="sub num">${rows.length}건</span></div>
-      ${q ? `<div class="chips"><span class="chip acc">"${esc(q)}"</span><button class="btn sm" id="clear-q" type="button">검색 지우기</button></div>` : `<div class="filters">${MAIL_FILTERS.map(([k, l]) => { const cnt = { '@진행중': (window.__counts || {}).mail_progress, '@업체검토중': (window.__counts || {}).mail_vendor }[k];
-        return `<button class="filter" type="button" data-f="${k}" aria-pressed="${mailState.filter === k}">${l}${cnt ? ` <b class="num">${cnt}</b>` : ''}</button>`; }).join('')}</div>`}
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h1>${q ? '검색 결과' : esc(folderOf(folderForFilter(mailState.filter))[1])}</h1><span class="sub num">${rows.length >= 60 ? '최근 60건' : rows.length + '건'}</span></div>
+      ${q ? `<div class="chips"><span class="chip acc">"${esc(q)}"</span><button class="btn sm" id="clear-q" type="button">검색 지우기</button></div>` : `<div class="filters mob">${FOLDERS.filter(Boolean).map(f => {
+        const c = folderCount(f); return `<button class="filter" type="button" data-f="${f[0]}" aria-pressed="${mailState.filter === f[2]}">${f[1]}${c ? ` <b class="num">${c}</b>` : ''}</button>`; }).join('')}</div>`}
     </div><div class="list-scroll">${rows.length ? rows.map(m => `
       <div class="mrow" data-id="${m.id}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
         <div class="l1"><span class="from">${esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
@@ -650,7 +683,7 @@ async function viewMail(V) {
         ${(m.tags || m.status) ? `<div class="chips">${m.status ? pill(m.status) : ''}${(m.tags || '').split(',').filter(Boolean).slice(0, 4).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
       </div>`).join('') : '<div class="empty">조건에 맞는 메일이 없습니다</div>'}</div></section>
     <section class="reader" id="reader"><div class="empty" style="margin-top:12vh">왼쪽에서 메일을 고르세요</div></section>`;
-  V.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { mailState.filter = b.dataset.f; mailState.sel = null; route(); }));
+  V.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { mailState.sel = null; location.hash = '#' + b.dataset.f; }));
   const cq = $('#clear-q', V); if (cq) cq.addEventListener('click', () => { mailState.q = ''; $('#q').value = ''; route(); });
   V.querySelectorAll('.mrow').forEach(el => el.addEventListener('click', () => openMail(+el.dataset.id, V)));
   if (mailState.sel && rows.some(r => r.id === mailState.sel)) openMail(mailState.sel, V);
@@ -1008,13 +1041,19 @@ async function openMold(id) {
 const VIEWS = { today: viewToday, mail: viewMail, req: viewReq, eo: viewEO, to: viewTO, mold: viewMold };
 async function route() {
   const k = (location.hash || '#today').slice(1);
-  const fn = VIEWS[k] || viewToday;
+  let fn = VIEWS[k] || viewToday;
+  if (k.startsWith('mail')) {   // 메일함 폴더
+    const f = folderOf(k);
+    if (mailState.filter !== f[2] && !PENDING) mailState.sel = null;   // 다른 폴더로 가면 선택 해제
+    mailState.filter = f[2];
+    fn = viewMail;
+  }
   renderNav(window.__counts || {});
   $('#layer').innerHTML = '';
   try { await fn($('#view')); } catch (e) { $('#view').innerHTML = `<div class="empty">화면을 불러오지 못했습니다: ${esc(e.message)}</div>`; }
 }
 window.addEventListener('hashchange', route);
-$('#search-form').addEventListener('submit', (e) => { e.preventDefault(); mailState.q = $('#q').value.trim(); mailState.sel = null; if (location.hash !== '#mail') location.hash = '#mail'; else route(); });
+$('#search-form').addEventListener('submit', (e) => { e.preventDefault(); mailState.q = $('#q').value.trim(); mailState.sel = null; if (!(location.hash || '').startsWith('#mail')) location.hash = '#mail'; else route(); });
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-export]'); if (!b) return;
   b.disabled = true; try { await api('export/' + b.dataset.export, {}); toast('엑셀을 만들어 열었습니다'); } finally { b.disabled = false; }
@@ -1036,6 +1075,7 @@ $('#sent-done').addEventListener('click', async () => {
 });
 setInterval(refreshSent, 5 * 60 * 1000);
 async function refreshSummary() {
+  try { window.__mailcounts = await api('mailcounts'); } catch { /* 무시 */ }
   try { const s = await api('summary'); window.__counts = s.counts; renderNav(s.counts);
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
