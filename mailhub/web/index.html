@@ -1,0 +1,859 @@
+<title>개발 업무 비서</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 레이아웃: 왼쪽 내비 + 상단 검색바 + 본문(목록·상세 2단). 사출부품 개발자의 하루 업무판 — 상태는 색 띠·칩으로 한눈에 */
+:root {
+  --bg: #eef1f5; --surface: #ffffff; --surface-2: #f5f7fa; --line: #dbe0e8; --line-2: #e8ecf1;
+  --fg: #17202b; --fg-2: #586477; --fg-3: #8a94a5;
+  --accent: #0e6a86; --accent-weak: #e0f0f5; --accent-fg: #ffffff;
+  --crit: #c4362b; --crit-weak: #fbe9e7; --warn: #b9700c; --warn-weak: #fdf1df; --ok: #2b7d50; --ok-weak: #e3f3ea;
+  --info: #3b5bb5; --info-weak: #e7ecfa; --mute-weak: #eceff3;
+  --side: #17222e; --side-fg: #c9d3df; --side-fg-2: #7f8ea1; --side-active: #233344;
+  --font: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Consolas", monospace;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141a; --surface: #161d26; --surface-2: #1b232e; --line: #283241; --line-2: #212a36;
+  --fg: #e5eaf0; --fg-2: #a2adbd; --fg-3: #6f7b8c;
+  --accent: #4fb2cf; --accent-weak: #15303b; --accent-fg: #06222b;
+  --crit: #f07468; --crit-weak: #3a1d1b; --warn: #e3a54a; --warn-weak: #36280f; --ok: #5cc28a; --ok-weak: #15301f;
+  --info: #8ea7f0; --info-weak: #1d2640; --mute-weak: #222b37;
+  --side: #0b1016; --side-fg: #c9d3df; --side-fg-2: #6f7d8f; --side-active: #1a2532;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f141a; --surface: #161d26; --surface-2: #1b232e; --line: #283241; --line-2: #212a36;
+  --fg: #e5eaf0; --fg-2: #a2adbd; --fg-3: #6f7b8c;
+  --accent: #4fb2cf; --accent-weak: #15303b; --accent-fg: #06222b;
+  --crit: #f07468; --crit-weak: #3a1d1b; --warn: #e3a54a; --warn-weak: #36280f; --ok: #5cc28a; --ok-weak: #15301f;
+  --info: #8ea7f0; --info-weak: #1d2640; --mute-weak: #222b37;
+  --side: #0b1016; --side-fg: #c9d3df; --side-fg-2: #6f7d8f; --side-active: #1a2532;
+  color-scheme: dark; }
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--mono); font-size: .92em; font-variant-numeric: tabular-nums; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- 셸 ---------- */
+.app { display: grid; grid-template-columns: 224px minmax(0, 1fr); height: 100%; }
+.side { background: var(--side); color: var(--side-fg); display: flex; flex-direction: column; gap: 4px;
+  padding: 18px 12px; padding-left: max(12px, env(safe-area-inset-left, 0px)); overflow-y: auto; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; }
+.brand-mark { width: 30px; height: 30px; border-radius: 7px; background: var(--accent); color: var(--accent-fg);
+  display: grid; place-items: center; font-weight: 700; font-size: 13px; letter-spacing: .02em; }
+.brand b { display: block; font-size: 15px; color: #fff; letter-spacing: -.01em; }
+.brand span { font-size: 11px; color: var(--side-fg-2); }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; color: var(--side-fg);
+  text-decoration: none; font-weight: 500; }
+.nav a:hover { background: var(--side-active); }
+.nav a[aria-current="page"] { background: var(--side-active); color: #fff; box-shadow: inset 3px 0 0 var(--accent); }
+.nav svg { width: 17px; height: 17px; flex: none; opacity: .85; }
+.nav .badge { margin-left: auto; font-size: 11px; font-weight: 600; min-width: 20px; text-align: center; padding: 1px 6px;
+  border-radius: 10px; background: #2c3c4e; color: #dfe7f0; }
+.nav .badge.crit { background: #8f2a22; color: #fff; }
+.side-foot { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid #243242; font-size: 12px; color: var(--side-fg-2);
+  display: grid; gap: 6px; }
+.mode { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-3); display: inline-block; }
+.dot.live { background: #4ec98a; } .dot.demo { background: #e3a54a; }
+
+.main { display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; }
+.top { display: flex; align-items: center; gap: 10px; padding: 12px 20px; padding-right: max(20px, env(safe-area-inset-right, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--line); }
+.search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 0 12px; height: 38px; max-width: 640px; }
+.search input[type=text] { border: 0; background: transparent; outline: none; flex: 1; min-width: 0; height: 100%; padding: 0; }
+.search svg { width: 16px; height: 16px; color: var(--fg-3); flex: none; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--surface); font-weight: 500; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.sm { height: 28px; padding: 0 9px; font-size: 12.5px; }
+.btn svg { width: 15px; height: 15px; }
+.btn[disabled] { opacity: .55; cursor: default; }
+.top .sync-time { font-size: 12px; color: var(--fg-3); white-space: nowrap; }
+.demo-bar { background: var(--warn-weak); color: var(--warn); font-size: 12.5px; padding: 7px 20px; border-bottom: 1px solid var(--line); }
+.demo-bar b { font-weight: 600; }
+
+.view { flex: 1; overflow-y: auto; padding: 22px 24px 40px; padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+.view.split { padding: 0; overflow: hidden; display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); }
+h1 { font-size: 20px; margin: 0; letter-spacing: -.02em; text-wrap: balance; }
+h2 { font-size: 14px; margin: 0; font-weight: 600; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.sub { color: var(--fg-2); font-size: 13px; }
+.eyebrow { font-size: 11.5px; letter-spacing: .06em; color: var(--fg-3); font-weight: 600; }
+
+/* ---------- 카드 · 칩 ---------- */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+.panel-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line-2); }
+.panel-h .sub { font-size: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
+  background: var(--mute-weak); color: var(--fg-2); white-space: nowrap; }
+.chip.crit { background: var(--crit-weak); color: var(--crit); }
+.chip.warn { background: var(--warn-weak); color: var(--warn); }
+.chip.ok { background: var(--ok-weak); color: var(--ok); }
+.chip.info { background: var(--info-weak); color: var(--info); }
+.chip.acc { background: var(--accent-weak); color: var(--accent); }
+.tag { font-size: 11px; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line); color: var(--fg-2); white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter { border: 1px solid var(--line); background: var(--surface); border-radius: 15px; padding: 4px 11px; font-size: 12.5px; color: var(--fg-2); }
+.filter[aria-pressed="true"] { background: var(--fg); border-color: var(--fg); color: var(--surface); }
+.empty { padding: 28px 16px; text-align: center; color: var(--fg-3); font-size: 13px; }
+
+/* 요약 타일 */
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px 12px; text-align: left;
+  display: grid; gap: 2px; position: relative; overflow: hidden; }
+.tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--line); }
+.tile.crit::before { background: var(--crit); } .tile.warn::before { background: var(--warn); } .tile.ok::before { background: var(--ok); }
+.tile:hover { border-color: var(--accent); }
+.tile .k { font-size: 12px; color: var(--fg-2); font-weight: 500; }
+.tile .v { font-size: 28px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.tile .d { font-size: 11.5px; color: var(--fg-3); }
+
+.grid2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.stack { display: grid; gap: 16px; min-width: 0; }
+
+/* 처리할 일 목록 */
+.rows { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 16px 11px 0;
+  border-bottom: 1px solid var(--line-2); cursor: pointer; }
+.row:last-child { border-bottom: 0; }
+.row:hover { background: var(--surface-2); }
+.row .sev { align-self: stretch; border-radius: 0 3px 3px 0; background: transparent; }
+.row .sev.crit { background: var(--crit); } .row .sev.warn { background: var(--warn); } .row .sev.info { background: var(--info); }
+.row .t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .m { font-size: 12px; color: var(--fg-2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row .r { display: grid; justify-items: end; gap: 3px; }
+.kind { font-size: 11px; font-weight: 600; color: var(--fg-3); letter-spacing: .03em; }
+
+/* 일정 */
+.agenda { padding: 6px 16px 12px; display: grid; gap: 2px; }
+.ag-day { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line-2); }
+.ag-day:last-child { border-bottom: 0; }
+.ag-date { font-weight: 600; font-size: 13px; }
+.ag-date small { display: block; font-weight: 500; font-size: 11px; color: var(--fg-3); }
+.ag-date.today { color: var(--accent); }
+.ag-items { display: grid; gap: 4px; min-width: 0; }
+.ag-item { font-size: 12.5px; display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.ag-item span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 메일 2단 */
+.list-pane { border-right: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.list-pane .pane-h { padding: 14px 16px 10px; display: grid; gap: 10px; border-bottom: 1px solid var(--line-2); }
+.list-scroll { overflow-y: auto; flex: 1; }
+.mrow { padding: 11px 16px; border-bottom: 1px solid var(--line-2); cursor: pointer; display: grid; gap: 3px; position: relative; }
+.mrow:hover { background: var(--surface-2); }
+.mrow[aria-selected="true"] { background: var(--accent-weak); }
+.mrow .l1 { display: flex; gap: 8px; align-items: baseline; }
+.mrow .from { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.mrow .date { font-size: 11.5px; color: var(--fg-3); white-space: nowrap; }
+.mrow .subj { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .snip { font-size: 12px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .star { position: absolute; left: 5px; top: 14px; width: 5px; height: 5px; border-radius: 50%; background: var(--crit); }
+.reader { overflow-y: auto; padding: 22px 28px 40px; padding-right: max(28px, env(safe-area-inset-right, 0px)); min-width: 0; }
+.reader h1 { font-size: 18px; line-height: 1.4; }
+.meta { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 10px; font-size: 13px; margin: 14px 0; }
+.meta dt { color: var(--fg-3); } .meta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 18px; }
+.body-text { white-space: pre-wrap; font-size: 13.5px; line-height: 1.7; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 16px 18px; overflow-wrap: anywhere; max-width: 78ch; }
+details.att { margin-top: 12px; max-width: 78ch; }
+details.att summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--fg-2); padding: 6px 0; }
+details.att pre { white-space: pre-wrap; font-size: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 12px; max-height: 320px; overflow: auto; margin: 0; }
+.back { display: none; }
+
+/* 표 */
+.table-wrap { overflow-x: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.t th { text-align: left; font-size: 11.5px; letter-spacing: .03em; color: var(--fg-3); font-weight: 600; padding: 9px 12px;
+  border-bottom: 1px solid var(--line); background: var(--surface-2); position: sticky; top: 0; white-space: nowrap; }
+table.t td { padding: 10px 12px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+table.t tbody tr { cursor: pointer; }
+table.t tbody tr:hover td { background: var(--surface-2); }
+table.t td.c { text-align: center; }
+.clip { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desc { font-size: 12px; color: var(--fg-2); margin-top: 2px; }
+
+/* E.O 단계 */
+.stages { display: flex; gap: 0; margin-bottom: 16px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.stage { flex: 1 0 auto; min-width: 96px; padding: 10px 14px; border-right: 1px solid var(--line-2); text-align: left; background: transparent; border-top: 0; border-bottom: 0; border-left: 0; }
+.stage:last-child { border-right: 0; }
+.stage .k { font-size: 11.5px; color: var(--fg-2); font-weight: 500; }
+.stage .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stage[aria-pressed="true"] { background: var(--accent-weak); box-shadow: inset 0 -2px 0 var(--accent); }
+.st { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+
+/* 상세 서랍 */
+.drawer-bg { position: fixed; inset: 0; background: rgba(10, 16, 24, .35); z-index: 40; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--surface); z-index: 41;
+  border-left: 1px solid var(--line); display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.drawer-h { display: flex; align-items: flex-start; gap: 10px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+.drawer-h h2 { font-size: 16px; line-height: 1.4; flex: 1; }
+.drawer-b { overflow-y: auto; padding: 16px 20px 28px; display: grid; gap: 18px; }
+.kv { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 12px; font-size: 13px; margin: 0; }
+.kv dt { color: var(--fg-3); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+.sect h3 { font-size: 12px; letter-spacing: .05em; color: var(--fg-3); margin: 0 0 8px; font-weight: 600; }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); display: grid; gap: 10px; }
+.timeline li { position: relative; font-size: 12.5px; }
+.timeline li::before { content: ""; position: absolute; left: -20px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--surface); border: 2px solid var(--accent); }
+.timeline time { color: var(--fg-3); font-size: 11.5px; margin-right: 6px; }
+.edit { display: grid; gap: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; }
+.edit-row { display: flex; gap: 8px; flex-wrap: wrap; }
+select, input[type=text], textarea { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 6px 9px; min-width: 0; }
+textarea { width: 100%; resize: vertical; min-height: 56px; }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.thumbs figure { margin: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.thumbs img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.thumbs figcaption { font-size: 11px; color: var(--fg-2); padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; font-size: 12.5px; }
+.case b { font-size: 13px; }
+
+/* 결함 분포 막대 */
+.bars { display: grid; gap: 6px; padding: 12px 16px 14px; }
+.bar { display: grid; grid-template-columns: 84px minmax(0, 1fr) 28px; gap: 8px; align-items: center; font-size: 12px; }
+.bar .track { height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--accent); border-radius: 5px; }
+.bar .fill.open { background: var(--warn); }
+
+/* 금형 매트릭스 */
+table.matrix td.doc { text-align: center; font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+.d-확정 { background: var(--ok-weak); color: var(--ok); }
+.d-검토중, .d-접수 { background: var(--warn-weak); color: var(--warn); }
+.d-요청 { background: var(--info-weak); color: var(--info); }
+.d-미접수 { background: var(--crit-weak); color: var(--crit); }
+.d-해당없음 { background: var(--mute-weak); color: var(--fg-3); }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--fg-2); }
+.legend span { display: inline-flex; gap: 4px; align-items: center; }
+.legend i { font-style: normal; display: inline-grid; place-items: center; width: 20px; height: 18px; border-radius: 3px; font-size: 11px; font-weight: 700; }
+
+/* 토스트 */
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60;
+  background: var(--fg); color: var(--surface); padding: 10px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px);
+  box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+.copybox { display: flex; gap: 8px; align-items: center; background: var(--surface-2); border: 1px dashed var(--line); border-radius: 6px; padding: 8px 10px; font-size: 12.5px; }
+.copybox code { font-family: var(--mono); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 1100px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .grid2 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 820px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .side { flex-direction: row; align-items: center; padding: 8px 12px; gap: 6px; overflow-x: auto;
+    padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+  .brand { padding: 0 6px 0 0; } .brand div { display: none; }
+  .nav { display: flex; gap: 2px; }
+  .nav a { padding: 7px 10px; white-space: nowrap; } .nav a svg { display: none; }
+  .nav a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--accent); }
+  .side-foot { display: none; }
+  .top { padding: 10px 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); flex-wrap: wrap; }
+  .top .sync-time { display: none; }
+  .view { padding: 16px 16px 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tiles .tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .view.split { grid-template-columns: minmax(0, 1fr); }
+  .view.split.reading .list-pane { display: none; }
+  .view.split:not(.reading) .reader { display: none; }
+  .reader { padding: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .back { display: inline-flex; margin-bottom: 10px; }
+  .hide-sm { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) { .drawer { animation: slide .18s ease-out; } @keyframes slide { from { transform: translateX(24px); opacity: .6; } } }
+</style>
+
+<div class="app">
+  <nav class="side" aria-label="메뉴">
+    <div class="brand"><div class="brand-mark">업무</div><div><b>개발 업무 비서</b><span>메일 · E.O · T/O · 금형 이관</span></div></div>
+    <div class="nav" id="nav"></div>
+    <div class="side-foot">
+      <span class="mode"><i class="dot" id="mode-dot"></i><span id="mode-text">연결 확인 중</span></span>
+      <span id="last-sync">마지막 수집 -</span>
+    </div>
+  </nav>
+  <div class="main">
+    <header class="top">
+      <form class="search" id="search-form" role="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="text" placeholder="메일 검색 (품번, 차종, 업체, 내용 · 첨부 안 글자까지)" autocomplete="off">
+      </form>
+      <span class="sync-time" id="sync-time"></span>
+      <button class="btn primary" id="sync-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+        새 메일 받기</button>
+    </header>
+    <div class="demo-bar" id="demo-bar" hidden><b>예시 화면</b> · 실제 회사 메일이 아닌 가상 데이터입니다. 회사 PC에서 <span class="mono">python -m mailhub app</span> 으로 실행하면 내 메일·대장이 연결됩니다.</div>
+    <main class="view" id="view"></main>
+  </div>
+</div>
+<div id="layer"></div>
+
+<script>
+(() => {
+'use strict';
+// ================= 데이터 =================
+const TODAY = new Date();
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const addDays = (n) => { const d = new Date(TODAY); d.setDate(d.getDate() + n); return iso(d); };
+const DEMO = buildDemo();
+let LIVE = false;
+
+async function api(path, opts) {
+  if (LIVE) {
+    const r = await fetch('/api/' + path, opts ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(opts) } : undefined);
+    if (!r.ok) { const t = await r.text(); throw new Error(t || r.statusText); }
+    return r.json();
+  }
+  return demoApi(path, opts);
+}
+
+function buildDemo() {
+  const T = (n, h = 9, m = 0) => addDays(n) + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':00';
+  const mails = [
+    { id: 30412, sent_at: T(0, 8, 41), sender_name: '이준호 책임 (고객사 품질)', sender_email: 'jh.lee@oem-example.com', subject: '[NX5 CUV] 도어트림 감싸기 주름 개선대책 회신 요청 (~11/12)', tags: 'T/O,품질문제,일정', part_nos: '82305-NX100', attachments: '도어트림 주름 사진.pptx', needs_action: 1, status: '', snippet: 'LP2 이벤트에서 FR 도어트림 암레스트 감싸기 주름이 재발했습니다. 원인과 개선대책을 11/12까지 회신 부탁드립니다.', body: '안녕하십니까. 고객사 품질팀 이준호입니다.\n\nLP2 이벤트에서 FR 도어트림 암레스트 감싸기 주름이 재발했습니다 (발생률 6/40).\n첨부 사진 참고하시어 원인과 개선대책을 11/12(목)까지 회신 부탁드립니다.\n\n1. 발생 부위: 암레스트 앞쪽 코너 R부\n2. 지난 M단계 대책(접착제 도포량 증가) 적용 여부 확인 필요\n\n감사합니다.', att_text: '[첨부: 도어트림 주름 사진.pptx]\n암레스트 코너 R부 주름 / 발생 6EA / 40EA 중' },
+    { id: 30398, sent_at: T(-1, 17, 12), sender_name: '박성민 과장 (한빛정밀)', sender_email: 'sm.park@hanbit-mold.example', subject: 'RE: [NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청', tags: 'E.O,금형수정', part_nos: '86511-NX200', attachments: '금형수정 검토서_86511.pdf', needs_action: 0, status: '', snippet: '검토서 송부드립니다. 육성 후 재가공, 수정 기간 7일, 비용 180만원입니다.', body: '안녕하십니까. 한빛정밀 박성민입니다.\n\n요청하신 보스 높이 2mm 상향 건 검토서 송부드립니다.\n- 수정 방식: 코어측 육성 후 재가공\n- 수정 기간: 착수 후 7일\n- 비용: 180만원 (VAT 별도)\n- 검사구 영향: 보스 체크핀 위치 수정 필요\n\n확인 부탁드립니다.', att_text: '[첨부: 금형수정 검토서_86511.pdf]\n수정 부위 보스 4EA / 육성 2.0mm / 재가공 / 일정 7일' },
+    { id: 30377, sent_at: T(-1, 10, 5), sender_name: '최유진 대리 (MSV설계)', sender_email: 'yj.choi@design-example.com', subject: '[NX5 HEV] 콘솔 브라켓 E.O 통보 (EO26-0871)', tags: 'E.O,설계반영', part_nos: '84634-NX100', attachments: 'EO26-0871.pdf, EO LIST.xlsx', needs_action: 1, status: '', snippet: '콘솔 CTR MTG 브라켓 볼트 형상 변경 E.O 통보드립니다. 금형 수정 가능 여부와 일정 회신 부탁드립니다.', body: '안녕하세요. MSV설계 최유진입니다.\n\nEO26-0871 통보드립니다.\n- 품번: 84634-NX100 BRKT ASSY-CONSOLE CTR MTG\n- 변경: IN-LINE 볼트 형상 변경, PAD 32x12 → 40x25x0.5t\n\n금형 수정 가능 여부와 일정을 11/14까지 회신 부탁드립니다.', att_text: '[첨부: EO LIST.xlsx]\nEO26-0871 / 84634-NX100 / BRKT ASSY-CONSOLE CTR MTG / PAD 형상 변경' },
+    { id: 30350, sent_at: T(-2, 15, 30), sender_name: 'Daniel Ruiz (멕시코 법인)', sender_email: 'd.ruiz@mx-plant.example', subject: 'RE: MD-2611 금형 이관 KD LIST 확인 요청', tags: '금형이관', part_nos: '', attachments: 'KD LIST_MD-2611.xlsx', needs_action: 1, status: '', snippet: 'Please confirm KD list. Hot runner nozzle will be LP. Need final list by Nov 14.', body: 'Hello,\n\nPlease find attached the KD list for MD-2611.\nHot runner nozzle will be locally procured (LP).\nWe need the final list by Nov 14 for customs.\n\nBest regards,\nDaniel', att_text: '[첨부: KD LIST_MD-2611.xlsx]\nINSERT NUT M6 KD 4EA / HOT RUNNER NOZZLE LP 2EA' },
+    { id: 30333, sent_at: T(-3, 11, 0), sender_name: '정다은 사원 (생산기술)', sender_email: 'de.jung@example-corp.com', subject: '[공유] 11월 금형 정기 점검 일정', tags: '일정', part_nos: '', attachments: '', needs_action: 0, status: '', snippet: '11월 금형 정기 점검 일정 공유드립니다.', body: '11월 금형 정기 점검 일정 공유드립니다.\n- 11/18~19 프레스동\n- 11/20 사출동', att_text: '' },
+    { id: 30310, sent_at: T(-4, 9, 20), sender_name: '김태현 차장 (누리검사구)', sender_email: 'th.kim@nuri-cf.example', subject: 'RE: 헤드라이닝 검사구 수정 일정', tags: '검사구,일정', part_nos: '85310-NX000', attachments: '', needs_action: 0, status: '', snippet: '검사구 수정 11/15 완료 예정입니다.', body: '검사구 수정 11/15 완료 예정입니다. 완료 후 R&R 결과 같이 송부드리겠습니다.', att_text: '' },
+  ];
+  const reqs = [
+    { id: 7, vendor: '한빛정밀', to_addrs: 'sm.park@hanbit-mold.example', subject: '[NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청 (회신 11/7)', requested_at: addDays(-6), due_date: addDays(-1), status: '회신받음', remind_count: 0, reply_mail_id: 30398, req_type: '금형수정검토', eo_id: 3 },
+    { id: 8, vendor: '누리검사구', to_addrs: 'th.kim@nuri-cf.example', subject: '헤드라이닝 검사구 수정 견적 요청', requested_at: addDays(-8), due_date: addDays(-3), status: '요청', remind_count: 1, reply_mail_id: null, req_type: '검사구수정', eo_id: null },
+    { id: 9, vendor: '대성금형', to_addrs: 'ys.han@daesung-mold.example', subject: '[NX5 HEV] 콘솔 브라켓 EO26-0871 금형수정 가능 여부 검토 요청', requested_at: addDays(-1), due_date: addDays(2), status: '요청', remind_count: 0, reply_mail_id: null, req_type: '금형수정검토', eo_id: 4 },
+    { id: 10, vendor: '멕시코 법인', to_addrs: 'd.ruiz@mx-plant.example', subject: 'MD-2611 성형조건표 송부 요청', requested_at: addDays(-5), due_date: addDays(0), status: '요청', remind_count: 0, reply_mail_id: null, req_type: '이관서류', eo_id: null },
+  ];
+  const eos = [
+    { id: 1, eo_no: 'EO26-0702', car: 'NX5 CUV', part_no: '85839-NX300', part_name: 'TRIM ASSY-RR PILLAR', change_desc: '재질 변경 PP → PP-TD20', status: '완료', received_at: addDays(-40), review_due: addDays(-35), mold_due: addDays(-20), verify_due: addDays(-10), mold_vendor: '대성금형', mold_action: '수정불필요', cf_impact: '불필요', cost: '', note: '', new_mails: 0, images: 0 },
+    { id: 2, eo_no: 'EO26-0815', car: 'NX5 5DR', part_no: '86535-NX800', part_name: 'BRKT-FR BPR REINF NO.1', change_desc: '상원판 6개소 가공, 리브 높이 1.5mm 하향', status: '수정중', received_at: addDays(-18), review_due: addDays(-14), mold_due: addDays(-2), verify_due: addDays(9), mold_vendor: '한빛정밀', mold_action: '가공', cf_impact: '필요', cost: '290만원', note: '[10/30] 착수', new_mails: 1, images: 2 },
+    { id: 3, eo_no: 'EO26-0844', car: 'NX5 CUV', part_no: '86511-NX200', part_name: 'FR BUMPER UPR', change_desc: '스크류 보스 높이 2mm 상향 (조립성 개선), 리브 2EA 추가', status: '검토중', received_at: addDays(-7), review_due: addDays(-1), mold_due: addDays(12), verify_due: '', mold_vendor: '한빛정밀', mold_action: '', cf_impact: '검토중', cost: '', note: '', new_mails: 1, images: 1 },
+    { id: 4, eo_no: 'EO26-0871', car: 'NX5 HEV', part_no: '84634-NX100', part_name: 'BRKT ASSY-CONSOLE CTR MTG', change_desc: 'IN-LINE 볼트 형상 변경, PAD 32x12 → 40x25x0.5t', status: '접수', received_at: addDays(-1), review_due: addDays(5), mold_due: '', verify_due: '', mold_vendor: '대성금형', mold_action: '', cf_impact: '', cost: '', note: '', new_mails: 0, images: 0 },
+    { id: 5, eo_no: 'EO26-0850', car: 'NX5 CUV', part_no: '86525/26-NXA0', part_name: 'BRKT-FR BPR SIDE UPR', change_desc: '후크 하단 형상 추가', status: '수정요청', received_at: addDays(-10), review_due: addDays(-6), mold_due: addDays(1), verify_due: addDays(10), mold_vendor: '한빛정밀', mold_action: '육성', cf_impact: '불필요', cost: '130만원', note: '', new_mails: 0, images: 0 },
+  ];
+  const tos = [
+    { id: 1, car: 'NX5 CUV', part_no: '86525/26-NXA0', part_name: 'BRKT-FR BPR SIDE UPR', to_stage: 'T1', to_date: addDays(-200), defect_type: '싱크', location: '스크류 보스 뒷면', phenomenon: '보스 뒷면 싱크 0.15mm (A면 외관 영향)', cause_cat: '제품설계', cause: '보스 두께 3.2t (일반부 2.5t 대비 과다)', action_cat: '금형수정', countermeasure: '보스 코어 살빼기 2.0t 육성 가공', status: '종결', effective: '유효', result: 'T2 싱크 0.03mm 이하 OK', recur_of: null, due: addDays(-190), verify_due: addDays(-170), mold_vendor: '한빛정밀', resin: 'PP-TD20' },
+    { id: 2, car: 'NX5 CUV', part_no: '86511-NX200', part_name: 'FR BUMPER UPR', to_stage: 'T2', to_date: addDays(-11), defect_type: '변형', location: '상단 플랜지', phenomenon: '상단 플랜지 휨 1.2mm (규격 ±0.5)', cause_cat: '금형', cause: '고정측 냉각 부족, 고정/가동 온도차 8℃', action_cat: '금형수정', countermeasure: '냉각 채널 추가 + 0.8mm 역변형 가공', status: '대책수립', effective: '', result: '', recur_of: null, due: addDays(-3), verify_due: addDays(9), mold_vendor: '한빛정밀', resin: 'PP-TD20' },
+    { id: 3, car: 'NX5 CUV', part_no: '86526-NXA0', part_name: 'BRKT-FR BPR SIDE UPR', to_stage: 'M', to_date: addDays(-2), defect_type: '싱크', location: '보스', phenomenon: '보스 싱크 재발 0.10mm', cause_cat: '', cause: '', action_cat: '', countermeasure: '', status: '발생', effective: '', result: '', recur_of: 1, due: addDays(6), verify_due: '', mold_vendor: '한빛정밀', resin: 'PP-TD20' },
+    { id: 4, car: 'NX5 CUV', part_no: '82305-NX100', part_name: 'TRIM ASSY-FR DR', to_stage: 'LP2', to_date: addDays(0), defect_type: '감싸기·접착', location: '암레스트 코너 R', phenomenon: '감싸기 주름 6/40 발생', cause_cat: '', cause: '', action_cat: '', countermeasure: '', status: '발생', effective: '', result: '', recur_of: null, due: addDays(4), verify_due: '', mold_vendor: '', resin: 'PVC 표피' },
+    { id: 5, car: 'NX5 5DR', part_no: '84710-NX000', part_name: 'CRASH PAD MAIN', to_stage: 'T1', to_date: addDays(-25), defect_type: '웰드라인', location: '센터 그릴 홀 주변', phenomenon: '홀 하단 웰드 선명, 외관 한도 초과', cause_cat: '금형', cause: '합류부 가스벤트 부족', action_cat: '금형수정', countermeasure: '가스벤트 2개소 추가 + 금형온도 +10℃', status: '대책적용', effective: '', result: '', recur_of: null, due: addDays(-12), verify_due: addDays(3), mold_vendor: '대성금형', resin: 'PP-TD20' },
+  ];
+  const molds = [
+    { id: 1, mold_no: 'MD-2611', car: 'NX5 CUV', part_no: '86511-NX200', part_name: 'FR BUMPER UPR', mold_vendor: '한빛정밀', dest: '멕시코', status: '이관준비',
+      docs: { '금형사양서': ['확정', addDays(-12)], '성형조건표': ['요청', ''], '부품리스트': ['검토중', addDays(-5)], '선적일정': ['접수', addDays(-3)], 'KD리스트': ['접수', addDays(-2)], '원소재리스트': ['미접수', ''] },
+      ship: { etd: addDays(10), eta: addDays(42), atd: '', ata: '', bl_no: '', port_from: '부산', port_to: 'Manzanillo' } },
+    { id: 2, mold_no: 'MD-2598', car: 'NX5 5DR', part_no: '84710-NX000', part_name: 'CRASH PAD MAIN', mold_vendor: '대성금형', dest: '인도', status: '선적',
+      docs: { '금형사양서': ['확정', addDays(-30)], '성형조건표': ['확정', addDays(-28)], '부품리스트': ['확정', addDays(-28)], '선적일정': ['확정', addDays(-14)], 'KD리스트': ['확정', addDays(-20)], '원소재리스트': ['확정', addDays(-20)] },
+      ship: { etd: addDays(-13), eta: addDays(19), atd: addDays(-12), ata: '', bl_no: 'HDMU2049117', port_from: '부산', port_to: 'Chennai' } },
+    { id: 3, mold_no: 'MD-2630', car: 'NX5 CUV', part_no: '', part_name: 'CONSOLE UPR', mold_vendor: '대성금형', dest: '멕시코', status: 'T/O',
+      docs: { '금형사양서': ['접수', addDays(-4)], '성형조건표': ['미접수', ''], '부품리스트': ['미접수', ''], '선적일정': ['미접수', ''], 'KD리스트': ['미접수', ''], '원소재리스트': ['해당없음', ''] },
+      ship: { etd: '', eta: '', atd: '', ata: '', bl_no: '', port_from: '', port_to: '' } },
+  ];
+  return { mails, reqs, eos, tos, molds, last_sync: T(0, 8, 0) };
+}
+
+// ---------- 예시 모드용 처리 ----------
+const STAGE_EO = ['접수', '검토중', '수정요청', '수정중', '수정완료', '검증중', '완료', '수정불필요', '보류', '취소'];
+const STAGE_TO = ['발생', '원인분석', '대책수립', '대책적용', '효과확인', '종결', '보류'];
+const SECTIONS = ['금형사양서', '성형조건표', '부품리스트', '선적일정', 'KD리스트', '원소재리스트'];
+const days = (d) => d ? Math.round((new Date(d + 'T00:00:00') - new Date(iso(TODAY) + 'T00:00:00')) / 86400000) : null;
+function eoDelay(r) {
+  const s = r.status, chk = [];
+  if (['접수', '검토중'].includes(s)) chk.push(['검토 회신', r.review_due]);
+  if (['접수', '검토중', '수정요청', '수정중'].includes(s)) chk.push(['금형 수정', r.mold_due]);
+  if (['접수', '검토중', '수정요청', '수정중', '수정완료', '검증중'].includes(s)) chk.push(['검증', r.verify_due]);
+  for (const [n, d] of chk) if (d && days(d) < 0) return `${n} ${-days(d)}일 지연`;
+  return '';
+}
+function eoSoon(r) {
+  for (const [n, f, sts] of [['검토 회신', 'review_due', ['접수', '검토중']], ['금형 수정', 'mold_due', ['접수', '검토중', '수정요청', '수정중']], ['검증', 'verify_due', ['수정완료', '검증중']]])
+    if (sts.includes(r.status) && r[f]) { const n2 = days(r[f]); if (n2 >= 0 && n2 <= 2) return `${n} ${n2 === 0 ? '오늘' : 'D-' + n2}`; }
+  return '';
+}
+function toDelay(r) {
+  if (['발생', '원인분석', '대책수립'].includes(r.status) && r.due && days(r.due) < 0) return `대책 적용 ${-days(r.due)}일 지연`;
+  if (r.status !== '종결' && r.status !== '보류' && r.verify_due && days(r.verify_due) < 0) return `효과 확인 ${-days(r.verify_due)}일 지연`;
+  return '';
+}
+function toSoon(r) {
+  if (['발생', '원인분석', '대책수립'].includes(r.status) && r.due) { const n = days(r.due); if (n >= 0 && n <= 2) return `대책 적용 ${n === 0 ? '오늘' : 'D-' + n}`; }
+  if (['대책적용', '효과확인'].includes(r.status) && r.verify_due) { const n = days(r.verify_due); if (n >= 0 && n <= 3) return `효과 확인 ${n === 0 ? '오늘' : 'D-' + n}`; }
+  return '';
+}
+function moldAlerts(m) {
+  const out = [], s = m.ship || {};
+  const missing = SECTIONS.filter(x => x !== '선적일정' && m.docs[x] && !['확정', '해당없음'].includes(m.docs[x][0]));
+  if (s.etd && !s.atd) { const n = days(s.etd); if (n < 0) out.push(`ETD 지남 - 출항 확인 필요`); else if (n <= 14 && missing.length) out.push(`선적 D-${n}, 미완료: ${missing.join(', ')}`); }
+  if (s.eta && s.atd && !s.ata && days(s.eta) < 0) out.push('ETA 지남 - 현지 도착 확인 필요');
+  return out;
+}
+function reqState(r) {
+  if (r.status !== '요청') return '';
+  const n = days(r.due_date);
+  return n < 0 ? `${-n}일 지남` : (n === 0 ? '오늘' : `D-${n}`);
+}
+
+function demoSummary() {
+  const D = DEMO;
+  const todo = D.mails.filter(m => m.needs_action && m.status !== '완료');
+  const reqLate = D.reqs.filter(r => r.status === '요청' && days(r.due_date) <= 0);
+  const eoLate = D.eos.filter(r => eoDelay(r));
+  const toLate = D.tos.filter(r => toDelay(r));
+  const moldAl = D.molds.filter(m => moldAlerts(m).length);
+  const prio = [];
+  for (const r of reqLate) prio.push({ kind: '업체 요청', sev: days(r.due_date) < 0 ? 'crit' : 'warn', title: r.subject, sub: r.vendor, alert: reqState(r) === '오늘' ? '오늘 회신 기한' : '회신 ' + reqState(r), go: '#req', id: r.id });
+  for (const r of eoLate) prio.push({ kind: 'E.O', sev: 'crit', title: `${r.car} ${r.part_name}`, sub: r.change_desc, alert: eoDelay(r), go: '#eo', id: r.id });
+  for (const r of toLate) prio.push({ kind: 'T/O', sev: 'crit', title: `${r.part_name} · ${r.defect_type}`, sub: r.phenomenon, alert: toDelay(r), go: '#to', id: r.id });
+  for (const m of moldAl) prio.push({ kind: '금형 이관', sev: 'warn', title: `${m.mold_no} ${m.part_name} → ${m.dest}`, sub: moldAlerts(m)[0], alert: '확인 필요', go: '#mold', id: m.id });
+  for (const m of todo) prio.push({ kind: '메일', sev: 'info', title: m.subject, sub: m.sender_name, alert: '회신 필요', go: '#mail', id: m.id });
+  const agenda = [];
+  for (const r of D.reqs) if (r.status === '요청') agenda.push({ date: r.due_date, kind: '요청', text: `${r.vendor} 회신 기한` });
+  for (const r of D.eos) for (const [f, l] of [['review_due', '검토 회신'], ['mold_due', '금형 수정 완료'], ['verify_due', '검증']]) if (r[f] && !['완료', '취소', '수정불필요'].includes(r.status)) agenda.push({ date: r[f], kind: 'E.O', text: `${r.part_name} ${l}` });
+  for (const r of D.tos) if (r.status !== '종결') { if (r.due) agenda.push({ date: r.due, kind: 'T/O', text: `${r.part_name} ${r.defect_type} 대책` }); if (r.verify_due) agenda.push({ date: r.verify_due, kind: 'T/O', text: `${r.part_name} 효과 확인` }); }
+  for (const m of D.molds) { if (m.ship.etd && !m.ship.atd) agenda.push({ date: m.ship.etd, kind: '선적', text: `${m.mold_no} ETD → ${m.dest}` }); if (m.ship.eta && !m.ship.ata) agenda.push({ date: m.ship.eta, kind: '도착', text: `${m.mold_no} ETA ${m.ship.port_to}` }); }
+  return {
+    counts: { todo: todo.length, req_late: reqLate.length, req_open: D.reqs.filter(r => r.status === '요청').length, eo_late: eoLate.length, eo_open: D.eos.filter(r => !['완료', '취소', '수정불필요'].includes(r.status)).length, to_late: toLate.length, to_open: D.tos.filter(r => r.status !== '종결').length, mold_alert: moldAl.length, mold_open: D.molds.filter(m => m.status !== '이관완료').length },
+    priority: prio, agenda: agenda.filter(a => days(a.date) >= -3 && days(a.date) <= 14).sort((a, b) => a.date.localeCompare(b.date)),
+    recent: D.mails.slice(0, 5), last_sync: D.last_sync,
+  };
+}
+
+async function demoApi(path, body) {
+  const D = DEMO;
+  const [base, qs] = path.split('?');
+  const p = new URLSearchParams(qs || '');
+  const parts = base.split('/');
+  await new Promise(r => setTimeout(r, 60));
+  if (base === 'summary') return demoSummary();
+  if (base === 'mails') {
+    let r = D.mails.slice();
+    const q = (p.get('q') || '').trim().toLowerCase();
+    if (q) r = r.filter(m => q.split(/\s+/).every(t => (m.subject + m.body + m.sender_name + m.part_nos + m.att_text + m.attachments).toLowerCase().includes(t)));
+    if (p.get('todo') === '1') r = r.filter(m => m.needs_action && m.status !== '완료');
+    if (p.get('tag')) r = r.filter(m => (',' + m.tags + ',').includes(',' + p.get('tag') + ','));
+    return r;
+  }
+  if (parts[0] === 'mail' && parts.length === 2) return D.mails.find(m => m.id === +parts[1]);
+  if (parts[0] === 'mail' && parts[2] === 'mark') { const m = D.mails.find(x => x.id === +parts[1]); m.status = body.status; if (body.status === '완료') m.needs_action = 0; return { ok: true }; }
+  if (base === 'reqs') return D.reqs.map(r => ({ ...r, state: reqState(r) }));
+  if (parts[0] === 'req' && parts.length === 2 && body) { const r = D.reqs.find(x => x.id === +parts[1]); if (body.status) r.status = body.status; if (body.extend) { const d = new Date(r.due_date); d.setDate(d.getDate() + 2); r.due_date = iso(d); } return { ok: true }; }
+  if (base === 'eos') return D.eos.map(r => ({ ...r, delay: eoDelay(r), soon: eoSoon(r) }));
+  if (parts[0] === 'eo' && parts.length === 2 && !body) {
+    const r = D.eos.find(x => x.id === +parts[1]);
+    return { eo: { ...r, delay: eoDelay(r), soon: eoSoon(r) }, log: [{ at: r.received_at + 'T09:00', what: '등록', note: '' }, ...(r.status !== '접수' ? [{ at: addDays(-2) + 'T14:00', what: `→ ${r.status}`, note: r.note || '' }] : [])],
+      mails: D.mails.filter(m => m.part_nos.includes(r.part_no.slice(0, 5))).map(m => ({ id: m.id, sent_at: m.sent_at, sender_name: m.sender_name, subject: m.subject })),
+      requests: D.reqs.filter(q => q.eo_id === r.id), images: [] };
+  }
+  if (parts[0] === 'eo' && body) { const r = D.eos.find(x => x.id === +parts[1]); if (body.status) r.status = body.status; if (body.note) r.note = (r.note ? r.note + '\n' : '') + body.note; return { ok: true }; }
+  if (base === 'tos') return D.tos.map(r => ({ ...r, delay: toDelay(r), soon: toSoon(r) }));
+  if (parts[0] === 'to' && parts.length === 2 && !body) {
+    const r = D.tos.find(x => x.id === +parts[1]);
+    const prev = r.recur_of ? D.tos.find(x => x.id === r.recur_of) : null;
+    const sim = D.tos.filter(x => x.id !== r.id && (x.defect_type === r.defect_type || x.part_name === r.part_name)).map(x => ({ score: x.defect_type === r.defect_type ? 9 : 4, why: x.defect_type === r.defect_type ? [`같은 불량(${x.defect_type})`, ...(x.effective === '유효' ? ['효과 확인된 대책'] : [])] : ['품명 유사'], ...x }));
+    return { issue: { ...r, delay: toDelay(r) }, previous: prev, similar: sim, log: [{ at: r.to_date + 'T10:00', what: '등록', note: r.recur_of ? `재발: T${r.recur_of}` : '' }], mails: [], images: [], guide: r.defect_type === '싱크' ? GUIDE_SINK : '' };
+  }
+  if (parts[0] === 'to' && body) { const r = D.tos.find(x => x.id === +parts[1]); if (body.status) r.status = body.status; return { ok: true }; }
+  if (base === 'molds') return D.molds.map(m => ({ ...m, alerts: moldAlerts(m) }));
+  if (parts[0] === 'mold' && parts.length === 2 && !body) { const m = D.molds.find(x => x.id === +parts[1]); return { mold: { ...m, alerts: moldAlerts(m) }, log: [{ at: addDays(-12) + 'T09:00', what: '등록', note: '' }], mails: [], items: { 부품: 12, KD: 2, 원소재: 0 } }; }
+  if (parts[0] === 'mold' && parts[2] === 'doc') { const m = D.molds.find(x => x.id === +parts[1]); m.docs[body.section] = [body.status, m.docs[body.section][1] || iso(TODAY)]; return { ok: true }; }
+  if (base === 'sync') return { added: 0, message: '예시 모드에서는 메일을 받지 않습니다' };
+  return { ok: true, demo: true };
+}
+const GUIDE_SINK = '■ 싱크 - 원인·대책 가이드\n[대책 우선순위] ① 조건 → ② 금형 → ③ 설계(E.O) → ④ 재질\n 1. 보압·보압 시간 증가 (게이트 실 시간 확인)\n 2. 금형 온도 하향, 냉각 시간 증가\n 3. 게이트 확대 또는 후육부 가까이 이동\n 4. 해당 부위 냉각 채널 보강·버블러\n 5. 리브/보스 두께 축소, 코어 빼기 → E.O';
+
+// ================= 공통 UI =================
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const md = (d) => d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : '';
+const wd = (d) => '일월화수목금토'[new Date(d + 'T00:00:00').getDay()];
+const ago = (s) => { if (!s) return ''; const n = days(s.slice(0, 10)); if (n === 0) return s.slice(11, 16); if (n === -1) return '어제'; return md(s.slice(0, 10)); };
+function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2600); }
+const STATE_CLASS = { '접수': 'warn', '검토중': 'warn', '수정요청': 'info', '수정중': 'info', '수정완료': 'ok', '검증중': 'ok', '완료': '', '수정불필요': '', '보류': 'crit', '취소': '',
+  '발생': 'crit', '원인분석': 'warn', '대책수립': 'warn', '대책적용': 'info', '효과확인': 'ok', '종결': '',
+  '요청': 'info', '회신받음': 'ok', '제작중': '', 'T/O': 'warn', '이관준비': 'warn', '선적대기': 'info', '선적': 'info', '현지도착': 'ok', '현지T/O': 'ok', '이관완료': '' };
+const pill = (s) => `<span class="chip ${STATE_CLASS[s] ?? ''}">${esc(s)}</span>`;
+const SYMBOL = { '확정': '●', '검토중': '◐', '접수': '◐', '요청': '○', '미접수': '✕', '해당없음': '－' };
+async function copyCmd(text) {
+  try { await navigator.clipboard.writeText(text); toast('명령을 복사했습니다. Claude Code 입력창에 붙여 넣으세요.'); }
+  catch { toast('복사가 막혀 있습니다. 아래 명령을 직접 선택해 복사하세요.'); }
+}
+const claudeBox = (cmd, label) => `<div class="copybox"><span class="eyebrow">Claude</span><code>${esc(cmd)}</code><button class="btn sm" data-copy="${esc(cmd)}" type="button">${esc(label || '복사')}</button></div>`;
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-copy]'); if (b) copyCmd(b.dataset.copy); });
+
+function drawer(title, html, onReady) {
+  const L = $('#layer');
+  L.innerHTML = `<div class="drawer-bg" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="drawer-h"><h2>${title}</h2><button class="btn sm" data-close type="button">닫기</button></div><div class="drawer-b">${html}</div></aside>`;
+  L.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { L.innerHTML = ''; }));
+  onReady && onReady(L);
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#layer').innerHTML = ''; });
+
+const ICONS = {
+  today: '<path d="M3 10h18M7 3v4M17 3v4"/><rect x="3" y="5" width="18" height="16" rx="2"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  req: '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>',
+  eo: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  to: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
+  mold: '<rect x="3" y="7" width="18" height="12" rx="1"/><path d="M7 7V4h10v3M3 12h18"/>',
+};
+const NAV = [['today', '오늘'], ['mail', '메일함'], ['req', '업체 요청'], ['eo', 'E.O 리스트'], ['to', 'T/O 문제점'], ['mold', '금형 이관']];
+function renderNav(counts = {}) {
+  const badge = { mail: [counts.todo, false], req: [counts.req_late, counts.req_late > 0], eo: [counts.eo_late, counts.eo_late > 0], to: [counts.to_late, counts.to_late > 0], mold: [counts.mold_alert, counts.mold_alert > 0] };
+  const cur = (location.hash || '#today').slice(1);
+  $('#nav').innerHTML = NAV.map(([k, l]) => {
+    const b = badge[k]; const n = b && b[0];
+    return `<a href="#${k}" ${cur === k ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>${l}${n ? `<span class="badge ${b[1] ? 'crit' : ''}">${n}</span>` : ''}</a>`;
+  }).join('');
+}
+
+// ================= 화면: 오늘 =================
+async function viewToday(V) {
+  const s = await api('summary');
+  renderNav(s.counts);
+  const c = s.counts;
+  const now = TODAY;
+  const hello = `${now.getMonth() + 1}월 ${now.getDate()}일 (${'일월화수목금토'[now.getDay()]})`;
+  const tiles = [
+    ['#mail', '회신·검토 필요 메일', c.todo, '받는사람이 나인 요청 메일', c.todo ? 'warn' : 'ok'],
+    ['#req', '업체 회신 기한 도래', c.req_late, `진행 중 요청 ${c.req_open}건`, c.req_late ? 'crit' : 'ok'],
+    ['#eo', 'E.O 지연', c.eo_late, `진행 중 ${c.eo_open}건`, c.eo_late ? 'crit' : 'ok'],
+    ['#to', 'T/O 대책 지연', c.to_late, `진행 중 ${c.to_open}건`, c.to_late ? 'crit' : 'ok'],
+    ['#mold', '금형 이관 확인 필요', c.mold_alert, `이관 진행 ${c.mold_open}벌`, c.mold_alert ? 'warn' : 'ok'],
+  ];
+  const byDay = {};
+  for (const a of s.agenda) (byDay[a.date] = byDay[a.date] || []).push(a);
+  const kindChip = { '요청': 'info', 'E.O': 'acc', 'T/O': 'crit', '선적': 'warn', '도착': 'ok' };
+  V.className = 'view';
+  V.innerHTML = `
+    <div class="head"><div><div class="eyebrow">${esc(hello)}</div><h1>오늘 처리할 일</h1></div>
+      <div class="sub">아침 자동 수집 후 업체 회신 · E.O · T/O · 금형 이관 기한을 한 번에 모았습니다</div></div>
+    <div class="tiles">${tiles.map(([h, k, v, d, sev]) => `<a class="tile ${sev}" href="${h}" style="text-decoration:none;color:inherit"><span class="k">${k}</span><span class="v">${v}</span><span class="d">${d}</span></a>`).join('')}</div>
+    <div class="grid2">
+      <section class="panel"><div class="panel-h"><h2>지금 처리할 일</h2><span class="sub">급한 순서 · 클릭하면 해당 화면으로</span></div>
+        <ul class="rows">${s.priority.length ? s.priority.map(p => `
+          <li class="row" data-go="${p.go}" data-id="${p.id}"><span class="sev ${p.sev}"></span>
+            <div style="min-width:0"><div class="kind">${esc(p.kind)}</div><div class="t">${esc(p.title)}</div><div class="m"><span class="clip">${esc(p.sub || '')}</span></div></div>
+            <div class="r"><span class="chip ${p.sev === 'info' ? 'info' : p.sev}">${esc(p.alert)}</span></div></li>`).join('') : '<li class="empty">급한 일이 없습니다</li>'}</ul></section>
+      <div class="stack">
+        <section class="panel"><div class="panel-h"><h2>다가오는 기한 · 일정</h2><span class="sub">2주</span></div>
+          <div class="agenda">${Object.keys(byDay).length ? Object.entries(byDay).map(([d, items]) => `
+            <div class="ag-day"><div class="ag-date ${days(d) === 0 ? 'today' : ''}">${md(d)} <small>${days(d) === 0 ? '오늘' : wd(d) + (days(d) < 0 ? ' · 지남' : '')}</small></div>
+              <div class="ag-items">${items.map(a => `<div class="ag-item"><span class="chip ${kindChip[a.kind] || ''}">${esc(a.kind)}</span><span>${esc(a.text)}</span></div>`).join('')}</div></div>`).join('') : '<div class="empty">2주 안에 기한이 없습니다</div>'}</div></section>
+        <section class="panel"><div class="panel-h"><h2>최근 받은 메일</h2><a class="sub" href="#mail">메일함 →</a></div>
+          <ul class="rows">${s.recent.map(m => `<li class="row" data-go="#mail" data-id="${m.id}"><span class="sev ${m.needs_action && m.status !== '완료' ? 'info' : ''}"></span>
+            <div style="min-width:0"><div class="t">${esc(m.subject)}</div><div class="m">${esc(m.sender_name)}</div></div><div class="r"><span class="sub num">${ago(m.sent_at)}</span></div></li>`).join('')}</ul></section>
+      </div></div>`;
+  V.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => { PENDING = { view: el.dataset.go.slice(1), id: +el.dataset.id }; location.hash = el.dataset.go; if (location.hash === el.dataset.go) route(); }));
+}
+let PENDING = null;
+
+// ================= 화면: 메일함 =================
+const MAIL_FILTERS = [['todo', '회신 필요'], ['', '전체'], ['E.O', 'E.O'], ['T/O', 'T/O'], ['금형수정', '금형수정'], ['검사구', '검사구'], ['품질문제', '품질문제'], ['금형이관', '금형이관']];
+let mailState = { filter: 'todo', q: '', sel: null };
+async function viewMail(V) {
+  V.className = 'view split';
+  const q = mailState.q;
+  const params = new URLSearchParams({ limit: 60 });
+  if (q) params.set('q', q);
+  if (mailState.filter === 'todo' && !q) params.set('todo', '1'); else if (mailState.filter && mailState.filter !== 'todo') params.set('tag', mailState.filter);
+  const rows = await api('mails?' + params);
+  if (PENDING && PENDING.view === 'mail') { mailState.sel = PENDING.id; PENDING = null; }
+  V.innerHTML = `
+    <section class="list-pane"><div class="pane-h">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h1>${q ? '검색 결과' : '메일함'}</h1><span class="sub num">${rows.length}건</span></div>
+      ${q ? `<div class="chips"><span class="chip acc">"${esc(q)}"</span><button class="btn sm" id="clear-q" type="button">검색 지우기</button></div>` : `<div class="filters">${MAIL_FILTERS.map(([k, l]) => `<button class="filter" type="button" data-f="${k}" aria-pressed="${mailState.filter === k}">${l}</button>`).join('')}</div>`}
+    </div><div class="list-scroll">${rows.length ? rows.map(m => `
+      <div class="mrow" data-id="${m.id}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
+        <div class="l1"><span class="from">${esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
+        <div class="subj">${esc(m.subject)}</div><div class="snip">${esc(m.snippet || '')}</div>
+        ${(m.tags || m.status) ? `<div class="chips">${m.status ? pill(m.status) : ''}${(m.tags || '').split(',').filter(Boolean).slice(0, 4).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      </div>`).join('') : '<div class="empty">조건에 맞는 메일이 없습니다</div>'}</div></section>
+    <section class="reader" id="reader"><div class="empty" style="margin-top:12vh">왼쪽에서 메일을 고르세요</div></section>`;
+  V.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { mailState.filter = b.dataset.f; mailState.sel = null; route(); }));
+  const cq = $('#clear-q', V); if (cq) cq.addEventListener('click', () => { mailState.q = ''; $('#q').value = ''; route(); });
+  V.querySelectorAll('.mrow').forEach(el => el.addEventListener('click', () => openMail(+el.dataset.id, V)));
+  if (mailState.sel && rows.some(r => r.id === mailState.sel)) openMail(mailState.sel, V);
+}
+async function openMail(id, V) {
+  mailState.sel = id;
+  V.querySelectorAll('.mrow').forEach(el => el.setAttribute('aria-selected', +el.dataset.id === id));
+  V.classList.add('reading');
+  const m = await api('mail/' + id);
+  const R = $('#reader', V);
+  const tags = (m.tags || '').split(',').filter(Boolean);
+  const isEO = tags.includes('E.O'), isTO = tags.includes('T/O') || tags.includes('품질문제'), isMold = tags.includes('금형이관');
+  R.innerHTML = `
+    <button class="btn sm back" id="back" type="button">← 목록</button>
+    <div class="chips" style="margin-bottom:8px">${m.needs_action && m.status !== '완료' ? '<span class="chip crit">회신 필요</span>' : ''}${m.status ? pill(m.status) : ''}${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
+    <h1>${esc(m.subject)}</h1>
+    <dl class="meta"><dt>보낸사람</dt><dd>${esc(m.sender_name)} <span class="sub">&lt;${esc(m.sender_email)}&gt;</span></dd>
+      <dt>받은 시각</dt><dd class="num">${esc((m.sent_at || '').replace('T', ' ').slice(0, 16))} · <span class="mono">#${m.id}</span></dd>
+      ${m.part_nos ? `<dt>품번</dt><dd class="mono">${esc(m.part_nos.split(',').slice(0, 8).join(', '))}</dd>` : ''}
+      ${m.attachments ? `<dt>첨부</dt><dd>${esc(m.attachments.split(/\n|, /).join(' · '))}</dd>` : ''}</dl>
+    <div class="actions">
+      <button class="btn primary sm" data-mark="완료" type="button">처리 완료</button>
+      <button class="btn sm" data-mark="진행중" type="button">진행중</button>
+      <button class="btn sm" data-mark="업체검토중" type="button">업체 검토중</button>
+      ${LIVE ? '<button class="btn sm" id="open-orig" type="button">원본 열기</button>' : ''}
+    </div>
+    ${claudeBox('/mail-review ' + m.id, '검토·회신 초안')}
+    ${isEO ? '<div style="height:8px"></div>' + claudeBox('/eo-update ' + m.id, 'E.O 반영') : ''}
+    ${isTO ? '<div style="height:8px"></div>' + claudeBox('/to-update ' + m.id, 'T/O 반영') : ''}
+    ${isMold ? '<div style="height:8px"></div>' + claudeBox('/mold-update ' + m.id, '이관 반영') : ''}
+    <div style="height:16px"></div>
+    <div class="body-text">${esc(m.body || '')}</div>
+    ${m.att_text ? `<details class="att"><summary>첨부파일 안의 글자 보기</summary><pre>${esc(m.att_text)}</pre></details>` : ''}`;
+  $('#back', R).addEventListener('click', () => V.classList.remove('reading'));
+  R.querySelectorAll('[data-mark]').forEach(b => b.addEventListener('click', async () => {
+    await api(`mail/${id}/mark`, { status: b.dataset.mark }); toast(LIVE ? `#${id} '${b.dataset.mark}' 로 기록했습니다` : `예시 화면이라 저장되지 않습니다 ('${b.dataset.mark}')`); route();
+  }));
+  const oo = $('#open-orig', R); if (oo) oo.addEventListener('click', async () => { await api(`mail/${id}/open`, {}); toast('아웃룩(또는 원본 파일)으로 열었습니다'); });
+}
+
+// ================= 화면: 업체 요청 =================
+async function viewReq(V) {
+  const rows = await api('reqs');
+  V.className = 'view';
+  const open = rows.filter(r => r.status === '요청');
+  const late = open.filter(r => r.state.includes('지남') || r.state === '오늘');
+  V.innerHTML = `
+    <div class="head"><div><h1>업체 요청</h1><div class="sub">금형·검사구 업체와 현지 법인에 요청한 건의 회신 기한. 같은 제목으로 회신이 오면 자동으로 '회신받음'이 됩니다</div></div>
+      <div class="chips"><span class="chip info">진행 ${open.length}</span><span class="chip ${late.length ? 'crit' : 'ok'}">기한 도래 ${late.length}</span></div></div>
+    <section class="panel"><div class="table-wrap"><table class="t">
+      <thead><tr><th>번호</th><th>업체</th><th>요청 내용</th><th>요청일</th><th>회신 기한</th><th>상태</th><th>재요청</th><th></th></tr></thead>
+      <tbody>${rows.map(r => `<tr data-id="${r.id}">
+        <td class="mono">R${r.id}</td><td>${esc(r.vendor || r.to_addrs)}</td>
+        <td><div class="clip">${esc(r.subject)}</div><div class="desc">${esc(r.req_type || '')}${r.eo_id ? ` · E${r.eo_id} 연결` : ''}${r.reply_mail_id ? ` · 회신 #${r.reply_mail_id}` : ''}</div></td>
+        <td class="num">${md(r.requested_at)}</td>
+        <td class="num">${md(r.due_date)} ${r.state ? `<span class="chip ${r.state.includes('지남') ? 'crit' : (r.state === '오늘' ? 'warn' : '')}">${esc(r.state)}</span>` : ''}</td>
+        <td>${pill(r.status)}</td><td class="num c">${r.remind_count || ''}</td>
+        <td style="white-space:nowrap">${r.status === '요청' ? `<button class="btn sm" data-act="extend" type="button">+2영업일</button>
+          <button class="btn sm" data-act="remind" type="button">재요청 메일</button>` : ''}
+          ${r.status !== '완료' ? `<button class="btn sm" data-act="done" type="button">완료</button>` : ''}</td></tr>`).join('')}</tbody></table></div></section>
+    <div style="height:14px"></div>${claudeBox('/mail-followup', '현황 정리·재요청 초안')}`;
+  V.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const id = +b.closest('tr').dataset.id, a = b.dataset.act;
+    if (a === 'remind') { if (!LIVE) return toast('예시 화면: PC에서는 아웃룩 새 메일 창에 재요청 메일이 뜹니다'); await api(`req/${id}/remind`, {}); return toast('아웃룩 작성 창을 띄웠습니다. 확인 후 보내기를 누르세요'); }
+    await api(`req/${id}`, a === 'extend' ? { extend: 2 } : { status: '완료' });
+    toast(LIVE ? (a === 'extend' ? '기한을 2영업일 늘렸습니다' : `R${id} 완료`) : '예시 화면이라 저장되지 않습니다'); route();
+  }));
+}
+
+// ================= 화면: E.O =================
+let eoState = { stage: 'open' };
+async function viewEO(V) {
+  const rows = await api('eos');
+  const counts = Object.fromEntries(STAGE_EO.map(s => [s, rows.filter(r => r.status === s).length]));
+  const openRows = rows.filter(r => !['완료', '취소', '수정불필요'].includes(r.status));
+  const shown = eoState.stage === 'open' ? openRows : (eoState.stage === 'all' ? rows : rows.filter(r => r.status === eoState.stage));
+  V.className = 'view';
+  V.innerHTML = `
+    <div class="head"><div><h1>E.O 리스트</h1><div class="sub">품번별 설계변경 · 접수 → 업체 검토 → 금형 수정 → 검증 → 완료</div></div>
+      <div class="chips">${LIVE ? '<button class="btn sm" data-export="eo" type="button">엑셀로 열기</button>' : ''}</div></div>
+    <div class="stages" role="group" aria-label="단계별">
+      <button class="stage" data-stage="open" aria-pressed="${eoState.stage === 'open'}" type="button"><div class="k">진행 중</div><div class="v">${openRows.length}</div></button>
+      ${STAGE_EO.slice(0, 7).map(s => `<button class="stage" data-stage="${s}" aria-pressed="${eoState.stage === s}" type="button"><div class="k">${s}</div><div class="v">${counts[s]}</div></button>`).join('')}
+      <button class="stage" data-stage="all" aria-pressed="${eoState.stage === 'all'}" type="button"><div class="k">전체</div><div class="v">${rows.length}</div></button>
+    </div>
+    <section class="panel"><div class="table-wrap"><table class="t">
+      <thead><tr><th>No</th><th>차종 · 품번 · 품명</th><th>변경 내용</th><th>상태</th><th>지연·임박</th><th>금형업체</th><th class="hide-sm">검토</th><th class="hide-sm">수정</th><th class="hide-sm">검증</th></tr></thead>
+      <tbody>${shown.length ? shown.map(r => `<tr data-id="${r.id}">
+        <td class="mono">E${r.id}</td>
+        <td><div><b>${esc(r.car)}</b> <span class="mono">${esc(r.part_no)}</span></div><div class="desc">${esc(r.part_name)}${r.eo_no ? ` · <span class="mono">${esc(r.eo_no)}</span>` : ''}</div></td>
+        <td><div class="clip" style="max-width:300px">${esc(r.change_desc)}</div>${r.new_mails ? `<div class="desc"><span class="chip acc">새 관련 메일 ${r.new_mails}</span></div>` : ''}</td>
+        <td>${pill(r.status)}</td>
+        <td>${r.delay ? `<span class="chip crit">${esc(r.delay)}</span>` : (r.soon ? `<span class="chip warn">${esc(r.soon)}</span>` : '')}</td>
+        <td>${esc(r.mold_vendor || '')}${r.mold_action ? `<div class="desc">${esc(r.mold_action)}</div>` : ''}</td>
+        <td class="num hide-sm">${md(r.review_due)}</td><td class="num hide-sm">${md(r.mold_due)}</td><td class="num hide-sm">${md(r.verify_due)}</td></tr>`).join('') : '<tr><td colspan="9" class="empty">해당 단계의 E.O가 없습니다</td></tr>'}</tbody></table></div></section>
+    <div style="height:14px"></div>${claudeBox('/eo-update', '새 E.O 메일 반영')}`;
+  V.querySelectorAll('[data-stage]').forEach(b => b.addEventListener('click', () => { eoState.stage = b.dataset.stage; route(); }));
+  V.querySelectorAll('tbody tr[data-id]').forEach(tr => tr.addEventListener('click', () => openEO(+tr.dataset.id)));
+  if (PENDING && PENDING.view === 'eo') { const id = PENDING.id; PENDING = null; openEO(id); }
+}
+async function openEO(id) {
+  const d = await api('eo/' + id), r = d.eo;
+  drawer(`E${r.id} · ${esc(r.car)} ${esc(r.part_name)}`, `
+    <div class="chips">${pill(r.status)}${r.delay ? `<span class="chip crit">${esc(r.delay)}</span>` : ''}${r.soon ? `<span class="chip warn">${esc(r.soon)}</span>` : ''}</div>
+    <dl class="kv"><dt>E.O No</dt><dd class="mono">${esc(r.eo_no || '-')}</dd><dt>품번</dt><dd class="mono">${esc(r.part_no)}</dd>
+      <dt>변경 내용</dt><dd>${esc(r.change_desc)}</dd><dt>금형업체</dt><dd>${esc(r.mold_vendor || '-')} ${r.mold_action ? '· ' + esc(r.mold_action) : ''}</dd>
+      <dt>검사구</dt><dd>${esc(r.cf_impact || '-')}</dd><dt>수정비</dt><dd>${esc(r.cost || '-')}</dd>
+      <dt>일정</dt><dd class="num">접수 ${md(r.received_at)} · 검토 ${md(r.review_due) || '-'} · 수정 ${md(r.mold_due) || '-'} · 검증 ${md(r.verify_due) || '-'}</dd></dl>
+    <div class="edit"><h3 class="eyebrow" style="margin:0">진행 단계 바꾸기</h3>
+      <div class="edit-row"><select id="eo-st">${STAGE_EO.map(s => `<option ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <input type="text" id="eo-note" placeholder="메모 (예: 검토서 회신, 육성 180만원)" style="flex:1"><button class="btn primary sm" id="eo-save" type="button">저장</button></div></div>
+    ${d.requests && d.requests.length ? `<div class="sect"><h3>업체 요청</h3>${d.requests.map(q => `<div class="case"><b>R${q.id} ${esc(q.vendor)}</b><span>${esc(q.subject)}</span><span>${pill(q.status)} 기한 ${md(q.due_date)}</span></div>`).join('')}</div>` : ''}
+    ${d.images && d.images.length ? `<div class="sect"><h3>참고 그림</h3><div class="thumbs">${d.images.map(im => `<figure><img src="${esc(im.url)}" alt="${esc(im.caption)}" loading="lazy"><figcaption>${esc(im.caption)}</figcaption></figure>`).join('')}</div></div>` : ''}
+    <div class="sect"><h3>진행 이력</h3><ul class="timeline">${(d.log || []).map(x => `<li><time>${esc((x.at || '').slice(5, 16).replace('T', ' '))}</time>${esc(x.what || '메모')} ${esc(x.note || '')}</li>`).join('')}</ul></div>
+    <div class="sect"><h3>관련 메일</h3>${(d.mails || []).length ? d.mails.map(m => `<div class="case" data-mail="${m.id}" style="cursor:pointer"><b>${esc(m.subject)}</b><span class="sub">#${m.id} · ${esc(m.sender_name)} · ${md((m.sent_at || '').slice(0, 10))}</span></div>`).join('') : '<div class="sub">연결된 메일 없음</div>'}</div>
+    ${claudeBox('/eo-update', '갱신 제안 받기')}`, (L) => {
+      $('#eo-save', L).addEventListener('click', async () => { await api('eo/' + id, { status: $('#eo-st', L).value, note: $('#eo-note', L).value }); L.innerHTML = ''; toast(LIVE ? `E${id} 저장했습니다` : '예시 화면이라 저장되지 않습니다'); route(); });
+      L.querySelectorAll('[data-mail]').forEach(el => el.addEventListener('click', () => { L.innerHTML = ''; PENDING = { view: 'mail', id: +el.dataset.mail }; mailState.filter = ''; location.hash = '#mail'; }));
+    });
+}
+
+// ================= 화면: T/O =================
+let toState = { stage: 'open', defect: '' };
+async function viewTO(V) {
+  const rows = await api('tos');
+  const openRows = rows.filter(r => r.status !== '종결');
+  let shown = toState.stage === 'open' ? openRows : (toState.stage === 'all' ? rows : rows.filter(r => r.status === toState.stage));
+  if (toState.defect) shown = shown.filter(r => r.defect_type === toState.defect);
+  const dist = {};
+  for (const r of rows) { dist[r.defect_type] = dist[r.defect_type] || [0, 0]; dist[r.defect_type][0]++; if (r.status !== '종결') dist[r.defect_type][1]++; }
+  const dmax = Math.max(1, ...Object.values(dist).map(x => x[0]));
+  V.className = 'view';
+  V.innerHTML = `
+    <div class="head"><div><h1>T/O 문제점</h1><div class="sub">불량 1가지 = 1건 · 발생 → 원인분석 → 대책수립 → 대책적용 → 효과확인 → 종결</div></div>
+      <div class="chips">${LIVE ? '<button class="btn sm" data-export="to" type="button">엑셀로 열기</button>' : ''}</div></div>
+    <div class="stages" role="group" aria-label="단계별">
+      <button class="stage" data-stage="open" aria-pressed="${toState.stage === 'open'}" type="button"><div class="k">진행 중</div><div class="v">${openRows.length}</div></button>
+      ${STAGE_TO.slice(0, 6).map(s => `<button class="stage" data-stage="${s}" aria-pressed="${toState.stage === s}" type="button"><div class="k">${s}</div><div class="v">${rows.filter(r => r.status === s).length}</div></button>`).join('')}
+      <button class="stage" data-stage="all" aria-pressed="${toState.stage === 'all'}" type="button"><div class="k">전체</div><div class="v">${rows.length}</div></button>
+    </div>
+    <div class="grid2">
+      <section class="panel"><div class="table-wrap"><table class="t">
+        <thead><tr><th>No</th><th>불량</th><th>부품 · 현상</th><th>상태</th><th>지연·임박</th><th class="hide-sm">대책</th></tr></thead>
+        <tbody>${shown.length ? shown.map(r => `<tr data-id="${r.id}">
+          <td class="mono">T${r.id}</td><td><span class="chip crit">${esc(r.defect_type)}</span>${r.recur_of ? `<div class="desc"><span class="chip warn">재발 ← T${r.recur_of}</span></div>` : ''}</td>
+          <td><div><b>${esc(r.part_name)}</b> <span class="sub">${esc(r.to_stage)} ${md(r.to_date)}</span></div><div class="desc clip" style="max-width:280px">${esc((r.location ? r.location + ' · ' : '') + r.phenomenon)}</div></td>
+          <td>${pill(r.status)}${r.effective ? `<div class="desc">효과 ${esc(r.effective)}</div>` : ''}</td>
+          <td>${r.delay ? `<span class="chip crit">${esc(r.delay)}</span>` : (r.soon ? `<span class="chip warn">${esc(r.soon)}</span>` : '')}</td>
+          <td class="hide-sm"><div class="clip" style="max-width:220px">${esc(r.countermeasure || '—')}</div></td></tr>`).join('') : '<tr><td colspan="6" class="empty">해당 조건의 문제점이 없습니다</td></tr>'}</tbody></table></div></section>
+      <section class="panel"><div class="panel-h"><h2>불량 유형</h2><span class="sub">전체 · <span style="color:var(--warn)">진행 중</span> · 누르면 거르기</span></div>
+        <div class="bars">${Object.entries(dist).sort((a, b) => b[1][0] - a[1][0]).map(([k, v]) => `
+          <button class="bar" type="button" data-defect="${esc(k)}" style="border:0;background:${toState.defect === k ? 'var(--accent-weak)' : 'transparent'};padding:3px 4px;border-radius:4px;text-align:left">
+            <span>${esc(k)}</span><span class="track" style="position:relative"><span class="fill" style="display:block;width:${v[0] / dmax * 100}%"></span><span class="fill open" style="position:absolute;left:0;top:0;width:${v[1] / dmax * 100}%"></span></span><span class="num">${v[0]}</span></button>`).join('')}</div>
+        <div style="padding:0 16px 14px">${claudeBox('/to-weekly', '주간 점검')}</div></section>
+    </div>`;
+  V.querySelectorAll('[data-stage]').forEach(b => b.addEventListener('click', () => { toState.stage = b.dataset.stage; route(); }));
+  V.querySelectorAll('[data-defect]').forEach(b => b.addEventListener('click', () => { toState.defect = toState.defect === b.dataset.defect ? '' : b.dataset.defect; route(); }));
+  V.querySelectorAll('tbody tr[data-id]').forEach(tr => tr.addEventListener('click', () => openTO(+tr.dataset.id)));
+  if (PENDING && PENDING.view === 'to') { const id = PENDING.id; PENDING = null; openTO(id); }
+}
+async function openTO(id) {
+  const d = await api('to/' + id), r = d.issue, p = d.previous;
+  drawer(`T${r.id} · ${esc(r.part_name)} · ${esc(r.defect_type)}`, `
+    <div class="chips">${pill(r.status)}${r.delay ? `<span class="chip crit">${esc(r.delay)}</span>` : ''}${r.recur_of ? `<span class="chip warn">재발 ← T${r.recur_of}</span>` : ''}</div>
+    <dl class="kv"><dt>부품</dt><dd>${esc(r.car)} <span class="mono">${esc(r.part_no)}</span></dd><dt>T/O</dt><dd>${esc(r.to_stage)} ${md(r.to_date)} · ${esc(r.mold_vendor || '')} · ${esc(r.resin || '')}</dd>
+      <dt>현상</dt><dd>${esc((r.location ? r.location + ' · ' : '') + r.phenomenon)}</dd>
+      <dt>원인</dt><dd>${r.cause ? `<span class="chip">${esc(r.cause_cat)}</span> ${esc(r.cause)}` : '<span class="sub">미확인</span>'}</dd>
+      <dt>대책</dt><dd>${r.countermeasure ? `<span class="chip">${esc(r.action_cat)}</span> ${esc(r.countermeasure)}` : '<span class="sub">없음</span>'}</dd>
+      <dt>목표</dt><dd class="num">대책 ${md(r.due) || '-'} · 효과 확인 ${md(r.verify_due) || '-'}</dd>
+      ${r.result ? `<dt>효과</dt><dd>${esc(r.effective)} · ${esc(r.result)}</dd>` : ''}</dl>
+    ${p ? `<div class="sect"><h3>이전 발생 T${p.id} (${esc(p.to_stage)})</h3><div class="case"><span><b>원인</b> ${esc(p.cause)}</span><span><b>대책</b> ${esc(p.countermeasure)}</span><span><b>결과</b> ${esc(p.effective)} · ${esc(p.result)}</span></div></div>` : ''}
+    <div class="edit"><h3 class="eyebrow" style="margin:0">진행 단계 바꾸기</h3>
+      <div class="edit-row"><select id="to-st">${STAGE_TO.map(s => `<option ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <input type="text" id="to-note" placeholder="메모" style="flex:1"><button class="btn primary sm" id="to-save" type="button">저장</button></div></div>
+    ${claudeBox('/to-advice ' + r.id, '개선 방법 조언')}
+    <div class="sect"><h3>비슷한 과거 사례</h3>${(d.similar || []).length ? d.similar.slice(0, 4).map(x => `<div class="case"><b>T${x.id} ${esc(x.part_name)} · ${esc(x.defect_type)} <span class="sub">${esc(x.to_stage)}</span></b>
+      <span class="sub">${esc((x.why || []).join(' · '))}</span>${x.countermeasure ? `<span>대책: ${esc(x.countermeasure)}</span>` : ''}${x.effective ? `<span>효과: ${esc(x.effective)} ${esc(x.result || '')}</span>` : ''}</div>`).join('') : '<div class="sub">비슷한 사례가 아직 없습니다</div>'}</div>
+    ${d.guide ? `<div class="sect"><h3>불량 유형 가이드</h3><details class="att" open><summary>${esc(r.defect_type)} 원인·대책</summary><pre>${esc(d.guide)}</pre></details></div>` : ''}
+    ${d.images && d.images.length ? `<div class="sect"><h3>사진</h3><div class="thumbs">${d.images.map(im => `<figure><img src="${esc(im.url)}" alt="${esc(im.caption)}" loading="lazy"><figcaption>${esc(im.caption)}</figcaption></figure>`).join('')}</div></div>` : ''}`, (L) => {
+      $('#to-save', L).addEventListener('click', async () => { await api('to/' + id, { status: $('#to-st', L).value, note: $('#to-note', L).value }); L.innerHTML = ''; toast(LIVE ? `T${id} 저장했습니다` : '예시 화면이라 저장되지 않습니다'); route(); });
+    });
+}
+
+// ================= 화면: 금형 이관 =================
+async function viewMold(V) {
+  const rows = await api('molds');
+  const secs = SECTIONS;
+  const ship = rows.filter(m => m.ship && (m.ship.etd || m.ship.eta)).sort((a, b) => (a.ship.etd || '9').localeCompare(b.ship.etd || '9'));
+  V.className = 'view';
+  V.innerHTML = `
+    <div class="head"><div><h1>금형 이관 종합장</h1><div class="sub">현지 법인 이관 금형별 서류 · 리스트 · 선적. 칸을 누르면 상태를 바꿀 수 있습니다</div></div>
+      <div class="chips">${LIVE ? '<button class="btn sm" data-export="mold" type="button">엑셀로 열기</button>' : ''}</div></div>
+    <div class="legend" style="margin-bottom:10px">${['확정', '접수', '요청', '미접수', '해당없음'].map(s => `<span><i class="d-${s}">${SYMBOL[s]}</i>${s === '접수' ? '접수·검토중' : s}</span>`).join('')}</div>
+    <section class="panel"><div class="table-wrap"><table class="t matrix">
+      <thead><tr><th>금형</th><th>품명 · 이관</th><th>상태</th>${secs.map(s => `<th style="text-align:center">${s}</th>`).join('')}<th>확인 필요</th></tr></thead>
+      <tbody>${rows.map(m => `<tr data-id="${m.id}"><td><span class="mono">M${m.id}</span><div class="desc mono">${esc(m.mold_no)}</div></td>
+        <td><b>${esc(m.part_name)}</b><div class="desc">${esc(m.car)} · → ${esc(m.dest)}</div></td><td>${pill(m.status)}</td>
+        ${secs.map(s => { const d = m.docs[s] || ['', '']; return `<td class="doc d-${esc(d[0])}" data-sec="${s}" title="${esc(d[0])}">${SYMBOL[d[0]] || ''} <span class="num" style="font-weight:500">${md(d[1])}</span></td>`; }).join('')}
+        <td>${(m.alerts || []).map(a => `<div class="chip crit" style="white-space:normal">${esc(a)}</div>`).join('')}</td></tr>`).join('')}</tbody></table></div></section>
+    <div style="height:16px"></div>
+    <div class="grid2">
+      <section class="panel"><div class="panel-h"><h2>선적 일정</h2><span class="sub">ETD 순</span></div>
+        <div class="table-wrap"><table class="t"><thead><tr><th>금형</th><th>ETD</th><th>ETA</th><th>상태</th><th>경로</th><th>B/L</th></tr></thead>
+        <tbody>${ship.map(m => { const s = m.ship; const n = days(s.etd); const st = s.ata ? '<span class="chip ok">도착</span>' : (s.atd ? '<span class="chip info">운송 중</span>' : (s.etd ? `<span class="chip ${n < 0 ? 'crit' : (n <= 14 ? 'warn' : '')}">${n < 0 ? -n + '일 지남' : 'D-' + n}</span>` : ''));
+          return `<tr data-id="${m.id}"><td class="mono">${esc(m.mold_no)}</td><td class="num">${md(s.etd)}</td><td class="num">${md(s.eta)}</td><td>${st}</td><td>${esc([s.port_from, s.port_to].filter(Boolean).join(' → '))}</td><td class="mono">${esc(s.bl_no || '')}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">선적 일정이 없습니다</td></tr>'}</tbody></table></div></section>
+      <section class="panel"><div class="panel-h"><h2>메일로 받은 서류 반영</h2></div><div style="padding:14px 16px;display:grid;gap:10px">
+        <div class="sub">사양서·성형조건표·KD/원소재 리스트 메일을 받으면 메일 번호로 반영합니다. 첨부는 금형별 폴더에 보관되고, 엑셀 리스트는 품목까지 불러옵니다.</div>
+        ${claudeBox('/mold-update', '메일 반영')}</div></section>
+    </div>`;
+  V.querySelectorAll('.matrix tbody tr').forEach(tr => tr.addEventListener('click', (e) => {
+    const td = e.target.closest('td[data-sec]');
+    if (td) { e.stopPropagation(); return docPicker(+tr.dataset.id, td.dataset.sec); }
+    openMold(+tr.dataset.id);
+  }));
+  if (PENDING && PENDING.view === 'mold') { const id = PENDING.id; PENDING = null; openMold(id); }
+}
+function docPicker(id, sec) {
+  drawer(`M${id} · ${esc(sec)}`, `<div class="edit"><h3 class="eyebrow" style="margin:0">상태</h3>
+    <div class="edit-row">${['미접수', '요청', '접수', '검토중', '확정', '해당없음'].map(s => `<button class="btn sm" data-s="${s}" type="button"><span class="chip d-${s === '검토중' ? '접수' : s}" style="padding:0 5px">${SYMBOL[s]}</span>${s}</button>`).join('')}</div></div>
+    <div class="sub">첨부파일 보관과 엑셀 리스트 불러오기는 메일 번호로 합니다:</div>${claudeBox(`/mold-update`, '복사')}`, (L) => {
+      L.querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', async () => { await api(`mold/${id}/doc`, { section: sec, status: b.dataset.s }); L.innerHTML = ''; toast(LIVE ? `${sec} → ${b.dataset.s}` : '예시 화면이라 저장되지 않습니다'); route(); }));
+    });
+}
+async function openMold(id) {
+  const d = await api('mold/' + id), m = d.mold, s = m.ship || {};
+  drawer(`M${m.id} · ${esc(m.mold_no)} ${esc(m.part_name)}`, `
+    <div class="chips">${pill(m.status)}${(m.alerts || []).map(a => `<span class="chip crit">${esc(a)}</span>`).join('')}</div>
+    <dl class="kv"><dt>차종 · 품번</dt><dd>${esc(m.car)} <span class="mono">${esc(m.part_no || '')}</span></dd><dt>금형업체</dt><dd>${esc(m.mold_vendor)}</dd><dt>이관 법인</dt><dd>${esc(m.dest)}</dd>
+      <dt>선적</dt><dd class="num">ETD ${md(s.etd) || '-'} · ETA ${md(s.eta) || '-'} ${s.atd ? '· 출항 ' + md(s.atd) : ''} ${s.ata ? '· 도착 ' + md(s.ata) : ''}</dd>
+      ${s.bl_no ? `<dt>B/L</dt><dd class="mono">${esc(s.bl_no)}</dd>` : ''}
+      <dt>리스트</dt><dd>부품 ${d.items?.부품 ?? 0} · KD ${d.items?.KD ?? 0} · 원소재 ${d.items?.원소재 ?? 0}건</dd></dl>
+    <div class="sect"><h3>서류</h3><div style="display:grid;gap:6px">${SECTIONS.map(sec => { const x = m.docs[sec] || ['미접수', '']; return `<div style="display:flex;gap:8px;align-items:center"><span class="chip d-${esc(x[0])}" style="min-width:66px;justify-content:center">${SYMBOL[x[0]] || ''} ${esc(x[0])}</span><span style="flex:1">${sec}</span><span class="sub num">${md(x[1])}</span></div>`; }).join('')}</div></div>
+    <div class="sect"><h3>진행 이력</h3><ul class="timeline">${(d.log || []).map(x => `<li><time>${esc((x.at || '').slice(5, 16).replace('T', ' '))}</time>${esc(x.what)} ${esc(x.note || '')}</li>`).join('')}</ul></div>
+    ${claudeBox('/mold-update', '메일 반영')}`);
+}
+
+// ================= 라우팅·시작 =================
+const VIEWS = { today: viewToday, mail: viewMail, req: viewReq, eo: viewEO, to: viewTO, mold: viewMold };
+async function route() {
+  const k = (location.hash || '#today').slice(1);
+  const fn = VIEWS[k] || viewToday;
+  renderNav(window.__counts || {});
+  $('#layer').innerHTML = '';
+  try { await fn($('#view')); } catch (e) { $('#view').innerHTML = `<div class="empty">화면을 불러오지 못했습니다: ${esc(e.message)}</div>`; }
+}
+window.addEventListener('hashchange', route);
+$('#search-form').addEventListener('submit', (e) => { e.preventDefault(); mailState.q = $('#q').value.trim(); mailState.sel = null; if (location.hash !== '#mail') location.hash = '#mail'; else route(); });
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-export]'); if (!b) return;
+  b.disabled = true; try { await api('export/' + b.dataset.export, {}); toast('엑셀을 만들어 열었습니다'); } finally { b.disabled = false; }
+});
+$('#sync-btn').addEventListener('click', async () => {
+  const b = $('#sync-btn'); b.disabled = true; b.lastChild.textContent = ' 받는 중…';
+  try { const r = await api('sync', {}); toast(r.message || `새 메일 ${r.added}건`); await refreshSummary(); route(); }
+  catch (err) { toast('메일 받기 실패: ' + err.message); }
+  finally { b.disabled = false; b.lastChild.textContent = ' 새 메일 받기'; }
+});
+async function refreshSummary() {
+  try { const s = await api('summary'); window.__counts = s.counts; renderNav(s.counts);
+    const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
+    $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
+}
+async function start() {
+  try {
+    const ctl = new AbortController(); setTimeout(() => ctl.abort(), 1500);
+    const r = await fetch('/api/ping', { signal: ctl.signal });
+    if (r.ok && (await r.json()).ok) LIVE = true;
+  } catch { LIVE = false; }
+  $('#mode-dot').className = 'dot ' + (LIVE ? 'live' : 'demo');
+  $('#mode-text').textContent = LIVE ? '내 PC 데이터 연결됨' : '예시 데이터';
+  $('#demo-bar').hidden = LIVE;
+  await refreshSummary();
+  route();
+}
+start();
+})();
+</script>

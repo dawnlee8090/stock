@@ -806,6 +806,12 @@ def cmd_mold(args, cfg, conn):
         return
 
 
+def cmd_app(args, cfg, conn):
+    from .webapp import serve
+    conn.close()
+    serve(args.config, port=args.port, open_window=not args.no_window, log=_out)
+
+
 def cmd_ingest_files(args, cfg, conn):
     from .ingest_files import ingest_folder
     for p in args.paths:
@@ -1274,6 +1280,11 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--dest", help="이관 법인만")
     x.add_argument("--open", action="store_true")
     s.set_defaults(func=cmd_mold)
+
+    s = sp.add_parser("app", help="업무 비서 앱 실행 (내 PC 전용 화면: 오늘 할 일·메일함·업체 요청·E.O·T/O·금형 이관)")
+    s.add_argument("--port", type=int, default=8765)
+    s.add_argument("--no-window", action="store_true", help="앱 창을 자동으로 열지 않음")
+    s.set_defaults(func=cmd_app)
 
     s = sp.add_parser("ingest-files", help=".eml/.msg 파일 폴더 가져오기")
     s.add_argument("paths", nargs="+")
