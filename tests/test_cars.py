@@ -78,3 +78,23 @@ class CarTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BackfillTest(unittest.TestCase):
+    def test_backfill_once(self):
+        from mailhub.webapp import backfill_cars
+        with tempfile.TemporaryDirectory() as d:
+            cfg = load_config(Path(d) / "x.toml")
+            cfg["archive"]["db_path"] = str(Path(d) / "m.db")
+            c = db.connect(cfg["archive"]["db_path"])
+            for i in range(4):   # 차종 기능 전에 들어온 메일 (cars 비어 있음)
+                db.insert_mail(c, f"k{i}", {"subject": f"BC4t CUV 범퍼 {i}", "body": ""})
+            c.commit()
+            c.close()
+            data = Data(cfg)
+            self.assertEqual(backfill_cars(data, log=lambda *_: None), 4)
+            self.assertEqual(backfill_cars(data, log=lambda *_: None), 0)          # 한 번만
+            c = db.connect(cfg["archive"]["db_path"])
+            self.assertEqual({r[0] for r in c.execute("SELECT cars FROM mails")}, {"BC4t"})
+            c.close()
+            self.assertEqual(data.mailcounts(data.conn())["cars"][0]["name"], "BC4t")

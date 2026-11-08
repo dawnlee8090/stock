@@ -666,7 +666,8 @@ function renderNav(counts = {}) {
       const caret = f[5] ? `<span class="caret ${f[5]}" aria-hidden="true"></span>` : '';
       return `<a href="#${f[0]}" class="sub-a${f[4] === 1 ? ' lvl1' : ''}" ${cur === f[0] ? 'aria-current="page"' : ''}>${caret}${f[1]}${c ? `<span class="cnt${hot ? ' hot' : ''}">${c.toLocaleString()}</span>` : ''}</a>`;
     }).join('');
-    return link + `<div class="subnav">${sub}</div>`;
+    const err = window.__mcErr ? `<span class="sub-label" style="color:#ffb4ab;white-space:normal">폴더 건수를 불러오지 못했습니다: ${esc(window.__mcErr.slice(0, 120))}</span>` : '';
+    return link + `<div class="subnav">${sub}${err}</div>`;
   }).join('');
 }
 
@@ -1140,12 +1141,13 @@ $('#sent-done').addEventListener('click', async () => {
 });
 setInterval(refreshSent, 5 * 60 * 1000);
 async function refreshSummary() {
-  try { window.__mailcounts = await api('mailcounts'); } catch { /* 무시 */ }
+  try { window.__mailcounts = await api('mailcounts'); window.__mcErr = ''; }
+  catch (e) { window.__mcErr = e.message || String(e); }
   try { const s = await api('summary'); window.__counts = s.counts; renderNav(s.counts);
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-08.3';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-08.4';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');
@@ -1181,6 +1183,8 @@ async function start() {
   const h1 = $('.list-pane h1');   // 차종 폴더 이름(BC4 → BC4t)은 건수를 받은 뒤 알 수 있음
   if (h1 && !mailState.q && curHash().startsWith('mail')) h1.textContent = folderTitle(mailState.filter);
   refreshSent();
+  // 처음 켤 때 예전 메일의 차종 정보를 채우는 중일 수 있으므로 잠시 뒤 한 번 더
+  if (LIVE && !((window.__mailcounts || {}).cars || []).length) setTimeout(refreshSummary, 15000);
 }
 start();
 })();

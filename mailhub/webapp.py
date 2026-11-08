@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-08.3"
+APP_VERSION = "2026-11-08.4"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -643,6 +643,33 @@ def open_app_window(url: str) -> None:
     webbrowser.open(url)
 
 
+def backfill_cars(data: "Data", log=print, force: bool = False) -> int:
+    """차종 폴더용 차종 정보(mails.cars)를 예전 메일에 한 번 채운다 (retag 를 안 해도 되게)."""
+    from .classify import Classifier, latest_part
+    c = data.conn()
+    try:
+        c.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+        if not force and c.execute("SELECT 1 FROM meta WHERE key='cars_backfilled'").fetchone():
+            return 0
+        clf = Classifier(data.cfg)
+        from .classify import find_cars
+        n = 0
+        rows = c.execute("SELECT id, subject, body FROM mails").fetchall()
+        for r in rows:
+            cars = ",".join(find_cars(r["subject"] or "", latest_part(r["body"] or ""), clf.car_known, clf.car_ignore))
+            c.execute("UPDATE mails SET cars=? WHERE id=?", (cars, r["id"]))
+            n += 1
+            if n % 2000 == 0:
+                c.commit()
+        c.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('cars_backfilled', ?)", (str(n),))
+        c.commit()
+        if n:
+            log(f"차종 정보를 메일 {n:,}건에 채웠습니다 (차종 폴더).")
+        return n
+    finally:
+        c.close()
+
+
 def _running_version(port: int) -> str | None:
     import urllib.request
     try:
@@ -690,6 +717,7 @@ def serve(cfg_path: str | None = None, port: int = 8765, open_window: bool = Tru
     log(f"업무 비서 앱: {url}  (이 PC 에서만 열립니다. 끄려면 이 창에서 Ctrl+C)")
     from . import sentmove
     sentmove.Scheduler(data.conn, cfg, data.sync, log).start()   # 평일 19~22시 보낸메일 옮기기 알림
+    threading.Thread(target=backfill_cars, args=(data, log), daemon=True).start()   # 차종 정보가 없는 예전 메일 채우기
     if open_window:
         threading.Timer(0.6, open_app_window, args=(url,)).start()
     try:

@@ -950,6 +950,9 @@ def cmd_retag(args, cfg, conn):
         if n % 5000 == 0:
             _out(f"  ... {n:,}/{len(rows):,}")
     conn.commit()
+    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('cars_backfilled', ?)", (str(n),))
+    conn.commit()
     _out(f"{n}건 재분류 완료 (config.toml 의 태그/키워드 기준)" + (f", HTML 본문 {fixed}건 정리" if fixed else ""))
 
 
