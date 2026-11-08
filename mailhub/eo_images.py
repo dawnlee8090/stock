@@ -23,7 +23,7 @@ from pathlib import Path
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS eo_images (
-    id INTEGER PRIMARY KEY, eo_id INTEGER, path TEXT, source TEXT, caption TEXT, mail_id INTEGER,
+    id INTEGER PRIMARY KEY, eo_id INTEGER, kind TEXT DEFAULT 'eo', path TEXT, source TEXT, caption TEXT, mail_id INTEGER,
     sha1 TEXT, sort INTEGER DEFAULT 0, created_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_eo_images ON eo_images(eo_id, sort);
@@ -37,12 +37,20 @@ MAX_PER_RUN = 20
 PPT_MAX_SLIDES = 10
 
 
+# 종류별: (번호 앞글자, 메일 연결 테이블, 연결 테이블의 항목 열)
+KINDS = {"eo": ("E", "eo_mails", "eo_id"), "to": ("T", "to_mails", "to_id")}
+
+
 def ensure(conn) -> None:
     conn.executescript(SCHEMA)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(eo_images)")}
+    if "kind" not in cols:  # E.O 전용이던 이전 버전 → T/O 문제점 사진도 같이 저장
+        conn.execute("ALTER TABLE eo_images ADD COLUMN kind TEXT DEFAULT 'eo'")
+        conn.commit()
 
 
-def img_dir(cfg: dict, eid: int) -> Path:
-    return Path(cfg["archive"].get("eo_image_dir", "data/eo_images")) / f"E{eid}"
+def img_dir(cfg: dict, eid: int, kind: str = "eo") -> Path:
+    return Path(cfg["archive"].get("eo_image_dir", "data/eo_images")) / f"{KINDS[kind][0]}{eid}"
 
 
 def _now() -> str:
@@ -74,7 +82,7 @@ def _normalize(data: bytes):
 
 
 def save_image(conn, cfg: dict, eid: int, data: bytes, source: str, caption: str, mail_id: int | None = None,
-               force: bool = False) -> int | None:
+               force: bool = False, kind: str = "eo") -> int | None:
     ensure(conn)
     norm = _normalize(data) if not force else None
     if force:
@@ -91,15 +99,17 @@ def save_image(conn, cfg: dict, eid: int, data: bytes, source: str, caption: str
     if not norm:
         return None
     im, sha = norm
-    if conn.execute("SELECT 1 FROM eo_images WHERE eo_id=? AND sha1=?", (eid, sha)).fetchone():
+    if conn.execute("SELECT 1 FROM eo_images WHERE eo_id=? AND kind=? AND sha1=?", (eid, kind, sha)).fetchone():
         return None
-    d = img_dir(cfg, eid)
+    d = img_dir(cfg, eid, kind)
     d.mkdir(parents=True, exist_ok=True)
-    n = (conn.execute("SELECT COALESCE(MAX(ABS(sort)), 0) FROM eo_images WHERE eo_id=?", (eid,)).fetchone()[0] or 0) + 1
+    n = (conn.execute("SELECT COALESCE(MAX(ABS(sort)), 0) FROM eo_images WHERE eo_id=? AND kind=?",
+                      (eid, kind)).fetchone()[0] or 0) + 1
     p = d / f"{n:02d}_{source}.png"
     im.save(p, "PNG", optimize=True)
-    cur = conn.execute("INSERT INTO eo_images (eo_id, path, source, caption, mail_id, sha1, sort, created_at) "
-                       "VALUES (?,?,?,?,?,?,?,?)", (eid, str(p.resolve()), source, caption, mail_id, sha, n, _now()))
+    cur = conn.execute("INSERT INTO eo_images (eo_id, kind, path, source, caption, mail_id, sha1, sort, created_at) "
+                       "VALUES (?,?,?,?,?,?,?,?,?)", (eid, kind, str(p.resolve()), source, caption, mail_id, sha, n,
+                                                      _now()))
     conn.commit()
     return cur.lastrowid
 
@@ -228,12 +238,13 @@ def _from_outlook(ns, entry_id: str, store_id: str, use_powerpoint: bool) -> lis
 
 
 def collect(conn, cfg: dict, eid: int, use_outlook: bool = False, use_powerpoint: bool = True,
-            log=print) -> int:
+            log=print, kind: str = "eo") -> int:
     """E.O 항목에 연결된 메일에서 그림을 모은다. 새로 저장한 개수 반환."""
     ensure(conn)
+    prefix, link_table, link_col = KINDS[kind]
     mails = conn.execute(
-        "SELECT m.id, m.sent_at, m.subject, m.file_path, m.entry_id, m.store_id FROM eo_mails em "
-        "JOIN mails m ON m.id = em.mail_id WHERE em.eo_id = ? ORDER BY m.sent_at", (eid,)).fetchall()
+        f"SELECT m.id, m.sent_at, m.subject, m.file_path, m.entry_id, m.store_id FROM {link_table} em "
+        f"JOIN mails m ON m.id = em.mail_id WHERE em.{link_col} = ? ORDER BY m.sent_at", (eid,)).fetchall()
     ns = None
     if use_outlook:
         try:
@@ -258,15 +269,15 @@ def collect(conn, cfg: dict, eid: int, use_outlook: bool = False, use_powerpoint
             continue
         for cap, data, src in items:
             caption = f"#{m['id']} {m['sent_at'][5:10].replace('-', '/')} {cap}"
-            if save_image(conn, cfg, eid, data, src, caption, m["id"]):
+            if save_image(conn, cfg, eid, data, src, caption, m["id"], kind=kind):
                 added += 1
                 if added >= MAX_PER_RUN:
-                    log(f"  E{eid}: 그림이 많아 {MAX_PER_RUN}장까지만 저장 (필요 없는 그림은 --remove)")
+                    log(f"  {prefix}{eid}: 그림이 많아 {MAX_PER_RUN}장까지만 저장 (필요 없는 그림은 --remove)")
                     return added
     return added
 
 
-def add_files(conn, cfg: dict, eid: int, files: list[str], caption: str = "") -> int:
+def add_files(conn, cfg: dict, eid: int, files: list[str], caption: str = "", kind: str = "eo") -> int:
     n = 0
     for f in files:
         p = Path(f)
@@ -274,12 +285,12 @@ def add_files(conn, cfg: dict, eid: int, files: list[str], caption: str = "") ->
             continue
         items = images_from_attachment(p.name, p.read_bytes())
         for cap, data, src in items:
-            if save_image(conn, cfg, eid, data, "file", caption or cap, force=(src == "mail")):
+            if save_image(conn, cfg, eid, data, "file", caption or cap, force=(src == "mail"), kind=kind):
                 n += 1
     return n
 
 
-def paste(conn, cfg: dict, eid: int, caption: str = "") -> bool:
+def paste(conn, cfg: dict, eid: int, caption: str = "", kind: str = "eo") -> bool:
     """클립보드의 캡처 이미지 (Win+Shift+S) 를 저장."""
     try:
         from PIL import ImageGrab
@@ -289,21 +300,22 @@ def paste(conn, cfg: dict, eid: int, caption: str = "") -> bool:
     if clip is None:
         raise RuntimeError("클립보드에 그림이 없습니다. Win+Shift+S 로 캡처한 뒤 다시 실행하세요.")
     if isinstance(clip, list):  # 탐색기에서 파일을 복사한 경우
-        return add_files(conn, cfg, eid, clip, caption) > 0
+        return add_files(conn, cfg, eid, clip, caption, kind) > 0
     buf = io.BytesIO()
     clip.convert("RGB").save(buf, "PNG")
     return save_image(conn, cfg, eid, buf.getvalue(), "capture",
-                      caption or f"캡처 {datetime.now():%m/%d %H:%M}", force=True) is not None
+                      caption or f"캡처 {datetime.now():%m/%d %H:%M}", force=True, kind=kind) is not None
 
 
-def listing(conn, eid: int) -> list:
+def listing(conn, eid: int, kind: str = "eo") -> list:
     ensure(conn)
-    return conn.execute("SELECT * FROM eo_images WHERE eo_id=? AND sort > 0 ORDER BY sort", (eid,)).fetchall()
+    return conn.execute("SELECT * FROM eo_images WHERE eo_id=? AND kind=? AND sort > 0 ORDER BY sort",
+                        (eid, kind)).fetchall()
 
 
-def remove(conn, eid: int, sort_no: int) -> bool:
+def remove(conn, eid: int, sort_no: int, kind: str = "eo") -> bool:
     ensure(conn)
-    r = conn.execute("SELECT * FROM eo_images WHERE eo_id=? AND sort=?", (eid, sort_no)).fetchone()
+    r = conn.execute("SELECT * FROM eo_images WHERE eo_id=? AND kind=? AND sort=?", (eid, kind, sort_no)).fetchone()
     if not r:
         return False
     try:

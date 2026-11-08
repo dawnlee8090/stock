@@ -18,7 +18,7 @@
 | 4. 매일 자동 수집 | 작업 스케줄러로 매일 수집 + 아침에 할 일 목록 | ✅ 스크립트 제공 (`scripts/daily_sync.bat`) |
 | 5. 첨부파일 내용 검색 | 엑셀/워드/PPT/PDF 첨부 안의 글자·품번까지 검색 (E.O 리스트, T/O 보고서) | ✅ `index-attachments` |
 | 6-1. E.O 리스트 관리 | 접수→검토→금형수정→검증 단계·기한·지연 알림, 미등록 E.O 메일 표시, 관련 메일 자동 연결, 엑셀 | ✅ `eo`, `/eo-update` |
-| 6-2. T/O 문제점·개선 이력 DB | T/O 문제점→원인→대책→결과 이력, 유사 문제 개선 사례 조언 | ⏳ 다음 |
+| 6-2. T/O 문제점·개선 이력 DB | 문제점→원인→대책→효과 이력, 재발 감지, 유사 사례, 불량별 대책 가이드, 조언 | ✅ `to`, `/to-update`, `/to-advice` |
 | 6-3. 금형 이관 체크리스트 | 현지 법인 이관 금형별 사양·서류·선적 준비 상태 관리 | ⏳ 예정 |
 | 7. 초안 자동 생성 → 아웃룩 임시보관함 | 새 메일 도착 시 검토 초안을 아웃룩 **임시보관함**에 만들어 두기 (발송은 본인이 확인 후) | ⏳ 예정 |
 
@@ -202,7 +202,30 @@ python -m mailhub eo export data\EO_LIST.xlsx --collect --open   # 그림까지 
   첨부 엑셀·워드 안의 그림. 작은 로고·아이콘은 자동 제외, 같은 그림은 한 번만.
 - 기존 엑셀 E.O 리스트가 있으면 `eo export x.csv` 와 같은 열 이름으로 맞춰 CSV(UTF-8) 저장 후 `eo import 파일.csv`.
 
-## 10. 분류 기준 수정
+## 10. T/O 문제점 · 개선 이력
+
+T/O 에서 나온 문제점을 **불량 1가지 = 1건**으로 등록하고 **발생 → 원인분석 → 대책수립 → 대책적용 → 효과확인 → 종결** 로 관리합니다.
+
+```powershell
+python -m mailhub to add --car "BC4t CUV" --part-no 86511-BN200 --part-name "FR BUMPER UPR" --stage T2 --date 10/28 --resin PP-TD20 --defect 변형 --location "상단 플랜지" --phenomenon "휨 1.2mm (규격 ±0.5)" --due 11/5
+python -m mailhub to set 2 --status 대책수립 --cause-cat 금형 --cause "고정측 냉각 부족" --action-cat 금형수정 --cm "냉각 채널 추가 + 역변형 0.8mm" --verify-due 11/20
+python -m mailhub to set 2 --status 종결 --result "T3 휨 0.3mm OK" --effective 유효
+
+python -m mailhub to list                       # 진행 중 (⚠지연 ⏰임박 ↻재발 ✉새 메일)
+python -m mailhub to show 2                     # 상세 + 비슷한 과거 사례
+python -m mailhub to similar --defect 싱크 --part-name "BRKT BPR" --resin PP-TD20   # 과거 사례 검색
+python -m mailhub to guide 웰드                  # 불량 유형별 원인·대책 가이드
+python -m mailhub to export data\TO_ISSUES.xlsx --collect --open   # 문제점 대장 엑셀 (사진·불량 통계)
+```
+
+- **불량 유형 자동 표준화**: "SINK", "싱크마크", "함몰" → `싱크` 처럼 21개 표준 유형으로 묶어 통계·검색이 됩니다.
+- **재발 감지**: 같은 품번(LH/RH 포함)이나 같은 품명에서 같은 불량이 다시 등록되면 `↻재발` 표시와 함께 **이전 원인·대책·효과**를 보여줍니다.
+- **유사 사례**: 불량 유형·품번·품명·재질·부위가 비슷한 과거 사례를 점수순으로, **효과가 확인된 대책**을 우선 보여줍니다.
+- **Claude Code** `/to-update`: T/O 결과 메일·보고서에서 문제점 등록안, 새 메일 기준 원인·대책·결과 갱신안 제안.
+  `/to-advice 2`: 과거 개선 이력 + 유사 사례 + 가이드를 근거로 **조건 → 금형 → 설계 → 재질 순 개선안**(비용·부작용·검증 방법 포함).
+- 엑셀: `TO 문제점`(사진 썸네일, 재발 강조) · `불량 통계`(유형·원인·금형업체·성형처별 건수, 재발, 지연) · `T번호` 상세(이전 발생 비교, 이력, 사진).
+
+## 11. 분류 기준 수정
 
 `config.toml` 의 `[tags]`, `[action]`, `[part_number]` 를 고친 뒤:
 ```powershell

@@ -420,6 +420,230 @@ def cmd_eo(args, cfg, conn):
         return
 
 
+def _to_line(conn, r) -> str:
+    from . import to as T
+    dl, soon = T.delay_of(r), T.soon_of(r)
+    flag = f" ⚠{dl}" if dl else (f" ⏰{soon}" if soon else "")
+    rec = f" ↻재발(T{r['recur_of']})" if r["recur_of"] else ""
+    nm = T.new_mail_count(conn, r)
+    new = f"  ✉새 관련메일 {nm}" if nm else ""
+    name = " ".join(x for x in (r["car"], r["part_no"], r["part_name"]) if x)
+    to = " ".join(x for x in (r["to_stage"], (r["to_date"] or "")[5:].replace("-", "/")) if x)
+    cm = f"\n       대책: {r['countermeasure'][:80]}" if r["countermeasure"] else ""
+    return (f"T{r['id']:<4} [{r['status']}] {r['defect_type']}  {name[:44]}  ({to}){rec}{flag}{new}"
+            f"\n       현상: {(r['location'] + ' - ' if r['location'] else '') + r['phenomenon'][:80]}{cm}")
+
+
+def _to_fields(args) -> dict:
+    from . import to as T
+    d = {k: getattr(args, k) for k in T.FIELDS if getattr(args, k, None) is not None}
+    if getattr(args, "eo", None) is not None:
+        d["eo_id"] = args.eo
+    return d
+
+
+def _print_similar(res) -> None:
+    if not res:
+        _out("  (비슷한 과거 사례 없음)")
+        return
+    for score, why, r in res:
+        eff = f"[{r['effective']}] " if r["effective"] else ""
+        _out(f"  T{r['id']:<4} 점수 {score:<2} {r['defect_type']}  {r['car']} {r['part_no']} {r['part_name']}  "
+             f"({r['to_stage']} {(r['to_date'] or '')[:7]}) [{r['status']}]")
+        _out(f"        근거: {', '.join(why)}")
+        if r["cause"]:
+            _out(f"        원인: {('[' + r['cause_cat'] + '] ') if r['cause_cat'] else ''}{r['cause'][:90]}")
+        if r["countermeasure"]:
+            _out(f"        대책: {('[' + r['action_cat'] + '] ') if r['action_cat'] else ''}{r['countermeasure'][:90]}")
+        if r["result"] or r["effective"]:
+            _out(f"        결과: {eff}{r['result'][:90]}")
+
+
+def cmd_to(args, cfg, conn):
+    from . import to as T
+    from .to_knowledge import guide_text, normalize_defect
+    T.ensure(conn)
+    a = args.to_cmd
+    if a == "add":
+        tid, prev = T.add(conn, status=args.status or "발생", mail_id=args.mail, **_to_fields(args))
+        r = conn.execute("SELECT * FROM to_issues WHERE id=?", (tid,)).fetchone()
+        _out("T/O 문제점 등록:\n" + _to_line(conn, r))
+        if prev:
+            _out(f"\n⚠ 재발입니다. 이전 발생 T{prev['id']} ({prev['to_stage']} {prev['to_date']}) [{prev['status']}]")
+            _out(f"   이전 원인: {prev['cause'] or '-'}\n   이전 대책: {prev['countermeasure'] or '-'}"
+                 f"\n   이전 결과: {(prev['effective'] + ' ') if prev['effective'] else ''}{prev['result'] or '-'}")
+        res = T.similar(conn, r["defect_type"], r["part_name"], r["part_no"], r["resin"], r["location"],
+                        r["phenomenon"], r["car"], exclude_id=tid, limit=3)
+        if res:
+            _out("\n비슷한 과거 사례 (상세: python -m mailhub to similar " + str(tid) + ")")
+            _print_similar(res)
+        return
+    if a == "set":
+        r = T.update(conn, args.id, status=args.status, note=args.note, mail_id=args.mail, **_to_fields(args))
+        _out(_to_line(conn, r))
+        return
+    if a == "link":
+        for m in args.mails:
+            T.link(conn, args.id, m, "수동")
+        conn.commit()
+        _out(f"T{args.id} 에 메일 {', '.join('#' + str(m) for m in args.mails)} 연결")
+        return
+    if a == "list":
+        rows = T.listing(conn, args.status, car=args.car, q=args.q, defect=args.defect)
+        if args.json:
+            out = []
+            for r in rows:
+                d = dict(r)
+                d.update(delay=T.delay_of(r), soon=T.soon_of(r), new_mails=T.new_mail_count(conn, r))
+                out.append(d)
+            _out(json.dumps(out, ensure_ascii=False, indent=1))
+            return
+        for r in rows:
+            _out(_to_line(conn, r))
+        _out(f"\n총 {len(rows)}건 / 지연 {sum(1 for r in rows if T.delay_of(r))}건 / 재발 {sum(1 for r in rows if r['recur_of'])}건"
+             + ("  (진행 중만. 전체: --status all)" if args.status == "open" else ""))
+        return
+    if a == "show":
+        r = conn.execute("SELECT * FROM to_issues WHERE id=?", (args.id,)).fetchone()
+        if not r:
+            sys.exit(f"T{args.id} 항목이 없습니다.")
+        mails = conn.execute("SELECT m.id, m.sent_at, m.sender_name, m.subject, t.how FROM to_mails t "
+                             "JOIN mails m ON m.id=t.mail_id WHERE t.to_id=? ORDER BY m.sent_at", (args.id,)).fetchall()
+        logs = conn.execute("SELECT * FROM to_log WHERE to_id=? ORDER BY id", (args.id,)).fetchall()
+        prev = conn.execute("SELECT * FROM to_issues WHERE id=?", (r["recur_of"],)).fetchone() if r["recur_of"] else None
+        sim = T.similar(conn, r["defect_type"], r["part_name"], r["part_no"], r["resin"], r["location"],
+                        r["phenomenon"], r["car"], exclude_id=r["id"], limit=5)
+        if args.json:
+            _out(json.dumps({"issue": dict(r), "delay": T.delay_of(r), "previous": dict(prev) if prev else None,
+                             "mails": [dict(m) for m in mails], "log": [dict(x) for x in logs],
+                             "similar": [{"score": sc, "why": why, **dict(x)} for sc, why, x in sim]},
+                            ensure_ascii=False, indent=1))
+        else:
+            _out(_to_line(conn, r))
+            for k in T.FIELDS:
+                if r[k] and k not in ("phenomenon",):
+                    _out(f"  {T.HEADERS.get(k, k):<8}: {r[k]}")
+            if prev:
+                _out(f"\n[재발 - 이전 T{prev['id']} {prev['to_stage']} {prev['to_date']}]\n  원인: {prev['cause']}\n"
+                     f"  대책: {prev['countermeasure']}\n  결과: {prev['effective']} {prev['result']}")
+            _out("\n[이력]")
+            for x in logs:
+                _out(f"  {x['at'][:16].replace('T', ' ')}  {x['from_status'] or '-'} → {x['to_status']}  {x['note'] or ''}")
+            _out("\n[관련 메일]")
+            seen = r["seen_mail_max"] or 0
+            for m in mails:
+                _out(f"  {'★' if m['id'] > seen else ' '}#{m['id']:<6} {m['sent_at'][:10]}  {m['sender_name'][:14]:<14} "
+                     f"| {m['subject'][:60]}  ({m['how']})")
+            _out("\n[비슷한 과거 사례]")
+            _print_similar(sim)
+        T.mark_seen(conn, args.id)
+        return
+    if a == "similar":
+        if args.id:
+            r = conn.execute("SELECT * FROM to_issues WHERE id=?", (args.id,)).fetchone()
+            if not r:
+                sys.exit(f"T{args.id} 항목이 없습니다.")
+            q = dict(defect=r["defect_type"], part_name=r["part_name"], part_no=r["part_no"], resin=r["resin"],
+                     location=r["location"], phenomenon=r["phenomenon"], car=r["car"], exclude_id=r["id"])
+        else:
+            q = dict(defect=args.defect or "", part_name=args.part_name or "", part_no=args.part_no or "",
+                     resin=args.resin or "", location=args.location or "", phenomenon=args.phenomenon or "",
+                     car=args.car or "")
+        res = T.similar(conn, limit=args.limit, **q)
+        if args.json:
+            _out(json.dumps([{"score": sc, "why": why, **dict(x)} for sc, why, x in res], ensure_ascii=False, indent=1))
+        else:
+            _print_similar(res)
+            d = normalize_defect(q["defect"]) if q["defect"] else ""
+            if d:
+                _out(f"\n(불량 유형별 일반 대책: python -m mailhub to guide {d})")
+        return
+    if a == "guide":
+        _out(guide_text(args.defect))
+        return
+    if a == "inbox":
+        from datetime import timedelta
+        since = args.since or (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d")
+        rows = T.inbox(conn, since, args.limit)
+        if args.json:
+            _out(json.dumps([_row_dict(r) for r in rows], ensure_ascii=False, indent=1))
+            return
+        _print_rows(rows, "")
+        _out(f"↑ T/O 관련인데 아직 문제점 대장에 연결되지 않은 메일 ({since} 이후)")
+        return
+    if a == "sync":
+        added = T.sync(conn)
+        for tid, mid, how in added:
+            _out(f"T{tid} ← #{mid} ({how})")
+        _out(f"새로 연결된 메일 {len(added)}건")
+        return
+    if a == "check":
+        T.sync(conn)
+        rows = T.listing(conn, "open")
+        delayed = [(r, T.delay_of(r)) for r in rows if T.delay_of(r)]
+        soon = [(r, T.soon_of(r)) for r in rows if T.soon_of(r) and not T.delay_of(r)]
+        news = [r for r in rows if T.new_mail_count(conn, r)]
+        for r, d in delayed:
+            _out(f"! 지연   T{r['id']} {r['defect_type']} {r['car']} {r['part_name'] or r['part_no']} - {d}")
+        for r, d in soon:
+            _out(f"- 임박   T{r['id']} {r['defect_type']} {r['car']} {r['part_name'] or r['part_no']} - {d}")
+        for r in news:
+            _out(f"✉ 새 메일 T{r['id']} {r['defect_type']} {r['part_name'] or r['part_no']} - {T.new_mail_count(conn, r)}건 (to show {r['id']})")
+        if not (delayed or soon or news):
+            _out("T/O: 지연·임박·새 관련 메일 없음")
+        n_inbox = len(T.inbox(conn, datetime.now().strftime("%Y-%m-01"), 200))
+        if n_inbox:
+            _out(f"? 미등록 T/O 메일 {n_inbox}건 (이번 달) → python -m mailhub to inbox")
+        if args.notify and (delayed or soon):
+            from .followup import notify
+            r0, d0 = (delayed or soon)[0]
+            notify(f"T/O 대책 지연 {len(delayed)}건 / 임박 {len(soon)}건",
+                   f"T{r0['id']} {r0['defect_type']} {r0['part_name'] or r0['part_no']} - {d0}")
+        return
+    if a == "img":
+        from . import eo_images as I
+        I.ensure(conn)
+        tid = args.id
+        if args.paste:
+            ok = I.paste(conn, cfg, tid, args.caption or "", kind="to")
+            _out("캡처 사진을 저장했습니다." if ok else "이미 저장된 사진과 같아서 건너뛰었습니다.")
+        if args.add:
+            _out(f"{I.add_files(conn, cfg, tid, args.add, args.caption or '', kind='to')}장 추가")
+        if args.remove:
+            for n in args.remove:
+                _out(f"[{n}] 삭제" if I.remove(conn, tid, n, kind="to") else f"[{n}] 없음")
+        if args.collect:
+            n = I.collect(conn, cfg, tid, use_outlook=args.outlook, use_powerpoint=not args.no_ppt, log=_out, kind="to")
+            _out(f"T{tid}: 사진 {n}장 새로 저장")
+        imgs = I.listing(conn, tid, kind="to")
+        _out(f"\nT{tid} 사진 {len(imgs)}장")
+        for im in imgs:
+            _out(f"  [{im['sort']}] {im['caption']}  ({im['source']})")
+        return
+    if a == "export":
+        p = Path(args.path)
+        if p.suffix.lower() == ".csv":
+            T.export_csv(conn, p, args.status)
+        else:
+            from . import eo_images as I
+            from . import to_excel
+            I.ensure(conn)
+            if args.collect and not args.no_images:
+                total = sum(I.collect(conn, cfg, r["id"], use_outlook=args.outlook, log=_out, kind="to")
+                            for r in T.listing(conn, args.status))
+                _out(f"사진 {total}장 새로 모음")
+            to_excel.build(conn, T.listing(conn, args.status), p, delay_of=T.delay_of, soon_of=T.soon_of,
+                           images_of=lambda i: I.listing(conn, i, kind="to"), with_images=not args.no_images)
+        _out(f"T/O 문제점 대장 저장: {p.resolve()}")
+        if args.open and os.name == "nt":
+            os.startfile(str(p.resolve()))  # type: ignore[attr-defined]
+        return
+    if a == "import":
+        ids = T.import_csv(conn, args.path)
+        _out(f"{len(ids)}건 가져옴" if ids else "가져온 항목이 없습니다 (열 이름 확인)")
+        return
+
+
 def cmd_ingest_files(args, cfg, conn):
     from .ingest_files import ingest_folder
     for p in args.paths:
@@ -709,6 +933,95 @@ def build_parser() -> argparse.ArgumentParser:
     e = es.add_parser("import", help="CSV(UTF-8) E.O 리스트 가져오기 (열 이름은 export 와 동일)")
     e.add_argument("path")
     s.set_defaults(func=cmd_eo)
+
+    s = sp.add_parser("to", help="T/O 문제점·개선 이력 (재발 감지, 유사 사례, 불량별 대책 가이드, 엑셀)")
+    ts = s.add_subparsers(dest="to_cmd", required=True)
+
+    def to_field_args(p):
+        p.add_argument("--car", help="차종")
+        p.add_argument("--part-no", dest="part_no", help="품번")
+        p.add_argument("--part-name", dest="part_name", help="품명")
+        p.add_argument("--stage", dest="to_stage", help="T/O 차수 (T0, T1, T2 / 시사출 / P1 / M ...)")
+        p.add_argument("--date", dest="to_date", help="T/O 일자")
+        p.add_argument("--mold-vendor", dest="mold_vendor", help="금형업체")
+        p.add_argument("--molder", help="성형처")
+        p.add_argument("--resin", help="재질 (PP-TD20, ABS ...)")
+        p.add_argument("--defect", dest="defect_type", help="불량 유형 (싱크, 웰드, 변형, 미성형, 버, 갭 ... 자동 표준화)")
+        p.add_argument("--location", help="발생 부위")
+        p.add_argument("--phenomenon", help="현상")
+        p.add_argument("--cause-cat", dest="cause_cat", help="원인 구분: 성형조건/금형/제품설계/재질/설비/검사구/조립·공정/미확인")
+        p.add_argument("--cause", help="원인")
+        p.add_argument("--action-cat", dest="action_cat", help="대책 구분: 조건변경/금형수정/설계변경(E.O)/재질변경/설비·지그/검사기준/작업표준")
+        p.add_argument("--countermeasure", "--cm", dest="countermeasure", help="대책")
+        p.add_argument("--owner", help="담당 (업체/부서)")
+        p.add_argument("--due", help="대책 적용 목표일")
+        p.add_argument("--verify-due", dest="verify_due", help="효과 확인 목표일 (다음 T/O 등)")
+        p.add_argument("--result", help="효과 확인 결과")
+        p.add_argument("--effective", help="대책 효과: 유효 / 부분 / 무효")
+        p.add_argument("--applied", dest="applied_at", help="대책 적용일")
+        p.add_argument("--closed", dest="closed_at", help="종결일")
+        p.add_argument("--eo", type=int, help="연결할 E.O 항목 번호")
+        p.add_argument("--mail", type=int, help="관련 메일 번호")
+        p.add_argument("--note", help="메모")
+        p.add_argument("--status", help="발생/원인분석/대책수립/대책적용/효과확인/종결/보류")
+
+    t = ts.add_parser("add", help="문제점 등록 (재발이면 이전 대책 표시)")
+    to_field_args(t)
+    t = ts.add_parser("set", help="원인·대책·상태 갱신")
+    t.add_argument("id", type=int)
+    to_field_args(t)
+    t = ts.add_parser("link", help="메일 연결")
+    t.add_argument("id", type=int)
+    t.add_argument("mails", type=int, nargs="+")
+    t = ts.add_parser("list", help="문제점 목록 (기본: 진행 중)")
+    t.add_argument("--status", default="open")
+    t.add_argument("--car")
+    t.add_argument("--defect", help="불량 유형")
+    t.add_argument("--q", help="품번·품명·현상·원인·대책·부위·업체 검색")
+    t.add_argument("--json", action="store_true")
+    t = ts.add_parser("show", help="상세 (재발 이력, 관련 메일, 비슷한 사례)")
+    t.add_argument("id", type=int)
+    t.add_argument("--json", action="store_true")
+    t = ts.add_parser("similar", help="비슷한 과거 사례 (번호 또는 조건)")
+    t.add_argument("id", type=int, nargs="?")
+    t.add_argument("--defect")
+    t.add_argument("--part-name", dest="part_name")
+    t.add_argument("--part-no", dest="part_no")
+    t.add_argument("--resin")
+    t.add_argument("--location")
+    t.add_argument("--phenomenon")
+    t.add_argument("--car")
+    t.add_argument("--limit", type=int, default=10)
+    t.add_argument("--json", action="store_true")
+    t = ts.add_parser("guide", help="불량 유형별 원인·대책 가이드")
+    t.add_argument("defect")
+    t = ts.add_parser("inbox", help="대장에 아직 없는 T/O 메일")
+    t.add_argument("--days", type=int, default=60)
+    t.add_argument("--since")
+    t.add_argument("--limit", type=int, default=50)
+    t.add_argument("--json", action="store_true")
+    ts.add_parser("sync", help="관련 메일 자동 연결")
+    t = ts.add_parser("check", help="지연·임박·새 관련 메일 (매일 자동)")
+    t.add_argument("--notify", action="store_true")
+    t = ts.add_parser("img", help="사진: 관련 메일·보고서에서 모으기 / 캡처 붙여넣기 / 삭제")
+    t.add_argument("id", type=int)
+    t.add_argument("--collect", action="store_true")
+    t.add_argument("--outlook", action="store_true")
+    t.add_argument("--no-ppt", action="store_true")
+    t.add_argument("--paste", action="store_true")
+    t.add_argument("--add", nargs="+")
+    t.add_argument("--caption")
+    t.add_argument("--remove", type=int, nargs="+")
+    t = ts.add_parser("export", help="문제점 대장 엑셀(.xlsx) 또는 CSV")
+    t.add_argument("path", nargs="?", default="data/TO_ISSUES.xlsx")
+    t.add_argument("--status", default="all")
+    t.add_argument("--open", action="store_true")
+    t.add_argument("--no-images", action="store_true")
+    t.add_argument("--collect", action="store_true")
+    t.add_argument("--outlook", action="store_true")
+    t = ts.add_parser("import", help="CSV(UTF-8) 가져오기 (열 이름은 export 와 동일)")
+    t.add_argument("path")
+    s.set_defaults(func=cmd_to)
 
     s = sp.add_parser("ingest-files", help=".eml/.msg 파일 폴더 가져오기")
     s.add_argument("paths", nargs="+")

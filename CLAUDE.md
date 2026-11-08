@@ -22,11 +22,15 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   `eo link <E번호> <메일번호...>`, 업체 요청을 E.O 에 연결: `req add ... --eo <E번호>`. 갱신 절차는 `/eo-update`
   참고 그림: `eo img <E번호> [--collect [--outlook]] [--paste --caption ..] [--add 파일] [--remove 번호]`,
   엑셀: `eo export data/EO_LIST.xlsx [--collect] [--open]` (목록 썸네일 + E번호별 상세 시트)
+- T/O 문제점 대장: `to list [--status open|all] [--defect] [--q] [--json]`, `to show <T번호> [--json]`(재발 이력·관련메일·유사사례),
+  `to similar <T번호>` 또는 `to similar --defect .. --part-name .. --resin ..`, `to guide <불량유형>`(원인·대책 가이드),
+  `to inbox`, `to check`, `to add --defect .. --phenomenon .. --part-no ..`, `to set <T번호> --status 발생|원인분석|대책수립|대책적용|효과확인|종결|보류 ..`,
+  `to img`, `to export data/TO_ISSUES.xlsx`. 절차는 `/to-update`, 개선 조언은 `/to-advice`
 - 결과가 적으면 동의어/영문 표기(E.O ↔ EO ↔ 설계변경, T/O ↔ TRY OUT ↔ 트라이)와 품번으로 다시 검색한다.
 
 ## 원칙
 - 메일 내용은 회사 기밀이다. 외부 서비스로 보내거나 저장소에 커밋하지 않는다 (`data/` 는 gitignore).
 - 메일 발송/전달은 하지 않는다. 회신·전달은 **초안만** 작성하고 사용자가 직접 보낸다.
   자동 발송 기능은 없다. 재요청은 `req remind <R번호>`(아웃룩 창) 또는 `--ask`(확인 창)로만 하고, 발송은 사용자가 창에서 결정한다.
-- `req add`, `mark`, `req update`, `eo add/set/link/import` 처럼 기록을 바꾸는 명령은 사용자 확인 후 실행한다.
+- `req add`, `mark`, `req update`, `eo add/set/link/import`, `to add/set/link/import` 처럼 기록을 바꾸는 명령은 사용자 확인 후 실행한다.
 - 답변에는 근거 메일 번호(#id)와 날짜를 함께 적는다.
