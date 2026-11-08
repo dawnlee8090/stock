@@ -99,3 +99,34 @@ class AskTest(unittest.TestCase):
             nxt = fu.check(conn, cfg, today=date(2026, 11, 10))["remind"]
             self.assertIn(ids[3], [r["id"] for r in nxt])
             conn.close()
+
+
+class CliTest(unittest.TestCase):
+    """명령어(main) 경로로 실행 - import 누락 같은 실수를 잡기 위함."""
+
+    def test_req_commands(self):
+        import contextlib
+        import io
+        import os
+        from mailhub.cli import main
+        with tempfile.TemporaryDirectory() as d:
+            cfgp = Path(d) / "c.toml"
+            cfgp.write_text(f'[archive]\ndb_path = "{(Path(d) / "m.db").as_posix()}"\n'
+                            f'draft_dir = "{(Path(d) / "drafts").as_posix()}"\n', encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                main(["--config", str(cfgp), "req", "add", "--to", "t@example.com", "--subject", "확인창 시험",
+                      "--due", "2020-01-02", "--requested", "2020-01-01", "--vendor", "시험업체"])
+                main(["--config", str(cfgp), "req", "list"])
+                main(["--config", str(cfgp), "req", "check"])
+                main(["--config", str(cfgp), "req", "check", "--ask", "--notify"])
+                main(["--config", str(cfgp), "req", "remind", "1", "--preview"])
+                main(["--config", str(cfgp), "req", "update", "1", "--status", "취소"])
+                main(["--config", str(cfgp), "req", "list", "--all", "--json"])
+            text = out.getvalue()
+            self.assertIn("확인창 시험", text)
+            self.assertIn("기한 지남", text)
+            self.assertIn("[재요청]", text)
+            self.assertIn("취소", text)
+            if os.name != "nt":  # 창을 못 띄우면 안전하게 초안 파일로
+                self.assertTrue(list((Path(d) / "drafts").glob("*.eml")))
