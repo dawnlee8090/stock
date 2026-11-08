@@ -85,6 +85,16 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
         where.append("(m.to_addr LIKE ? OR m.cc_addr LIKE ?)")
         params += [f"%{to}%"] * 2
 
+    covered = not use_fts and not params_touch_text(where)
+    if covered:   # 폴더 목록: 색인(idx_mails_meta)만 훑어 번호를 고르고 본문은 고른 메일만 읽음
+        ids_sql = "SELECT m.id FROM mails m" + (" WHERE " + " AND ".join(where) if where else "") + \
+            " ORDER BY m.sent_at DESC LIMIT ?"
+        ids = [r[0] for r in conn.execute(ids_sql, [*params, limit])]
+        if not ids:
+            return []
+        rows = {r["id"]: r for r in conn.execute(
+            f"SELECT * FROM mails WHERE id IN ({','.join('?' * len(ids))})", ids)}
+        return [rows[i] for i in ids if i in rows]
     sql = "SELECT m.* FROM mails m"
     if use_fts:
         sql += " JOIN mails_fts ON mails_fts.rowid = m.id"
@@ -94,6 +104,18 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
     sql += " LIMIT ?"
     params.append(limit)
     return conn.execute(sql, params).fetchall()
+
+
+_META_COLS = ("m.sent_at", "m.tags", "m.cars", "m.status", "m.needs_action", "m.is_mine", "m.sender_email", "m.sender_name")
+
+
+def params_touch_text(where: list[str]) -> bool:
+    """조건에 색인에 없는 열(본문·제목 등)이 들어 있으면 True."""
+    for w in where:
+        cols = set(re.findall(r"m\.[a-z_]+", w))
+        if cols - set(_META_COLS):
+            return True
+    return False
 
 
 def _merge_fts(where: list[str], params: list) -> tuple[list[str], list]:

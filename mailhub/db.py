@@ -102,9 +102,24 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
         if col not in cols:
             conn.execute(f"ALTER TABLE mails ADD COLUMN {col} {ddl}")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_mails_thread ON mails(thread_key, sent_at)")
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='idx_mails_meta'").fetchone() is None and \
+            conn.execute("SELECT COUNT(*) FROM (SELECT 1 FROM mails LIMIT 3000)").fetchone()[0] < 3000:
+        ensure_meta_index(conn)   # 작은 DB 는 바로, 큰 DB 는 앱 시작·retag 때 (처음 한 번 시간이 걸림)
     conn.commit()
     _ensure_fts(conn)
     return conn
+
+
+META_INDEX_COLS = "sent_at, tags, cars, status, needs_action, is_mine, sender_email, sender_name"
+
+
+def ensure_meta_index(conn: sqlite3.Connection) -> bool:
+    """폴더·건수용 색인 (본문을 읽지 않고 분류·차종·상태·보낸사람만으로 세고 고르기). 새로 만들었으면 True."""
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='idx_mails_meta'").fetchone():
+        return False
+    conn.execute(f"CREATE INDEX idx_mails_meta ON mails({META_INDEX_COLS})")
+    conn.commit()
+    return True
 
 
 def normalize_message_id(mid: str | None) -> str:

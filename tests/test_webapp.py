@@ -232,7 +232,8 @@ class RestartTest(unittest.TestCase):
                     mock.patch.object(webapp, "load_config", return_value=cfg), \
                     mock.patch.object(webapp.ThreadingHTTPServer, "serve_forever", side_effect=KeyboardInterrupt), \
                     mock.patch("mailhub.sentmove.Scheduler.start"), \
-                    mock.patch.object(webapp, "_shutdown_old", side_effect=shutdown_and_close):
+                    mock.patch.object(webapp, "_shutdown_old", side_effect=shutdown_and_close), \
+                    mock.patch.object(webapp, "backfill_cars"):
                 logs = []
                 webapp.serve(None, port=port, open_window=False, log=logs.append)
             self.assertTrue(any("예전 버전 앱 엔진" in x for x in logs), logs)

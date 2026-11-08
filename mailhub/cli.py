@@ -950,6 +950,8 @@ def cmd_retag(args, cfg, conn):
         if n % 5000 == 0:
             _out(f"  ... {n:,}/{len(rows):,}")
     conn.commit()
+    from .db import ensure_meta_index
+    ensure_meta_index(conn)
     conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
     conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('cars_backfilled', ?)", (str(n),))
     conn.commit()

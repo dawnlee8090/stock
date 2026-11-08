@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-08.4"
+APP_VERSION = "2026-11-08.5"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -173,7 +173,15 @@ class Data:
         w = " OR ".join("lower(sender_email) LIKE ? OR lower(sender_name) LIKE ?" for _ in names)
         return ("NOT " if neg else "") + f"({w})", [f"%{n.lower()}%" for n in names for _ in (0, 1)]
 
-    def car_groups(self, c) -> dict:
+    def _meta_rows(self, c) -> list:
+        """(tags, cars, status, sender_email, sender_name) 전체 - 색인(idx_mails_meta)만 읽어 빠름."""
+        return c.execute("SELECT tags, cars, status, sender_email, sender_name FROM mails").fetchall()
+
+    def _is_auto(self, email: str, name: str) -> bool:
+        who = f"{email or ''} {name or ''}".lower()
+        return any(a.lower() in who for a in self.autoway_senders())
+
+    def car_groups(self, c, rows: list | None = None) -> dict:
         """차종 폴더: {키: {name, count, variants}}. 표기가 다른 같은 차종(BC4t/BC4/BC4b)은 한 폴더."""
         from collections import Counter
         from .classify import car_key
@@ -181,54 +189,56 @@ class Data:
         alias = {v: k for k, vs in (cars_cfg.get("aliases") or {}).items() for v in [k, *vs]}
         var_n: Counter = Counter()
         mails_n: Counter = Counter()
-        nw, npar = self._auto_sql(True)
-        for cars, n in c.execute(f"SELECT cars, COUNT(*) FROM mails WHERE cars != '' AND {nw} GROUP BY cars", npar):
+        for r in (rows if rows is not None else self._meta_rows(c)):
+            if not r["cars"] or self._is_auto(r["sender_email"], r["sender_name"]):
+                continue
             seen = set()
-            for v in cars.split(","):
-                var_n[v] += n
+            for v in r["cars"].split(","):
+                var_n[v] += 1
                 k = car_key(alias.get(v, v))
                 if k not in seen:
-                    mails_n[k] += n
+                    mails_n[k] += 1
                     seen.add(k)
         groups: dict = {}
         for v, n in var_n.items():
             k = car_key(alias.get(v, v))
-            g = groups.setdefault(k, {"key": k, "variants": [], "count": mails_n[k], "_best": ("", -1)})
+            g = groups.setdefault(k, {"variants": [], "best": ("", -1)})
             g["variants"].append(v)
-            name = alias.get(v, v)
-            if n > g["_best"][1]:
-                g["_best"] = (name, n)
+            if n > g["best"][1]:
+                g["best"] = (alias.get(v, v), n)
         min_n = int(cars_cfg.get("min_mails", 3))
-        out = {}
-        for k, g in groups.items():
-            if g["count"] >= min_n:
-                out[k] = {"key": k, "name": g["_best"][0], "count": g["count"], "variants": sorted(g["variants"])}
-        return out
+        return {k: {"key": k, "name": g["best"][0], "count": mails_n[k], "variants": sorted(g["variants"])}
+                for k, g in groups.items() if mails_n[k] >= min_n}
 
     TAGS = ("E.O", "T/O", "금형수정", "검사구", "품질문제", "금형이관")
 
     def mailcounts(self, c) -> dict:
-        """왼쪽 메일함 폴더별 건수 (차종별 분류 건수 포함, 오토웨이 접수는 따로)."""
+        """왼쪽 메일함 폴더별 건수 (차종별 분류 포함, 오토웨이 접수는 따로). 색인 한 번만 훑음."""
+        from collections import Counter
+        from .classify import car_key
         from .search import todo
-        one = lambda sql, *a: c.execute(sql, a).fetchone()[0]  # noqa: E731
-        nw, npar = self._auto_sql(True)
-        aw, apar = self._auto_sql(False)
-        tag_sql = "(',' || tags || ',') LIKE ?"
-        tags = {t: one(f"SELECT COUNT(*) FROM mails WHERE {tag_sql} AND {nw}", f"%,{t},%", *npar) for t in self.TAGS}
-        cars = []
-        for g in sorted(self.car_groups(c).values(), key=lambda g: -g["count"]):
-            cw = "(" + " OR ".join("(',' || cars || ',') LIKE ?" for _ in g["variants"]) + ")"
-            cp = [f"%,{v},%" for v in g["variants"]]
-            cars.append({"key": g["key"], "name": g["name"], "count": g["count"],
-                         "tags": {t: one(f"SELECT COUNT(*) FROM mails WHERE {cw} AND {tag_sql} AND {nw}", *cp, f"%,{t},%", *npar)
-                                  for t in self.TAGS}})
-        return {"all": one("SELECT COUNT(*) FROM mails"),
-                "todo": len(todo(c, _iso(date.today() - timedelta(days=30)), 10 ** 6)),
-                "progress": one("SELECT COUNT(*) FROM mails WHERE status='진행중'"),
-                "vendor": one("SELECT COUNT(*) FROM mails WHERE status='업체검토중'"),
-                "done": one("SELECT COUNT(*) FROM mails WHERE status='완료'"),
-                "autoway": one(f"SELECT COUNT(*) FROM mails WHERE {aw}", *apar),
-                "tags": tags, "cars": cars}
+        rows = self._meta_rows(c)
+        groups = self.car_groups(c, rows)
+        alias = {v: k for k, vs in (self.cfg.get("cars", {}).get("aliases") or {}).items() for v in [k, *vs]}
+        status = Counter(r["status"] for r in rows)
+        tags: Counter = Counter()
+        car_tags: dict = {k: Counter() for k in groups}
+        auto = 0
+        for r in rows:
+            if self._is_auto(r["sender_email"], r["sender_name"]):
+                auto += 1
+                continue
+            ts = [t for t in (r["tags"] or "").split(",") if t in self.TAGS]
+            tags.update(ts)
+            keys = {car_key(alias.get(v, v)) for v in (r["cars"] or "").split(",") if v}
+            for k in keys & set(car_tags):
+                car_tags[k].update(ts)
+        cars = [{"key": g["key"], "name": g["name"], "count": g["count"],
+                 "tags": {t: car_tags[g["key"]][t] for t in self.TAGS}}
+                for g in sorted(groups.values(), key=lambda g: -g["count"])]
+        return {"all": len(rows), "todo": len(todo(c, _iso(date.today() - timedelta(days=30)), 10 ** 6)),
+                "progress": status["진행중"], "vendor": status["업체검토중"], "done": status["완료"],
+                "autoway": auto, "tags": {t: tags[t] for t in self.TAGS}, "cars": cars}
 
     def mail(self, c, mid: int) -> dict:
         r = c.execute("SELECT * FROM mails WHERE id=?", (mid,)).fetchone()
@@ -694,7 +704,15 @@ def _shutdown_old(port: int) -> None:
 def serve(cfg_path: str | None = None, port: int = 8765, open_window: bool = True, log=print) -> None:
     cfg = load_config(cfg_path)
     data = Data(cfg, cfg_path)
-    data.conn().close()  # 표 준비 확인
+    c0 = data.conn()     # 표 준비 확인
+    try:
+        from .db import ensure_meta_index
+        if c0.execute("SELECT 1 FROM sqlite_master WHERE name='idx_mails_meta'").fetchone() is None:
+            log("메일함 폴더용 색인을 만드는 중입니다 (처음 한 번, 메일이 많으면 1~2분)...")
+            ensure_meta_index(c0)
+            log("색인 완료")
+    finally:
+        c0.close()
     url = f"http://127.0.0.1:{port}/"
     srv = None
     for attempt in range(2):
