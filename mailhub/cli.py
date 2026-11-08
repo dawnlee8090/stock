@@ -30,7 +30,27 @@ def _row_dict(r, with_body=False, query=""):
     return d
 
 
-def _print_rows(rows, query, as_json=False):
+def _short_parts(parts: str, n: int = 5) -> str:
+    items = [p for p in (parts or "").split(",") if p]
+    return ",".join(items[:n]) + (f" 외 {len(items) - n}개" if len(items) > n else "")
+
+
+def _group_threads(rows, limit):
+    """같은 건(RE:/FW: 뗀 제목)은 첫 번째(최신 또는 가장 관련 높은) 메일만 남기고 통수를 센다."""
+    seen, out, counts = {}, [], {}
+    for r in rows:
+        k = r["thread_key"] or f"#{r['id']}"
+        if k in seen:
+            counts[seen[k]] += 1
+            continue
+        seen[k] = r["id"]
+        counts[r["id"]] = 1
+        out.append(r)
+    return out[:limit], counts
+
+
+def _print_rows(rows, query, as_json=False, counts=None):
+    counts = counts or {}
     if as_json:
         _out(json.dumps([_row_dict(r, query=query) for r in rows], ensure_ascii=False, indent=1))
         return
@@ -41,10 +61,11 @@ def _print_rows(rows, query, as_json=False):
         flag = "★" if r["needs_action"] and r["status"] != "완료" else " "
         att = f" [첨부{len(r['attachments'].splitlines())}]" if r["attachments"] else ""
         st = f" [{r['status']}]" if r["status"] else ""
+        grp = f" (같은 건 {counts[r['id']]}통)" if counts.get(r["id"], 1) > 1 else ""
         _out(f"{flag}#{r['id']:<6} {r['sent_at'][:16].replace('T', ' ')}  {r['sender_name'][:16]:<16} "
-             f"| {r['subject'][:70]}{att}{st}")
+             f"| {r['subject'][:70]}{att}{st}{grp}")
         meta = "  ".join(x for x in [f"태그:{r['tags']}" if r["tags"] else "",
-                                     f"품번:{r['part_nos']}" if r["part_nos"] else ""] if x)
+                                     f"품번:{_short_parts(r['part_nos'])}" if r["part_nos"] else ""] if x)
         if meta:
             _out(f"         {meta}")
         _out(f"         {snippet(r['body'], query, att_text=r['att_text'])}")
@@ -113,7 +134,11 @@ def cmd_search(args, cfg, conn):
     query = " ".join(args.query)
     rows = search(conn, query, sender=args.sender, since=args.since, until=args.until, tag=args.tag,
                   has_attach=args.has_attach, attach_name=args.attach, subject_only=args.subject,
-                  needs_action=args.todo, part_no=args.part, sort=args.sort, limit=args.limit)
+                  needs_action=args.todo, part_no=args.part, sort=args.sort,
+                  limit=args.limit * 10 if args.group else args.limit)
+    counts = None
+    if args.group:
+        rows, counts = _group_threads(rows, args.limit)
     if args.csv:
         with open(args.csv, "w", newline="", encoding="utf-8-sig") as f:  # 엑셀 한글 깨짐 방지
             w = csv.writer(f)
@@ -125,7 +150,7 @@ def cmd_search(args, cfg, conn):
                             d["status"], d["note"], d["folder"], d["snippet"]])
         _out(f"{len(rows)}건을 {args.csv} 로 저장했습니다.")
         return
-    _print_rows(rows, query, args.json)
+    _print_rows(rows, query, args.json, counts)
 
 
 def _get(conn, mail_id):
@@ -299,6 +324,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--has-attach", action="store_true", help="첨부 있는 메일만")
     s.add_argument("--subject", action="store_true", help="제목에서만 검색")
     s.add_argument("--todo", action="store_true", help="조치필요 메일만")
+    s.add_argument("--group", action="store_true", help="같은 건(RE:/FW:)은 최신 1통만 표시")
     s.add_argument("--sort", choices=["date", "relevance"], default="date")
     s.add_argument("--limit", type=int, default=30)
     s.add_argument("--json", action="store_true", help="JSON 출력 (Claude Code 연동용)")

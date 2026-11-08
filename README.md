@@ -86,6 +86,7 @@ python -m mailhub search 크래쉬패드 E.O                 # 공백 = 그리�
 python -m mailhub search "게이트 위치" -견적             # "구문" 정확히, -제외어
 python -m mailhub search 웰드 --tag T/O --since 2026-01-01
 python -m mailhub search --part 84710-AA000              # 품번 이력 전체
+python -m mailhub search 보스 높이 --group                # 같은 건(RE:/FW:)은 최신 1통만
 python -m mailhub search --from 금형업체 --has-attach
 python -m mailhub search --attach "EO LIST"              # 첨부파일명으로
 python -m mailhub search 검사구 --csv 검사구메일.csv     # 엑셀로 저장
