@@ -38,10 +38,16 @@ class CarTest(unittest.TestCase):
             clf = Classifier(cfg)
             subjects = ["BC4t CUV 범퍼 1", "BC4t CUV 범퍼 2", "[BC4 HEV N] 카울", "BC4b/t ARM REST", "GN7 PE EO 1",
                         "GN7 PE EO 2", "GN7 PE EO 3", "NX4a SBC CONSOLE", "공지"]
+            tags = ["E.O", "T/O", "E.O", "", "E.O", "", "", "", ""]
             for i, sub in enumerate(subjects):
-                rec = {"subject": sub, "body": "", "sent_at": f"2026-11-0{1 + i % 8}T09:00:00"}
-                rec.update(clf.classify(rec))
+                rec = {"subject": sub, "body": "", "sent_at": f"2026-11-0{1 + i % 8}T09:00:00", "tags": tags[i]}
+                rec.update({k: v for k, v in clf.classify(rec).items() if k != "tags"})
                 db.insert_mail(c, f"k{i}", rec)
+            for i in range(3):   # 오토웨이 접수 (RPABOT) - BC4t·E.O 가 들어 있어도 차종·분류 폴더에서는 빠짐
+                rec = {"subject": f"BC4t CUV EO 시스템 알림 {i}", "sender_name": "RPABOT", "sender_email": "rpabot@corp.com",
+                       "tags": "E.O", "sent_at": "2026-11-05T08:00:00"}
+                rec.update({k: v for k, v in clf.classify(rec).items() if k != "tags"})
+                db.insert_mail(c, f"r{i}", rec)
             c.commit()
             c.close()
             srv = ThreadingHTTPServer(("127.0.0.1", 0), None)
@@ -52,11 +58,19 @@ class CarTest(unittest.TestCase):
                 def get(p):
                     with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/{p}") as r:
                         return json.loads(r.read())
-                cars = get("mailcounts")["cars"]
-                # BC4t·BC4·BC4b → 한 폴더(이름은 가장 많이 쓴 BC4t), NX4a 는 1건이라 폴더 없음
+                mc = get("mailcounts")
+                cars = mc["cars"]
+                # BC4t·BC4·BC4b → 한 폴더(이름은 가장 많이 쓴 BC4t), NX4a 는 1건이라 폴더 없음, RPABOT 은 제외
                 self.assertEqual([(x["key"], x["name"], x["count"]) for x in cars], [("BC4", "BC4t", 4), ("GN7", "GN7", 3)])
+                self.assertEqual((cars[0]["tags"]["E.O"], cars[0]["tags"]["T/O"], cars[1]["tags"]["E.O"]), (2, 1, 1))
+                self.assertEqual((mc["autoway"], mc["tags"]["E.O"]), (3, 3))
                 self.assertEqual(len(get("mails?car=BC4")), 4)
                 self.assertEqual(len(get("mails?car=GN7")), 3)
+                self.assertEqual(len(get("mails?car=BC4&tag=E.O")), 2)
+                self.assertEqual(len(get("mails?tag=E.O")), 3)
+                auto = get("mails?special=autoway")
+                self.assertEqual((len(auto), auto[0]["sender_name"]), (3, "RPABOT"))
+                self.assertEqual(len(get("mails")), 12)          # 전체 메일에는 모두
             finally:
                 srv.shutdown()
                 srv.server_close()

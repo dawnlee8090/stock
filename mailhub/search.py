@@ -22,7 +22,8 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
            has_attach: bool = False, attach_name: str | None = None, subject_only: bool = False,
            needs_action: bool = False, status: str | None = None, part_no: str | None = None,
            sort: str = "date", limit: int = 50, mine: bool = False,
-           to: str | None = None, cars: list[str] | None = None) -> list[sqlite3.Row]:
+           to: str | None = None, cars: list[str] | None = None, senders_any: list[str] | None = None,
+           exclude_senders: list[str] | None = None) -> list[sqlite3.Row]:
     where, params = [], []
     use_fts = False
     for raw in split_terms(query):
@@ -67,6 +68,17 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
     if cars:   # 차종 폴더: 같은 차종의 여러 표기(BC4t, BC4 ...) 중 하나라도
         where.append("(" + " OR ".join("(',' || m.cars || ',') LIKE ?" for _ in cars) + ")")
         params += [f"%,{c},%" for c in cars]
+    def _who(names):   # 보낸사람 주소·이름에 포함
+        return "(" + " OR ".join("lower(m.sender_email) LIKE ? OR lower(m.sender_name) LIKE ?" for _ in names) + ")", \
+            [f"%{n.lower()}%" for n in names for _ in (0, 1)]
+    if senders_any:      # 예: 오토웨이 접수 (RPABOT)
+        w, p = _who(senders_any)
+        where.append(w)
+        params += p
+    if exclude_senders:  # 차종·분류 폴더에서는 시스템 알림 메일 제외
+        w, p = _who(exclude_senders)
+        where.append("NOT " + w)
+        params += p
     if mine:
         where.append("m.is_mine = 1")
     if to:

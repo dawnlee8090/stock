@@ -142,9 +142,16 @@ class Data:
         limit = min(int((q.get("limit") or ["150"])[0]), 500)
         status = (q.get("status") or [""])[0]
         car = (q.get("car") or [""])[0]
-        if car:      # 차종 폴더
+        tag = (q.get("tag") or [None])[0]
+        auto = self.autoway_senders()
+        if (q.get("special") or [""])[0] == "autoway":   # 오토웨이 접수 (RPABOT)
+            rows = search(c, query, senders_any=auto, limit=limit, sort="date")
+        elif car:      # 차종 폴더 (+ 분류)
             g = self.car_groups(c).get(car)
-            rows = search(c, query, cars=(g["variants"] if g else [car]), limit=limit, sort="date")
+            rows = search(c, query, cars=(g["variants"] if g else [car]), tag=tag, exclude_senders=auto, limit=limit,
+                          sort="date")
+        elif tag and not query:   # 분류 폴더
+            rows = search(c, query, tag=tag, exclude_senders=auto, limit=limit, sort="date")
         elif status:   # 내가 표시한 진행 상태 (진행중 / 업체검토중 / 완료)
             rows = search(c, query, status=status, limit=limit, sort="date")
         elif (q.get("todo") or [""])[0] == "1" and not query:
@@ -154,6 +161,15 @@ class Data:
                           sort="relevance" if query else "date")
         return [self.mail_row(r, query) for r in rows]
 
+    def autoway_senders(self) -> list[str]:
+        """오토웨이 접수 메일 보낸사람 (기본: RPABOT). config [folders] autoway_senders"""
+        return [x for x in self.cfg.get("folders", {}).get("autoway_senders", ["rpabot"]) if x]
+
+    def _auto_sql(self, neg: bool) -> tuple[str, list]:
+        names = self.autoway_senders() or ["\x00"]
+        w = " OR ".join("lower(sender_email) LIKE ? OR lower(sender_name) LIKE ?" for _ in names)
+        return ("NOT " if neg else "") + f"({w})", [f"%{n.lower()}%" for n in names for _ in (0, 1)]
+
     def car_groups(self, c) -> dict:
         """차종 폴더: {키: {name, count, variants}}. 표기가 다른 같은 차종(BC4t/BC4/BC4b)은 한 폴더."""
         from collections import Counter
@@ -162,7 +178,8 @@ class Data:
         alias = {v: k for k, vs in (cars_cfg.get("aliases") or {}).items() for v in [k, *vs]}
         var_n: Counter = Counter()
         mails_n: Counter = Counter()
-        for cars, n in c.execute("SELECT cars, COUNT(*) FROM mails WHERE cars != '' GROUP BY cars"):
+        nw, npar = self._auto_sql(True)
+        for cars, n in c.execute(f"SELECT cars, COUNT(*) FROM mails WHERE cars != '' AND {nw} GROUP BY cars", npar):
             seen = set()
             for v in cars.split(","):
                 var_n[v] += n
@@ -185,19 +202,30 @@ class Data:
                 out[k] = {"key": k, "name": g["_best"][0], "count": g["count"], "variants": sorted(g["variants"])}
         return out
 
+    TAGS = ("E.O", "T/O", "금형수정", "검사구", "품질문제", "금형이관")
+
     def mailcounts(self, c) -> dict:
-        """왼쪽 메일함 폴더별 건수."""
+        """왼쪽 메일함 폴더별 건수 (차종별 분류 건수 포함, 오토웨이 접수는 따로)."""
         from .search import todo
         one = lambda sql, *a: c.execute(sql, a).fetchone()[0]  # noqa: E731
-        tags = {t: one("SELECT COUNT(*) FROM mails WHERE (',' || tags || ',') LIKE ?", f"%,{t},%")
-                for t in ("E.O", "T/O", "금형수정", "검사구", "품질문제", "금형이관")}
+        nw, npar = self._auto_sql(True)
+        aw, apar = self._auto_sql(False)
+        tag_sql = "(',' || tags || ',') LIKE ?"
+        tags = {t: one(f"SELECT COUNT(*) FROM mails WHERE {tag_sql} AND {nw}", f"%,{t},%", *npar) for t in self.TAGS}
+        cars = []
+        for g in sorted(self.car_groups(c).values(), key=lambda g: -g["count"]):
+            cw = "(" + " OR ".join("(',' || cars || ',') LIKE ?" for _ in g["variants"]) + ")"
+            cp = [f"%,{v},%" for v in g["variants"]]
+            cars.append({"key": g["key"], "name": g["name"], "count": g["count"],
+                         "tags": {t: one(f"SELECT COUNT(*) FROM mails WHERE {cw} AND {tag_sql} AND {nw}", *cp, f"%,{t},%", *npar)
+                                  for t in self.TAGS}})
         return {"all": one("SELECT COUNT(*) FROM mails"),
                 "todo": len(todo(c, _iso(date.today() - timedelta(days=30)), 10 ** 6)),
                 "progress": one("SELECT COUNT(*) FROM mails WHERE status='진행중'"),
                 "vendor": one("SELECT COUNT(*) FROM mails WHERE status='업체검토중'"),
-                "done": one("SELECT COUNT(*) FROM mails WHERE status='완료'"), "tags": tags,
-                "cars": sorted(({"key": g["key"], "name": g["name"], "count": g["count"]} for g in self.car_groups(c).values()),
-                               key=lambda g: -g["count"])}
+                "done": one("SELECT COUNT(*) FROM mails WHERE status='완료'"),
+                "autoway": one(f"SELECT COUNT(*) FROM mails WHERE {aw}", *apar),
+                "tags": tags, "cars": cars}
 
     def mail(self, c, mid: int) -> dict:
         r = c.execute("SELECT * FROM mails WHERE id=?", (mid,)).fetchone()
