@@ -742,7 +742,7 @@ async function viewMail(V) {
       <div class="mrow" data-id="${m.id}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
         <div class="l1"><span class="from">${esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
         <div class="subj">${esc(m.subject)}</div><div class="snip">${esc(m.snippet || '')}</div>
-        ${(m.tags || m.status) ? `<div class="chips">${m.status ? pill(m.status) : ''}${(m.tags || '').split(',').filter(Boolean).slice(0, 4).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+        <div class="chips row-chips"${(m.tags || m.status) ? '' : ' hidden'}>${rowChips(m)}</div>
       </div>`).join('') : '<div class="empty">조건에 맞는 메일이 없습니다</div>'}</div></section>
     <section class="reader" id="reader"><div class="empty" style="margin-top:12vh">왼쪽에서 메일을 고르세요</div></section>`;
   V.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { mailState.sel = null; location.hash = '#' + b.dataset.f; }));
@@ -754,6 +754,12 @@ async function viewMail(V) {
     openMail(mailState.sel, V);          // 목록(최근 150건)에 없어도 메일은 연다
   }
 }
+function readerChips(m, tags) {
+  return `${m.needs_action && m.status !== '완료' ? '<span class="chip crit">회신 필요</span>' : ''}${m.status ? pill(m.status) : ''}${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}`;
+}
+function rowChips(m) {
+  return `${m.status ? pill(m.status) : ''}${(m.tags || '').split(',').filter(Boolean).slice(0, 4).map(t => `<span class="tag">${esc(t)}</span>`).join('')}`;
+}
 async function openMail(id, V) {
   mailState.sel = id;
   V.querySelectorAll('.mrow').forEach(el => el.setAttribute('aria-selected', +el.dataset.id === id));
@@ -764,7 +770,7 @@ async function openMail(id, V) {
   const isEO = tags.includes('E.O'), isTO = tags.includes('T/O') || tags.includes('품질문제'), isMold = tags.includes('금형이관');
   R.innerHTML = `
     <button class="btn sm back" id="back" type="button">← 목록</button>
-    <div class="chips" style="margin-bottom:8px">${m.needs_action && m.status !== '완료' ? '<span class="chip crit">회신 필요</span>' : ''}${m.status ? pill(m.status) : ''}${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
+    <div class="chips" id="rd-chips" style="margin-bottom:8px">${readerChips(m, tags)}</div>
     <h1>${esc(m.subject)}</h1>
     <dl class="meta"><dt>보낸사람</dt><dd>${esc(m.sender_name)} <span class="sub">&lt;${esc(m.sender_email)}&gt;</span></dd>
       <dt>받은 시각</dt><dd class="num">${esc((m.sent_at || '').replace('T', ' ').slice(0, 16))} · <span class="mono">#${m.id}</span></dd>
@@ -772,7 +778,7 @@ async function openMail(id, V) {
       ${m.attachments ? `<dt>첨부</dt><dd>${esc(m.attachments.split(/\n|, /).join(' · '))}</dd>` : ''}</dl>
     <div class="actions">
       ${[['완료', '처리 완료'], ['진행중', '진행중'], ['업체검토중', '업체 검토중']].map(([v, l]) =>
-        `<button class="btn sm mark${m.status === v ? ' on' : ''}" data-mark="${v}" aria-pressed="${m.status === v}" type="button">${m.status === v ? '✓ ' : ''}${l}</button>`).join('')}
+        `<button class="btn sm mark${m.status === v ? ' on' : ''}" data-mark="${v}" data-label="${l}" aria-pressed="${m.status === v}" type="button">${m.status === v ? '✓ ' : ''}${l}</button>`).join('')}
       ${LIVE ? '<button class="btn sm" id="view-orig" type="button">원본 보기</button><button class="btn sm" id="open-orig" type="button">Outlook에서 열기</button>' : ''}
     </div>
     <div class="ai-bar">
@@ -790,10 +796,25 @@ async function openMail(id, V) {
   const eb = $('#ai-eo', R); if (eb) eb.addEventListener('click', () => startEO(m, eb));
   R.querySelectorAll('[data-mark]').forEach(b => b.addEventListener('click', async () => {
     const v = b.dataset.mark, off = m.status === v;          // 같은 버튼을 다시 누르면 상태 해제
-    await api(`mail/${id}/mark`, { status: off ? '' : v });
+    try { await api(`mail/${id}/mark`, { status: off ? '' : v }); } catch (err) { return toast('기록 실패: ' + err.message); }
     const where = { '진행중': '메일함 [진행중]', '업체검토중': '메일함 [업체 검토중]', '완료': '메일함 [처리 완료]' }[v];
-    toast(!LIVE ? '예시 화면이라 저장되지 않습니다' : (off ? '상태를 해제했습니다' : `'${b.textContent.replace('✓ ', '')}'로 표시했습니다 · ${where} 과 [오늘] 화면에서 볼 수 있습니다`));
-    await refreshSummary(); route();
+    toast(!LIVE ? '예시 화면이라 저장되지 않습니다' : (off ? '상태를 해제했습니다' : `'${b.dataset.label}'로 표시했습니다 · ${where} 과 [오늘] 화면에서 볼 수 있습니다`));
+    // 화면 전체를 다시 그리지 않고 바뀐 곳만 고침 (목록·본문 스크롤 위치 유지)
+    m.status = off ? '' : v;
+    R.querySelectorAll('[data-mark]').forEach(x => {
+      const on = x.dataset.mark === m.status;
+      x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); x.textContent = (on ? '✓ ' : '') + x.dataset.label;
+    });
+    $('#rd-chips', R).innerHTML = readerChips(m, tags);
+    const row = V.querySelector(`.mrow[data-id="${id}"]`);
+    if (row) {
+      const rc = row.querySelector('.row-chips');
+      const listM = { ...m, tags: m.tags };
+      rc.innerHTML = rowChips(listM); rc.hidden = !(m.tags || m.status);
+      const star = row.querySelector('.star');
+      if (star && m.status === '완료') star.remove();
+    }
+    refreshSummary();   // 왼쪽 폴더 건수만 새로
   }));
   const oo = $('#open-orig', R); if (oo) oo.addEventListener('click', async () => {
     try { await api(`mail/${id}/open`, {}); toast('Outlook으로 열었습니다. 열리지 않으면 [원본 보기]를 쓰세요'); } catch (err) { toast(err.message); } });
@@ -1147,7 +1168,7 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-08.5';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-08.6';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');
