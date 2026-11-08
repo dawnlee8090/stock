@@ -8,6 +8,8 @@ import sqlite3
 TEXT_COLS = ["subject", "sender_name", "sender_email", "to_addr", "cc_addr", "body", "attachments", "tags",
              "part_nos", "att_text"]
 
+FALLBACK_COLS = ["subject", "sender_name", "sender_email", "attachments", "part_nos"]
+
 
 def split_terms(query: str) -> list[str]:
     try:
@@ -23,14 +25,14 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
            needs_action: bool = False, status: str | None = None, part_no: str | None = None,
            sort: str = "date", limit: int = 50, mine: bool = False,
            to: str | None = None, cars: list[str] | None = None, senders_any: list[str] | None = None,
-           exclude_senders: list[str] | None = None) -> list[sqlite3.Row]:
+           exclude_senders: list[str] | None = None, like_only: bool = False) -> list[sqlite3.Row]:
     where, params = [], []
     use_fts = False
     for raw in split_terms(query):
         neg = raw.startswith("-") and len(raw) > 1
         t = raw[1:] if neg else raw
-        cols = ["subject"] if subject_only else TEXT_COLS
-        if len(t) >= 3 and not neg and not subject_only:
+        cols = ["subject"] if subject_only else (FALLBACK_COLS if like_only else TEXT_COLS)
+        if len(t) >= 3 and not neg and not subject_only and not like_only:
             use_fts = True
             where.append("mails_fts MATCH ?")
             params.append('"' + t.replace('"', '""') + '"')
@@ -103,7 +105,14 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
     sql += " ORDER BY " + ("bm25(mails_fts)" if (use_fts and sort == "relevance") else "m.sent_at DESC")
     sql += " LIMIT ?"
     params.append(limit)
-    return conn.execute(sql, params).fetchall()
+    rows = conn.execute(sql, params).fetchall()
+    if not rows and use_fts:
+        # 검색 색인에서 못 찾으면 (색인이 어긋났거나 특수한 띄어쓰기) 제목·보낸사람·첨부명·품번을 직접 훑어 한 번 더 찾는다
+        rows = search(conn, query, sender=sender, since=since, until=until, tag=tag, has_attach=has_attach,
+                      attach_name=attach_name, subject_only=subject_only, needs_action=needs_action, status=status,
+                      part_no=part_no, sort="date", limit=limit, mine=mine, to=to, cars=cars,
+                      senders_any=senders_any, exclude_senders=exclude_senders, like_only=True)
+    return rows
 
 
 _META_COLS = ("m.sent_at", "m.tags", "m.cars", "m.status", "m.needs_action", "m.is_mine", "m.sender_email", "m.sender_name")

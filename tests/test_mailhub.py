@@ -62,6 +62,13 @@ class MailhubTest(unittest.TestCase):
         self.assertEqual(len(search(self.conn, "", sender="vendor")), 1)
         self.assertEqual(len(search(self.conn, "", since="2026-11-03", until="2026-11-03")), 1)
 
+    def test_search_falls_back_when_index_misses(self):
+        self.assertEqual(len(search(self.conn, "CRASH PAD 검토 요청")), 1)
+        # 검색 색인이 어긋나도 (예: 색인에서 빠짐) 제목으로 다시 찾는다
+        self.conn.execute("INSERT INTO mails_fts(mails_fts) VALUES ('delete-all')")
+        self.assertEqual(len(search(self.conn, "CRASH PAD 검토 요청")), 1)
+        self.assertEqual(len(search(self.conn, "없는단어조합")), 0)
+
     def test_classify(self):
         a = search(self.conn, "CRASH PAD")[0]
         self.assertIn("E.O", a["tags"])
