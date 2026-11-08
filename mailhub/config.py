@@ -12,11 +12,14 @@ DEFAULT_CONFIG: dict = {
         "msg_dir": "data/msg",
         "attach_dir": "data/attachments",
         "eml_dir": "data/eml",
+        "draft_dir": "data/drafts",
     },
+    # 업체 요청 재요청 메일
+    "reminder": {"auto_send": False, "interval_days": 2, "max_count": 3, "subject_prefix": "[재요청]"},
     # 그룹웨어 메일 서버 (IMAP). 비밀번호는 여기 적지 않음 → imap-setup 으로 저장
     "imap": {"host": "", "port": 993, "ssl": True, "user": "", "folders": []},
     # 내 메일 주소 (보낸 메일은 '조치 필요' 판정에서 제외)
-    "me": {"addresses": [], "names": []},
+    "me": {"addresses": [], "names": [], "intro": "", "signature": ""},
     # 태그명 = 키워드 목록 (대소문자 무시, 제목/본문/첨부파일명 대상)
     "tags": {
         "E.O": ["E.O", "EO 변경", "EO변경", "설계변경", "설계 변경", "ECN", "ECO", "도면 변경", "도면변경"],

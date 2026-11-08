@@ -1,0 +1,65 @@
+import tempfile
+import unittest
+from datetime import date
+from pathlib import Path
+
+from mailhub import db, followup as fu
+from mailhub.classify import thread_key
+from mailhub.config import load_config
+
+
+class FollowupTest(unittest.TestCase):
+    def test_parse_due(self):
+        t = date(2026, 11, 6)  # 금
+        self.assertEqual(fu.parse_due("11/12", t), "2026-11-12")
+        self.assertEqual(fu.parse_due("2026-11-12", t), "2026-11-12")
+        self.assertEqual(fu.parse_due("+3", t), "2026-11-09")
+        self.assertEqual(fu.parse_due("+3영업일", t), "2026-11-11")  # 주말 건너뜀
+        self.assertEqual(fu.parse_due("1/5", date(2026, 12, 20)), "2027-01-05")
+        self.assertIn("2일 지남", fu.dday("2026-11-04", t))
+        with self.assertRaises(ValueError):
+            fu.parse_due("다음주", t)
+
+    def test_flow(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = load_config(Path(d) / "none.toml")
+            cfg["me"].update(signature="서연이화 개발3팀 이성욱 대리")
+            conn = db.connect(Path(d) / "t.db")
+            t0 = date(2026, 11, 2)
+            r1 = fu.add(conn, "kim@abc-mold.co.kr", "BC4t CUV 범퍼 보스 높이 변경 금형수정 검토 요청", "11/4",
+                        vendor="ABC정밀", req_type="금형수정검토", today=t0)
+            r2 = fu.add(conn, "lee@cf-tech.co.kr", "헤드라이닝 검사구 수정 요청", "11/10", vendor="CF테크", today=t0)
+
+            # 다른 업체가 같은 제목으로 보낸 메일은 회신으로 보지 않음
+            db.insert_mail(conn, "x1", {"subject": "RE: BC4t CUV 범퍼 보스 높이 변경 금형수정 검토 요청",
+                                        "sender_email": "park@other.co.kr", "sent_at": "2026-11-03T10:00:00",
+                                        "thread_key": thread_key("RE: BC4t CUV 범퍼 보스 높이 변경 금형수정 검토 요청")})
+            res = fu.check(conn, cfg, today=date(2026, 11, 6))
+            self.assertEqual([r["id"] for r in res["overdue"]], [r1])
+            self.assertEqual([r["id"] for r in res["remind"]], [r1])
+
+            subj, body = fu.reminder_mail(res["remind"][0], cfg)
+            self.assertTrue(subj.startswith("[재요청] BC4t CUV"))
+            self.assertIn("11/4", body)
+            self.assertIn("이성욱", body)
+            fu.mark_reminded(conn, r1)
+            # 재요청 직후에는 interval(2일) 동안 다시 재요청 대상 아님
+            self.assertEqual(fu.check(conn, cfg, today=date(2026, 11, 6))["remind"], [])
+            row = conn.execute("SELECT * FROM requests WHERE id=?", (r1,)).fetchone()
+            self.assertTrue(fu.reminder_mail(row, cfg)[0].startswith("[재요청 2차]"))
+
+            # 업체 회신 도착 → 자동 '회신받음'
+            db.insert_mail(conn, "x2", {"subject": "RE: BC4t CUV 범퍼 보스 높이 변경 금형수정 검토 요청",
+                                        "sender_email": "kim@abc-mold.co.kr", "sender_name": "김과장",
+                                        "sent_at": "2026-11-07T09:00:00",
+                                        "thread_key": thread_key("RE: BC4t CUV 범퍼 보스 높이 변경 금형수정 검토 요청")})
+            res = fu.check(conn, cfg, today=date(2026, 11, 9))
+            self.assertEqual([r["id"] for r, _ in res["replied"]], [r1])
+            self.assertEqual([r["id"] for r in res["soon"]], [r2])  # 11/10 = D-1
+            st = conn.execute("SELECT status, reply_mail_id FROM requests WHERE id=?", (r1,)).fetchone()
+            self.assertEqual(st[0], "회신받음")
+            conn.close()
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -21,7 +21,8 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
            since: str | None = None, until: str | None = None, tag: str | None = None,
            has_attach: bool = False, attach_name: str | None = None, subject_only: bool = False,
            needs_action: bool = False, status: str | None = None, part_no: str | None = None,
-           sort: str = "date", limit: int = 50) -> list[sqlite3.Row]:
+           sort: str = "date", limit: int = 50, mine: bool = False,
+           to: str | None = None) -> list[sqlite3.Row]:
     where, params = [], []
     use_fts = False
     for raw in split_terms(query):
@@ -63,6 +64,11 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
     if part_no:
         where.append("(m.part_nos LIKE ? OR m.subject LIKE ? OR m.body LIKE ?)")
         params += [f"%{part_no}%"] * 3
+    if mine:
+        where.append("m.is_mine = 1")
+    if to:
+        where.append("(m.to_addr LIKE ? OR m.cc_addr LIKE ?)")
+        params += [f"%{to}%"] * 2
 
     sql = "SELECT m.* FROM mails m"
     if use_fts:

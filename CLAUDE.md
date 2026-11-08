@@ -12,9 +12,15 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   - 검색 결과 snippet 이 `[첨부내용]` 으로 시작하면 첨부파일 안에서 찾은 것이다
 - `python -m mailhub todo --json [--days 30] [--include-replied]` : 미회신 조치필요 메일
 - `python -m mailhub mark <id> --status <상태> --note "<메모>"` : 상태 기록 (사용자 확인 후에만)
+- `search --mine [--to 상대]` : 내가 보낸 메일 (회신 말투 참고). 말투 가이드는 `data/my_style.md` (`/mail-style` 로 생성)
+- 업체 요청 추적: `req add --to 주소 --subject "보낸 제목" --due 11/12 [--vendor --type --mail]`,
+  `req list [--all] [--json]`, `req check`(업체 회신 자동 확인), `req remind <R번호> [--preview]`(아웃룩 창에 재요청 메일),
+  `req update <R번호> --status 완료|취소 --due ...`
 - 결과가 적으면 동의어/영문 표기(E.O ↔ EO ↔ 설계변경, T/O ↔ TRY OUT ↔ 트라이)와 품번으로 다시 검색한다.
 
 ## 원칙
 - 메일 내용은 회사 기밀이다. 외부 서비스로 보내거나 저장소에 커밋하지 않는다 (`data/` 는 gitignore).
 - 메일 발송/전달은 하지 않는다. 회신·전달은 **초안만** 작성하고 사용자가 직접 보낸다.
+  `req remind --send`, `req check --auto-send` 는 사용자가 그 자리에서 명시적으로 요청할 때만 쓴다.
+- `req add`, `mark`, `req update` 처럼 기록을 바꾸는 명령은 사용자 확인 후 실행한다.
 - 답변에는 근거 메일 번호(#id)와 날짜를 함께 적는다.

@@ -142,7 +142,29 @@ python -m mailhub retag                          # 첨부 안의 품번을 --par
 - 대상: `.xlsx .xlsm .docx .pptx .pdf .txt .csv` (옛날 형식 xls/doc/ppt, 이미지, 도면 파일은 파일명으로만 검색)
 - 검색 결과에서 본문이 아니라 첨부에서 찾은 경우 `[첨부내용]` 으로 표시되고, `show 번호` 아래쪽에 첨부 내용이 나옵니다.
 
-## 8. 분류 기준 수정
+## 8. 업체 요청 추적 (기한 · 회신 자동 확인 · 알림 · 재요청)
+
+금형 수정 검토서, 수정 진행, 검사구 수정 등 업체에 요청한 건을 기한과 함께 등록하면:
+- 매일 자동 수집 때 그 업체에서 **같은 제목(RE:)으로 회신이 오면 자동으로 '회신받음'** 처리
+- 기한이 지났거나 오늘·내일인 건은 **윈도우 알림**
+- 기한이 지난 건은 **재요청 메일을 아웃룩 작성 창에 띄워** 확인 후 보내기
+
+```powershell
+python -m mailhub req add --to kim@abc-mold.co.kr --vendor ABC정밀 --subject "BC4t CUV 범퍼 보스 높이 금형수정 검토 요청" --due 11/12 --type 금형수정검토
+python -m mailhub req list                 # 진행 중인 요청 (D-day)
+python -m mailhub req check --notify       # 회신 확인 + 알림 (매일 자동 실행됨)
+python -m mailhub req remind 3 --preview   # 재요청 메일 미리보기
+python -m mailhub req remind 3             # 아웃룩 새 메일 창에 띄우기
+python -m mailhub req update 3 --status 완료
+```
+
+- `--due` 는 `11/12`, `2026-11-12`, `+3`(3일 뒤), `+3영업일` 형식.
+- `--subject` 는 업체에 **실제로 보낸 메일 제목**과 같아야 회신을 자동으로 찾습니다.
+- 재요청 문구·서명은 `config.toml` 의 `[me] intro / signature`, `[reminder]` 에서 설정.
+- **자동 발송**: `[reminder] auto_send = true` 로 바꾸고 `req add ... --auto` 로 등록한 건만, 매일 자동 수집 때
+  기한이 지나면 재요청을 자동 발송합니다 (간격 2일, 최대 3회). 처음에는 꺼둔 채 문구를 확인하는 것을 권장합니다.
+
+## 9. 분류 기준 수정
 
 `config.toml` 의 `[tags]`, `[action]`, `[part_number]` 를 고친 뒤:
 ```powershell

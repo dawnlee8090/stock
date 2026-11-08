@@ -27,6 +27,12 @@ user = "my.id@company.com"
 # → 내가 보낸 메일 구분, 참조(CC)로만 받은 메일·이미 회신한 건은 '조치필요'에서 제외
 addresses = ["my.name@company.com"]
 names = ["홍길동"]
+# 재요청 메일에 들어갈 자기소개 줄과 서명
+intro = "OO회사 개발O팀 홍길동입니다."
+signature = """
+홍길동 대리 / 개발O팀
+OO회사 | Tel. 000-000-0000 | my.name@company.com
+"""
 
 [tags]
 # 태그명 = [키워드...]  (대소문자 무시 / 제목·본문·첨부파일명에서 검색)
@@ -52,3 +58,11 @@ max_to = 10
 [part_number]
 # 품번 정규식 (회사 품번 체계에 맞게 추가)
 patterns = ['\b\d{5}-[A-Z0-9]{5}\b']
+
+[reminder]
+# 업체 요청(req) 기한이 지났을 때 재요청 메일
+auto_send = false      # true 로 바꾸면 'req add --auto' 로 등록한 건은 매일 자동 수집 때 재요청을 자동 발송
+interval_days = 2      # 재요청 간격 (일)
+max_count = 3          # 최대 재요청 횟수
+subject_prefix = "[재요청]"
+# template = """..."""  # 직접 문구를 정하려면 사용. {greeting} {subject} {requested_md} {due_md} {vendor} {part_no} {count} {signature}

@@ -123,6 +123,104 @@ def cmd_index_attachments(args, cfg, conn):
         _out("원본 없음 = 아웃룩(PST)에서 가져온 메일입니다. 아웃룩을 켠 상태에서 --outlook 을 붙여 실행하세요.")
 
 
+def _req_line(r) -> str:
+    from .followup import dday
+    st = r["status"]
+    if st == "요청":
+        st = "요청(" + dday(r["due_date"]) + ")"
+    who = r["vendor"] or r["to_addrs"]
+    extra = f"  재요청 {r['remind_count']}회" if r["remind_count"] else ""
+    rep = f"  ← 회신 #{r['reply_mail_id']} {str(r['replied_at'])[:10]}" if r["reply_mail_id"] else ""
+    return (f"R{r['id']:<4} {st:<22} {who[:24]:<24} | {r['subject'][:60]}"
+            f"{'  [' + r['req_type'] + ']' if r['req_type'] else ''}{extra}{rep}")
+
+
+def cmd_req(args, cfg, conn):
+    from . import followup as fu
+    fu.ensure(conn)
+    a = args.req_cmd
+    if a == "add":
+        rid = fu.add(conn, args.to, args.subject, args.due, cc=args.cc or "", vendor=args.vendor or "",
+                     req_type=args.type or "", part_no=args.part or "", mail_id=args.mail, note=args.note or "",
+                     requested=args.requested, auto=args.auto)
+        r = conn.execute("SELECT * FROM requests WHERE id=?", (rid,)).fetchone()
+        _out("요청 등록:\n  " + _req_line(r))
+        return
+    if a == "list":
+        where = "" if args.all else "WHERE status = '요청'"
+        rows = conn.execute(f"SELECT * FROM requests {where} ORDER BY status != '요청', due_date").fetchall()
+        if args.json:
+            _out(json.dumps([dict(r) for r in rows], ensure_ascii=False, indent=1))
+            return
+        for r in rows:
+            _out(_req_line(r))
+        _out(f"\n총 {len(rows)}건" + ("" if args.all else " (진행 중인 요청만, 전체: --all)"))
+        return
+    if a == "check":
+        res = fu.check(conn, cfg)
+        for r, rep in res["replied"]:
+            _out(f"✓ 회신받음  R{r['id']} {r['subject'][:50]}  ← #{rep['id']} {rep['sender_name']} {rep['sent_at'][:10]}")
+        for r in res["overdue"]:
+            _out("! 기한 지남 " + _req_line(r))
+        for r in res["soon"]:
+            _out("- 기한 임박 " + _req_line(r))
+        if not any(res.values()):
+            _out("기한이 지났거나 임박한 요청이 없습니다.")
+        rc = cfg.get("reminder", {})
+        sent = 0
+        for r in res["remind"]:
+            if rc.get("auto_send") and r["auto_remind"] and args.auto_send:
+                subj, body = fu.reminder_mail(r, cfg)
+                try:
+                    fu.open_draft(r["to_addrs"], r["cc_addrs"], subj, body, send=True,
+                                  draft_dir=Path(cfg["archive"].get("draft_dir", "data/drafts")))
+                    fu.mark_reminded(conn, r["id"])
+                    sent += 1
+                    _out(f"→ 재요청 자동 발송: R{r['id']} {r['to_addrs']}")
+                except Exception as e:
+                    _out(f"→ 재요청 자동 발송 실패: R{r['id']} {e}")
+        manual = [r for r in res["remind"] if not (rc.get("auto_send") and r["auto_remind"] and args.auto_send)]
+        if manual:
+            _out("\n재요청 메일 띄우기: " + "  ".join(f"python -m mailhub req remind {r['id']}" for r in manual))
+        if args.notify and (res["overdue"] or res["soon"] or res["replied"]):
+            parts = []
+            if res["overdue"]:
+                parts.append(f"기한 지남 {len(res['overdue'])}건")
+            if res["soon"]:
+                parts.append(f"오늘·내일 기한 {len(res['soon'])}건")
+            if res["replied"]:
+                parts.append(f"업체 회신 {len(res['replied'])}건")
+            first = (res["overdue"] or res["soon"] or [r for r, _ in res["replied"]])[0]
+            fu.notify("업체 요청 회신 확인 - " + ", ".join(parts), f"{first['vendor'] or first['to_addrs']}: {first['subject'][:60]}")
+        return
+    if a == "remind":
+        r = conn.execute("SELECT * FROM requests WHERE id=?", (args.id,)).fetchone()
+        if not r:
+            sys.exit(f"R{args.id} 요청이 없습니다.")
+        subj, body = fu.reminder_mail(r, cfg)
+        if args.preview:
+            _out(f"받는사람: {r['to_addrs']}\n참조: {r['cc_addrs']}\n제목: {subj}\n\n{body}")
+            return
+        res = fu.open_draft(r["to_addrs"], r["cc_addrs"], subj, body, send=args.send,
+                            draft_dir=Path(cfg["archive"].get("draft_dir", "data/drafts")))
+        fu.mark_reminded(conn, r["id"])
+        _out(f"R{r['id']} 재요청: {res}")
+        return
+    if a == "update":
+        r = conn.execute("SELECT * FROM requests WHERE id=?", (args.id,)).fetchone()
+        if not r:
+            sys.exit(f"R{args.id} 요청이 없습니다.")
+        if args.due:
+            conn.execute("UPDATE requests SET due_date=? WHERE id=?", (fu.parse_due(args.due), args.id))
+        if args.status:
+            conn.execute("UPDATE requests SET status=? WHERE id=?", (args.status, args.id))
+        if args.note is not None:
+            conn.execute("UPDATE requests SET note=? WHERE id=?", (args.note, args.id))
+        conn.commit()
+        _out(_req_line(conn.execute("SELECT * FROM requests WHERE id=?", (args.id,)).fetchone()))
+        return
+
+
 def cmd_ingest_files(args, cfg, conn):
     from .ingest_files import ingest_folder
     for p in args.paths:
@@ -134,7 +232,7 @@ def cmd_search(args, cfg, conn):
     query = " ".join(args.query)
     rows = search(conn, query, sender=args.sender, since=args.since, until=args.until, tag=args.tag,
                   has_attach=args.has_attach, attach_name=args.attach, subject_only=args.subject,
-                  needs_action=args.todo, part_no=args.part, sort=args.sort,
+                  needs_action=args.todo, part_no=args.part, sort=args.sort, mine=args.mine, to=args.to,
                   limit=args.limit * 10 if args.group else args.limit)
     counts = None
     if args.group:
@@ -309,6 +407,37 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--limit", type=int, default=0, help="이번에 처리할 최대 건수 (시험용)")
     s.set_defaults(func=cmd_index_attachments)
 
+    s = sp.add_parser("req", help="업체 요청 추적 (기한 등록 · 회신 자동 확인 · 알림 · 재요청)")
+    rs = s.add_subparsers(dest="req_cmd", required=True)
+    r = rs.add_parser("add", help="요청 등록")
+    r.add_argument("--to", required=True, help="업체 담당자 메일 주소 (여러 명은 쉼표)")
+    r.add_argument("--subject", required=True, help="업체에 보낸(보낼) 메일 제목 그대로")
+    r.add_argument("--due", required=True, help="회신 기한: 2026-11-12, 11/12, +3, +3영업일")
+    r.add_argument("--cc", help="재요청 메일 참조")
+    r.add_argument("--vendor", help="업체명 (표시용)")
+    r.add_argument("--type", help="금형수정검토 / 수정진행 / 검사구수정 / 견적 등")
+    r.add_argument("--part", help="품번")
+    r.add_argument("--mail", type=int, help="관련 메일 번호 (고객사 요청 메일 등)")
+    r.add_argument("--note", help="메모")
+    r.add_argument("--requested", help="요청한 날 (기본: 오늘)")
+    r.add_argument("--auto", action="store_true", help="기한 지나면 재요청 자동 발송 대상 (config 에서 auto_send=true 필요)")
+    r = rs.add_parser("list", help="진행 중인 요청 목록")
+    r.add_argument("--all", action="store_true", help="완료·회신받음 포함 전체")
+    r.add_argument("--json", action="store_true")
+    r = rs.add_parser("check", help="업체 회신 자동 확인 + 기한 지남/임박 표시")
+    r.add_argument("--notify", action="store_true", help="윈도우 알림 띄우기")
+    r.add_argument("--auto-send", action="store_true", help="자동 발송 허용 (config auto_send=true 이고 --auto 등록 건만)")
+    r = rs.add_parser("remind", help="재요청 메일을 아웃룩 작성 창에 띄우기")
+    r.add_argument("id", type=int)
+    r.add_argument("--preview", action="store_true", help="화면에 내용만 보기")
+    r.add_argument("--send", action="store_true", help="창을 띄우지 않고 바로 발송")
+    r = rs.add_parser("update", help="기한·상태·메모 변경")
+    r.add_argument("id", type=int)
+    r.add_argument("--due")
+    r.add_argument("--status", help="요청 / 회신받음 / 완료 / 취소")
+    r.add_argument("--note")
+    s.set_defaults(func=cmd_req)
+
     s = sp.add_parser("ingest-files", help=".eml/.msg 파일 폴더 가져오기")
     s.add_argument("paths", nargs="+")
     s.set_defaults(func=cmd_ingest_files)
@@ -316,6 +445,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sp.add_parser("search", help="메일 검색", aliases=["s"])
     s.add_argument("query", nargs="*", help='검색어 (공백=AND, "정확한 구문", -제외어)')
     s.add_argument("--from", dest="sender", help="보낸사람 이름/주소")
+    s.add_argument("--to", help="받는사람/참조 이름·주소·도메인 (예: --to abc-mold.co.kr)")
+    s.add_argument("--mine", action="store_true", help="내가 보낸 메일만 (회신 말투 참고용)")
     s.add_argument("--since", help="시작일 YYYY-MM-DD")
     s.add_argument("--until", help="종료일 YYYY-MM-DD")
     s.add_argument("--tag", help="태그 (E.O, T/O, 금형수정, 검사구, 품질문제, 금형이관, 일정, 설계반영)")
