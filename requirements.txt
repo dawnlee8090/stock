@@ -3,3 +3,4 @@ extract-msg                         # .msg 파일 읽기
 keyring                             # 메일 비밀번호를 Windows 자격 증명 관리자에 저장
 pypdf                               # PDF 첨부 내용 검색
 openpyxl                            # E.O 리스트 엑셀 내보내기
+Pillow                              # E.O 참고 그림 (엑셀 삽입, 캡처 붙여넣기)

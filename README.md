@@ -185,7 +185,10 @@ python -m mailhub eo set 3 --status 완료 --note "T/O 치수 OK"
 python -m mailhub eo list                    # 진행 중 (⚠지연 ⏰임박 ✉새 관련메일)
 python -m mailhub eo show 3                  # 이력 + 관련 메일 + 업체 요청
 python -m mailhub eo inbox                   # 리스트에 아직 없는 E.O 메일 (누락 방지)
-python -m mailhub eo export data\EO_LIST.xlsx --open   # 엑셀 (상태별 색, 지연 빨간색, 필터)
+python -m mailhub eo img 3 --collect         # 관련 메일의 도면 캡처·PPT 슬라이드·엑셀 그림 모으기
+python -m mailhub eo img 3 --paste --caption "보스 단면"   # Win+Shift+S 캡처를 바로 붙여넣기
+python -m mailhub eo img 3 --remove 2         # 필요 없는 그림 빼기
+python -m mailhub eo export data\EO_LIST.xlsx --collect --open   # 그림까지 모아서 엑셀로
 ```
 
 - **누락 방지**: E.O 태그 메일 중 리스트에 연결 안 된 메일은 `eo inbox` 와 매일 확인에 표시됩니다.
@@ -193,6 +196,10 @@ python -m mailhub eo export data\EO_LIST.xlsx --open   # 엑셀 (상태별 색, 
 - **지연 알림**: 현재 단계의 기한(검토 회신 / 금형 수정 / 검증)이 지나면 매일 아침 알림.
 - **업체 요청 연결**: `req add ... --eo 3` 으로 등록하면 업체 회신이 오는 즉시 E.O 이력에 "업체 회신 도착"이 남습니다.
 - **Claude Code** `/eo-update`: 미등록 E.O 메일과 첨부 E.O LIST 를 읽어 품번별 등록안, 새 메일 기준 상태 변경안을 표로 제안 → 확인한 것만 반영.
+- **엑셀 구성**: `E.O LIST`(그룹 머리글·상태 색·지연 강조·대표 그림 썸네일·내용에 맞춘 열/행 크기, No 클릭 시 상세로 이동),
+  `요약`(상태별·차종별·지연 목록), `E번호` 상세 시트(기본 정보·일정·진행 이력·관련 메일·참고 그림 크게).
+- **참고 그림 출처**: 메일 본문에 붙여 넣은 캡처, 첨부 이미지, 첨부 PPT(파워포인트가 있으면 슬라이드 통째로, 없으면 PPT 안의 그림),
+  첨부 엑셀·워드 안의 그림. 작은 로고·아이콘은 자동 제외, 같은 그림은 한 번만.
 - 기존 엑셀 E.O 리스트가 있으면 `eo export x.csv` 와 같은 열 이름으로 맞춰 CSV(UTF-8) 저장 후 `eo import 파일.csv`.
 
 ## 10. 분류 기준 수정

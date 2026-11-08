@@ -39,8 +39,13 @@ E.O 리스트를 최신 메일 기준으로 갱신해줘. $ARGUMENTS (차종 등
 - 업체에 검토·수정을 요청하는 메일 초안이 필요하면 `/mail-review` 형식(기한 포함)으로 쓰고,
   보낸 뒤 `req add ... --eo <E번호>` 로 연결하면 업체 회신이 E.O 이력에 자동으로 남는다고 안내한다.
 
+## 4-1. 참고 그림
+- 새로 등록했거나 관련 메일이 늘어난 항목은 그림을 모은다: `python -m mailhub eo img <E번호> --collect` (PST 메일이면 `--outlook`)
+- 결과 목록에서 서명 로고·무관한 사진처럼 보이는 그림(캡션·출처로 판단)은 `eo img <E번호> --remove 번호` 를 제안한다.
+- 도면·PPT 그림이 없는 진행 중 항목은 "Win+Shift+S 로 캡처 후 `eo img <E번호> --paste --caption \"설명\"`" 을 안내한다.
+
 ## 5. 마무리
 - 요약: 진행 중 N건 (상태별), 이번에 등록/갱신한 건, 지연 건
-- 엑셀이 필요하면: `python -m mailhub eo export data/EO_LIST.xlsx --open`
+- 엑셀이 필요하면: `python -m mailhub eo export data/EO_LIST.xlsx --collect --open` (그림까지 모아서 저장 후 열기)
 
 기록을 바꾸는 명령(`eo add`, `eo set`, `eo link`, `eo import`, `req add`)은 사용자 확인 후에만 실행한다. 메일은 보내지 않는다.

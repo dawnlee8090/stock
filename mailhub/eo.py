@@ -309,7 +309,7 @@ def _export_rows(conn, rows, today=None):
     return out
 
 
-def export(conn, path: str | Path, status: str = "all", today: date | None = None) -> Path:
+def export(conn, path: str | Path, status: str = "all", today: date | None = None, with_images: bool = True) -> Path:
     rows = _export_rows(conn, listing(conn, status), today)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -320,47 +320,11 @@ def export(conn, path: str | Path, status: str = "all", today: date | None = Non
             for d in rows:
                 w.writerow([d.get(c, "") for c in EXPORT_COLS])
         return path
-    from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-    from openpyxl.utils import get_column_letter
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "E.O LIST"
-    thin = Side(style="thin", color="BFBFBF")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    ws.append([HEADERS[c] for c in EXPORT_COLS])
-    for c in ws[1]:
-        c.font = Font(bold=True, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor="305496")
-        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        c.border = border
-    for d in rows:
-        ws.append([d.get(c, "") if d.get(c) is not None else "" for c in EXPORT_COLS])
-        row = ws.max_row
-        for c in ws[row]:
-            c.border = border
-            c.alignment = Alignment(vertical="top", wrap_text=True)
-        ws.cell(row, EXPORT_COLS.index("status") + 1).fill = PatternFill("solid", fgColor=STATUS_COLOR.get(d["status"], "FFFFFF"))
-        if d["delay"]:
-            dc = ws.cell(row, EXPORT_COLS.index("delay") + 1)
-            dc.font = Font(bold=True, color="C00000")
-    widths = {"id": 5, "eo_no": 14, "car": 12, "part_no": 14, "part_name": 22, "change_desc": 40, "customer": 12,
-              "status": 9, "delay": 14, "mold_vendor": 12, "mold_action": 10, "mails": 18, "note": 40}
-    for i, c in enumerate(EXPORT_COLS, 1):
-        ws.column_dimensions[get_column_letter(i)].width = widths.get(c, 11)
-    ws.freeze_panes = "F2"
-    ws.auto_filter.ref = ws.dimensions
-    # 요약 시트
-    s2 = wb.create_sheet("요약")
-    s2.append(["상태", "건수", "지연"])
-    for st in STATUSES:
-        n = sum(1 for d in rows if d["status"] == st)
-        if n:
-            s2.append([st, n, sum(1 for d in rows if d["status"] == st and d["delay"])])
-    s2.append([])
-    s2.append([f"작성: {datetime.now():%Y-%m-%d %H:%M}"])
-    wb.save(path)
-    return path
+    from . import eo_excel, eo_images
+    eo_images.ensure(conn)
+    return eo_excel.build(conn, listing(conn, status), path,
+                          delay_of=lambda r: delay_of(r, today), soon_of=lambda r: soon_of(r, today),
+                          images_of=lambda eid: eo_images.listing(conn, eid), with_images=with_images)
 
 
 def import_csv(conn, path: str | Path, today: date | None = None) -> list[int]:

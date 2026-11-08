@@ -371,8 +371,45 @@ def cmd_eo(args, cfg, conn):
             notify(f"E.O 지연 {len(delayed)}건 / 임박 {len(soon)}건",
                    f"E{r0['id']} {r0['car']} {r0['part_name'] or r0['part_no']} - {d0}")
         return
+    if a == "img":
+        from . import eo_images as I
+        I.ensure(conn)
+        if args.all:
+            targets = [r["id"] for r in E.listing(conn, "open")]
+        elif args.id:
+            targets = [args.id]
+        else:
+            sys.exit("E번호를 넣거나 --all 을 주세요. 예) eo img 3 --collect")
+        if args.paste:
+            ok = I.paste(conn, cfg, targets[0], args.caption or "")
+            _out("캡처 그림을 저장했습니다." if ok else "이미 저장된 그림과 같아서 건너뛰었습니다.")
+        if args.add:
+            _out(f"{I.add_files(conn, cfg, targets[0], args.add, args.caption or '')}장 추가")
+        if args.remove:
+            for n in args.remove:
+                _out(f"[{n}] 삭제" if I.remove(conn, targets[0], n) else f"[{n}] 없음")
+        if args.collect or args.all:
+            for eid in targets:
+                n = I.collect(conn, cfg, eid, use_outlook=args.outlook, use_powerpoint=not args.no_ppt, log=_out)
+                if n or not args.all:
+                    _out(f"E{eid}: 그림 {n}장 새로 저장")
+        if not args.all:
+            imgs = I.listing(conn, targets[0])
+            _out(f"\nE{targets[0]} 참고 그림 {len(imgs)}장 (엑셀 내보내기에 들어감)")
+            for im in imgs:
+                _out(f"  [{im['sort']}] {im['caption']}  ({im['source']})")
+            if imgs:
+                _out(f"  필요 없는 그림 빼기: python -m mailhub eo img {targets[0]} --remove 번호")
+        return
     if a == "export":
-        p = E.export(conn, args.path, args.status)
+        if args.collect and not args.no_images:
+            from . import eo_images as I
+            I.ensure(conn)
+            total = 0
+            for r in E.listing(conn, args.status):
+                total += I.collect(conn, cfg, r["id"], use_outlook=args.outlook, use_powerpoint=True, log=_out)
+            _out(f"참고 그림 {total}장 새로 모음")
+        p = E.export(conn, args.path, args.status, with_images=not args.no_images)
         _out(f"E.O 리스트 저장: {p.resolve()}")
         if args.open and os.name == "nt":
             os.startfile(str(p.resolve()))  # type: ignore[attr-defined]
@@ -656,6 +693,19 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("path", nargs="?", default="data/EO_LIST.xlsx")
     e.add_argument("--status", default="all")
     e.add_argument("--open", action="store_true", help="저장 후 열기")
+    e.add_argument("--no-images", action="store_true", help="그림 없이 (파일 크기 작게)")
+    e.add_argument("--collect", action="store_true", help="내보내기 전에 관련 메일·PPT 그림 모으기")
+    e.add_argument("--outlook", action="store_true", help="--collect 시 PST(아웃룩) 메일 첨부도 읽기 [Windows]")
+    e = es.add_parser("img", help="참고 그림: 관련 메일·PPT에서 모으기 / 캡처 붙여넣기 / 목록·삭제")
+    e.add_argument("id", type=int, nargs="?", help="E번호의 숫자")
+    e.add_argument("--collect", action="store_true", help="연결된 메일의 그림·PPT·엑셀 그림 모으기")
+    e.add_argument("--all", action="store_true", help="진행 중인 모든 E.O 에 대해 모으기")
+    e.add_argument("--outlook", action="store_true", help="PST(아웃룩) 메일의 첨부도 읽기 [Windows]")
+    e.add_argument("--no-ppt", action="store_true", help="파워포인트로 슬라이드를 그림으로 만들지 않음")
+    e.add_argument("--paste", action="store_true", help="클립보드 캡처(Win+Shift+S)를 붙여넣기 [Windows]")
+    e.add_argument("--add", nargs="+", help="그림/PPT 파일 추가")
+    e.add_argument("--caption", help="그림 설명")
+    e.add_argument("--remove", type=int, nargs="+", help="뺄 그림 번호")
     e = es.add_parser("import", help="CSV(UTF-8) E.O 리스트 가져오기 (열 이름은 export 와 동일)")
     e.add_argument("path")
     s.set_defaults(func=cmd_eo)

@@ -82,11 +82,18 @@ class EoTest(unittest.TestCase):
         E.add(self.conn, today=date(2026, 11, 2), car="BC4t", part_no="84710-AA000", status="완료")
         x = E.export(self.conn, self.d / "eo.xlsx")
         from openpyxl import load_workbook
-        ws = load_workbook(x)["E.O LIST"]
-        self.assertEqual(ws.cell(1, 4).value, "품번")
-        self.assertEqual(ws.max_row, 3)
-        delay_col = E.EXPORT_COLS.index("delay") + 1
-        self.assertTrue(any("지연" in str(ws.cell(r, delay_col).value or "") for r in (2, 3)))
+        wb = load_workbook(x)
+        ws = wb["E.O LIST"]
+        self.assertEqual(ws.cell(1, 1).value, "E.O 관리 리스트")
+        self.assertEqual(ws.cell(3, 1).value, "기본 정보")          # 그룹 머리글
+        self.assertEqual(ws.cell(4, 3).value, "품번")
+        self.assertEqual(ws.max_row, 6)                              # 머리글 4줄 + 2건
+        from mailhub.eo_excel import COLUMNS
+        alert_col = [k for k, *_ in COLUMNS].index("alert") + 1
+        self.assertTrue(any("지연" in str(ws.cell(r, alert_col).value or "") for r in (5, 6)))
+        self.assertEqual(ws.cell(5, 1).hyperlink.location, "'E1'!A1")
+        self.assertIn("E1", wb.sheetnames)
+        self.assertIn("요약", wb.sheetnames)
         c = E.export(self.conn, self.d / "eo.csv")
         conn2 = db.connect(self.d / "t2.db")
         ids = E.import_csv(conn2, c, today=date(2026, 11, 2))
@@ -158,4 +165,70 @@ class PartExpandTest(unittest.TestCase):
             m = mail(conn, "x", "86526-BNGA0 후크 금형수정 검토서", "2026-11-05T09:00:00", tags="금형수정",
                      part_nos="86526-BNGA0")
             self.assertEqual([(e, mid) for e, mid, _ in E.sync(conn)], [(eid, m)])
+            conn.close()
+
+
+class EoImageTest(unittest.TestCase):
+    def test_collect_and_excel(self):
+        import zipfile
+        from email.message import EmailMessage
+        from PIL import Image, ImageDraw
+        from mailhub import eo_images as I
+
+        def png(w, h, text):
+            im = Image.new("RGB", (w, h), "white")
+            dr = ImageDraw.Draw(im)
+            for k in range(0, w, 7):  # 압축이 덜 되게 패턴
+                dr.line([(k, 0), (w - k, h)], fill=(k % 255, 80, 160))
+            dr.text((20, 20), text, fill="black")
+            b = io.BytesIO()
+            im.save(b, "PNG")
+            return b.getvalue()
+
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            cfg = load_config(d / "none.toml")
+            cfg["archive"]["eo_image_dir"] = str(d / "img")
+            conn = db.connect(d / "t.db")
+            drawing, logo = png(900, 600, "BOSS +2mm"), png(120, 40, "logo")
+            pptx = io.BytesIO()
+            with zipfile.ZipFile(pptx, "w") as z:
+                z.writestr("ppt/slides/slide1.xml", "<p:sld/>")
+                z.writestr("ppt/media/image1.png", png(1000, 700, "slide pic"))
+            m = EmailMessage()
+            m["Subject"], m["From"], m["Date"], m["Message-ID"] = "EO 송부", "c@oem.com", "Mon, 02 Nov 2026 09:00:00 +0900", "<i@x>"
+            m.set_content("도면 참고")
+            m.add_related = None
+            m.add_attachment(drawing, maintype="image", subtype="png", filename="image001.png")
+            m.add_attachment(logo, maintype="image", subtype="png", filename="image002.png")
+            m.add_attachment(pptx.getvalue(), maintype="application", subtype="octet-stream", filename="EO 설명.pptx")
+            (d / "a.eml").write_bytes(bytes(m))
+            mid = db.insert_mail(conn, "mid:i@x", {"subject": "EO 송부", "sent_at": "2026-11-02T09:00:00",
+                                                   "file_path": str(d / "a.eml")})
+            eid = E.add(conn, today=date(2026, 11, 2), car="BC4t", part_no="86511-BN200", mail_id=mid,
+                        change_desc="보스 높이 2mm 상향 " * 8)
+            n = I.collect(conn, cfg, eid, use_powerpoint=False, log=lambda *_: None)
+            self.assertEqual(n, 2)                                   # 도면 + PPT 그림 (로고 제외)
+            self.assertEqual(I.collect(conn, cfg, eid, use_powerpoint=False, log=lambda *_: None), 0)  # 중복 없음
+            caps = [x["caption"] for x in I.listing(conn, eid)]
+            self.assertTrue(caps[0].startswith("#%d 11/02 본문 캡처" % mid))
+            self.assertIn("EO 설명.pptx", caps[1])
+            # 직접 추가 + 삭제 후 다시 모아도 되살아나지 않음
+            p = d / "cap.png"
+            p.write_bytes(png(700, 500, "capture"))
+            self.assertEqual(I.add_files(conn, cfg, eid, [str(p)], "현장 사진"), 1)
+            self.assertTrue(I.remove(conn, eid, 1))
+            self.assertEqual(I.collect(conn, cfg, eid, use_powerpoint=False, log=lambda *_: None), 0)
+            self.assertEqual([x["sort"] for x in I.listing(conn, eid)], [2, 3])
+
+            x = E.export(conn, d / "eo.xlsx")
+            from openpyxl import load_workbook
+            wb = load_workbook(x)
+            ws = wb["E.O LIST"]
+            self.assertEqual(len(ws._images), 1)                     # 목록 썸네일
+            self.assertEqual(len(wb[f"E{eid}"]._images), 2)          # 상세 시트 그림 2장
+            self.assertGreater(ws.row_dimensions[5].height, 60)      # 썸네일/긴 내용에 맞춰 행 높이
+            self.assertGreater(x.stat().st_size, 5000)
+            y = E.export(conn, d / "eo2.xlsx", with_images=False)
+            self.assertEqual(len(load_workbook(y)["E.O LIST"]._images), 0)
             conn.close()

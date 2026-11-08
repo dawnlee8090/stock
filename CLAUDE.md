@@ -20,6 +20,8 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   `eo inbox`(미등록 E.O 메일), `eo check`(새 메일 자동 연결 + 지연·임박), `eo export data/EO_LIST.xlsx`,
   `eo add --mail N --eo-no --car --part-no --part-name --desc ..`, `eo set <E번호> --status 접수|검토중|수정요청|수정중|수정완료|검증중|완료|수정불필요|보류|취소 [--note --mail --mold-due ...]`,
   `eo link <E번호> <메일번호...>`, 업체 요청을 E.O 에 연결: `req add ... --eo <E번호>`. 갱신 절차는 `/eo-update`
+  참고 그림: `eo img <E번호> [--collect [--outlook]] [--paste --caption ..] [--add 파일] [--remove 번호]`,
+  엑셀: `eo export data/EO_LIST.xlsx [--collect] [--open]` (목록 썸네일 + E번호별 상세 시트)
 - 결과가 적으면 동의어/영문 표기(E.O ↔ EO ↔ 설계변경, T/O ↔ TRY OUT ↔ 트라이)와 품번으로 다시 검색한다.
 
 ## 원칙
