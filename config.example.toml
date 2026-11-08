@@ -65,3 +65,9 @@ interval_days = 2      # 재요청 간격 (일)
 max_count = 3          # 최대 재요청 횟수
 subject_prefix = "[재요청]"
 # template = """..."""  # 직접 문구를 정하려면 사용. {greeting} {subject} {requested_md} {due_md} {vendor} {part_no} {count} {signature}
+
+[sent_move]
+# 퇴근 전 알림: 그룹웨어 보낸편지함 → 받은편지함 옮기기 (평일, 오늘 보낸 메일이 수집되면 그날은 끝)
+enabled = true
+times = ["19:00", "20:00", "21:00", "22:00"]
+weekdays = [0, 1, 2, 3, 4]   # 0=월 ... 4=금

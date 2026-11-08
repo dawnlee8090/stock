@@ -159,7 +159,8 @@ class Data:
         import email
         import html as _html
         from email import policy
-        r = c.execute("SELECT file_path, entry_id, store_id, body, subject FROM mails WHERE id=?", (mid,)).fetchone()
+        r = c.execute("SELECT file_path, entry_id, store_id, body, subject, sender_name, sender_email, to_addr, cc_addr, "
+                      "sent_at, attachments FROM mails WHERE id=?", (mid,)).fetchone()
         if not r:
             raise KeyError(f"#{mid} 메일이 없습니다")
         fp = r["file_path"] or ""
@@ -188,8 +189,22 @@ class Data:
         if not doc:
             doc = f"<pre>{_html.escape(r['body'] or '')}</pre>"
         style = ("<meta charset='utf-8'><style>body{font-family:'Malgun Gothic',sans-serif;font-size:14px;margin:16px;"
-                 "background:#fff;color:#111}pre{white-space:pre-wrap}img{max-width:100%;height:auto}</style>")
-        return style + doc
+                 "background:#fff;color:#111}pre{white-space:pre-wrap}img{max-width:100%;height:auto}"
+                 ".mh-head{border-collapse:collapse;width:100%;margin:0 0 14px;font-size:13px;border-bottom:2px solid #1f3864}"
+                 ".mh-head th{text-align:left;color:#555;font-weight:600;width:72px;padding:4px 8px 4px 0;vertical-align:top}"
+                 ".mh-head td{padding:4px 0;word-break:break-all}.mh-subj{font-size:17px;font-weight:700;margin:0 0 8px}</style>")
+        e = _html.escape
+
+        def people(v: str) -> str:   # 받는사람·참조: 사람마다 줄바꿈 없이 ; 로
+            return e("; ".join(x.strip() for x in re.split(r"[;\n]", v or "") if x.strip()))
+
+        sender = f"{r['sender_name']} <{r['sender_email']}>" if r["sender_name"] else (r["sender_email"] or "")
+        rows = [("보낸사람", e(sender)), ("받는사람", people(r["to_addr"])), ("참조", people(r["cc_addr"])),
+                ("날짜", e((r["sent_at"] or "").replace("T", " ")[:16])),
+                ("첨부", e(" · ".join(x for x in (r["attachments"] or "").splitlines() if x)))]
+        head = (f"<div class='mh-subj'>{e(r['subject'] or '')}</div><table class='mh-head'>"
+                + "".join(f"<tr><th>{k}</th><td>{v}</td></tr>" for k, v in rows if v) + "</table>")
+        return style + head + doc
 
     # ---- 업체 요청 ----
     def reqs(self, c) -> list:
@@ -316,6 +331,15 @@ class Data:
                                draft_dir=Path(self.cfg["archive"].get("draft_dir", "data/drafts")))
             F.mark_reminded(c, r["id"])
             return {"ok": True, "message": res}
+        if path[0] == "eo" and path[1] == "add":
+            mail_id = int(body.get("mail_id") or 0) or None
+            ids = []
+            for it in body.get("items") or []:
+                kw = {k: str(it.get(k) or "").strip() for k in E.FIELDS if k in it}
+                if not (kw.get("part_no") or kw.get("part_name") or kw.get("eo_no")):
+                    continue
+                ids.append(E.add(c, mail_id=mail_id, **kw))
+            return {"ok": True, "ids": ids}
         if path[0] == "eo":
             E.update(c, int(path[1]), status=body.get("status") or None, note=(body.get("note") or "").strip() or None)
             return {"ok": True}
@@ -414,8 +438,18 @@ def make_handler(data: Data, port: int):
                         return self._send(404, b"not found", "text/plain")
                     ctype = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
                     return self._send(200, p.read_bytes(), ctype)
+                if parts[0] == "ai" and len(parts) == 3:
+                    from . import ai
+                    key = f"{'review' if parts[1] == 'review' else 'eo'}:{int(parts[2])}"
+                    out = {"available": bool(ai.find_claude()), "job": ai.job(key)}
+                    if parts[1] == "review":
+                        out["saved"] = ai.saved_review(data.cfg, int(parts[2]))
+                    return self._json(out)
                 c = data.conn()
                 try:
+                    if parts == ["sentmove"]:
+                        from . import sentmove
+                        return self._json(sentmove.status(c, data.cfg))
                     if parts == ["summary"]:
                         return self._json(data.summary(c))
                     if parts == ["mails"]:
@@ -473,6 +507,21 @@ def make_handler(data: Data, port: int):
             try:
                 if parts == ["sync"]:
                     return self._json(data.sync())
+                if parts[0] == "ai" and len(parts) == 3:
+                    from . import ai
+                    mid = int(parts[2])
+                    if parts[1] == "review":
+                        return self._json({"job": ai.start_review(data.cfg, mid)})
+                    if parts[1] == "eo":
+                        return self._json({"job": ai.start_eo_extract(data.cfg, mid, data.conn)})
+                if parts == ["sentmove"]:
+                    from . import sentmove
+                    r = data.sync()
+                    c = data.conn()
+                    try:
+                        return self._json(sentmove.status(c, data.cfg) | {"message": r.get("message", "")})
+                    finally:
+                        c.close()
                 c = data.conn()
                 try:
                     return self._json(data.post(c, parts + [""] * (3 - len(parts)), body))
@@ -517,6 +566,8 @@ def serve(cfg_path: str | None = None, port: int = 8765, open_window: bool = Tru
             open_app_window(url)
         return
     log(f"업무 비서 앱: {url}  (이 PC 에서만 열립니다. 끄려면 이 창에서 Ctrl+C)")
+    from . import sentmove
+    sentmove.Scheduler(data.conn, cfg, data.sync, log).start()   # 평일 19~22시 보낸메일 옮기기 알림
     if open_window:
         threading.Timer(0.6, open_app_window, args=(url,)).start()
     try:

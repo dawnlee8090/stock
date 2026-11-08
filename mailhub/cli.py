@@ -806,6 +806,22 @@ def cmd_mold(args, cfg, conn):
         return
 
 
+def cmd_remind_sent(args, cfg, conn):
+    from . import sentmove
+    from .webapp import Data
+    conn.close()
+    d = Data(cfg, args.config)
+    if args.status:
+        c = d.conn()
+        try:
+            st = sentmove.status(c, cfg)
+        finally:
+            c.close()
+        _out(f"오늘 수집된 보낸 메일 {st['sent_today']}건 / 알림 시각 {', '.join(st['times'])}")
+        return
+    _out(sentmove.check_and_ask(d.conn, cfg, d.sync, log=_out))
+
+
 def cmd_app(args, cfg, conn):
     from .webapp import serve
     conn.close()
@@ -1288,6 +1304,10 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--dest", help="이관 법인만")
     x.add_argument("--open", action="store_true")
     s.set_defaults(func=cmd_mold)
+
+    s = sp.add_parser("remind-sent", help="퇴근 전 알림: 보낸편지함 → 받은편지함 옮기기 (오늘 보낸 메일이 수집 안 됐으면 알림 창)")
+    s.add_argument("--status", action="store_true", help="오늘 수집된 보낸 메일 수만 보기")
+    s.set_defaults(func=cmd_remind_sent)
 
     s = sp.add_parser("app", help="업무 비서 앱 실행 (내 PC 전용 화면: 오늘 할 일·메일함·업체 요청·E.O·T/O·금형 이관)")
     s.add_argument("--port", type=int, default=8765)

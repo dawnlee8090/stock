@@ -16,6 +16,8 @@ DEFAULT_CONFIG: dict = {
     },
     # 업체 요청 재요청 메일
     "reminder": {"interval_days": 2, "max_count": 3, "subject_prefix": "[재요청]"},
+    # 퇴근 전 알림: 그룹웨어 보낸편지함 → 받은편지함 옮기기 (앱이 켜져 있을 때, 평일)
+    "sent_move": {"enabled": True, "times": ["19:00", "20:00", "21:00", "22:00"], "weekdays": [0, 1, 2, 3, 4]},
     # 그룹웨어 메일 서버 (IMAP). 비밀번호는 여기 적지 않음 → imap-setup 으로 저장
     "imap": {"host": "", "port": 993, "ssl": True, "user": "", "folders": []},
     # 내 메일 주소 (보낸 메일은 '조치 필요' 판정에서 제외)

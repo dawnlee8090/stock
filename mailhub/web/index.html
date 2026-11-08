@@ -201,7 +201,7 @@ table.t td.c { text-align: center; }
   border-left: 1px solid var(--line); display: flex; flex-direction: column;
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px); }
 .drawer.wide { width: min(1000px, 100%); }
-.drawer.wide .drawer-b { padding: 0; display: block; overflow: hidden; flex: 1; }
+.drawer.flush .drawer-b { padding: 0; display: block; overflow: hidden; flex: 1; }
 iframe.orig { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
 .drawer-h { display: flex; align-items: flex-start; gap: 10px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
 .drawer-h h2 { font-size: 16px; line-height: 1.4; flex: 1; }
@@ -246,6 +246,31 @@ table.matrix td.doc { text-align: center; font-weight: 600; font-size: 12.5px; w
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60;
   background: var(--fg); color: var(--surface); padding: 10px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px);
   box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+.ai-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.ai-panel { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); margin: 4px 0 14px; max-width: 920px; }
+.ai-panel .panel-h { background: var(--accent-weak); }
+.ai-body { padding: 14px 18px 18px; font-size: 13.5px; line-height: 1.65; overflow-wrap: anywhere; }
+.ai-body h1, .ai-body h2, .ai-body h3 { font-size: 14.5px; margin: 16px 0 6px; }
+.ai-body h1:first-child, .ai-body h2:first-child, .ai-body h3:first-child { margin-top: 0; }
+.ai-body p { margin: 6px 0; } .ai-body ul, .ai-body ol { margin: 6px 0; padding-left: 20px; }
+.ai-body table { border-collapse: collapse; font-size: 12.5px; margin: 8px 0; display: block; overflow-x: auto; }
+.ai-body th, .ai-body td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+.ai-body th { background: var(--surface-2); }
+.ai-body code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); padding: 1px 4px; border-radius: 3px; }
+.ai-body pre { background: var(--surface-2); padding: 10px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+.spin { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.9s linear infinite; vertical-align: -2px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.eo-form { display: grid; gap: 10px; }
+.eo-item { border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: grid; gap: 6px; }
+.eo-item.off { opacity: .5; }
+.eo-item .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.eo-item label { display: grid; gap: 2px; font-size: 11.5px; color: var(--fg-3); }
+.eo-item label.wide { grid-column: 1 / -1; }
+.eo-item input[type=text] { width: 100%; font-size: 13px; color: var(--fg); }
+.eo-item .hd { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; }
+.sent-bar { background: var(--info-weak); color: var(--info); font-size: 13px; padding: 8px 20px; border-bottom: 1px solid var(--line);
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.sent-bar b { font-weight: 600; }
 .copybox { display: flex; gap: 8px; align-items: center; background: var(--surface-2); border: 1px dashed var(--line); border-radius: 6px; padding: 8px 10px; font-size: 12.5px; }
 .copybox code { font-family: var(--mono); flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
@@ -295,6 +320,8 @@ table.matrix td.doc { text-align: center; font-weight: 600; font-size: 12.5px; w
         새 메일 받기</button>
     </header>
     <div class="demo-bar" id="demo-bar" hidden><b>예시 화면</b> · 실제 회사 메일이 아닌 가상 데이터입니다. 회사 PC에서 <span class="mono">python -m mailhub app</span> 으로 실행하면 내 메일·대장이 연결됩니다.</div>
+    <div class="sent-bar" id="sent-bar" hidden><span><b>퇴근 전 확인</b> · 그룹웨어 [보낸편지함]의 오늘 보낸 메일을 [받은편지함]으로 옮겨 주세요. 내가 보낸 메일까지 백업되고 회신한 건이 정리됩니다.</span>
+      <button class="btn sm primary" id="sent-done" type="button">옮겼어요 · 지금 수집</button></div>
     <main class="view" id="view"></main>
   </div>
 </div>
@@ -436,6 +463,7 @@ async function demoApi(path, body) {
   const parts = base.split('/');
   await new Promise(r => setTimeout(r, 60));
   if (base === 'summary') return demoSummary();
+  if (base === 'eo/add') return { ok: true, ids: [] };
   if (base === 'mails') {
     let r = D.mails.slice();
     const q = (p.get('q') || '').trim().toLowerCase();
@@ -468,8 +496,37 @@ async function demoApi(path, body) {
   if (parts[0] === 'mold' && parts.length === 2 && !body) { const m = D.molds.find(x => x.id === +parts[1]); return { mold: { ...m, alerts: moldAlerts(m) }, log: [{ at: addDays(-12) + 'T09:00', what: '등록', note: '' }], mails: [], items: { 부품: 12, KD: 2, 원소재: 0 } }; }
   if (parts[0] === 'mold' && parts[2] === 'doc') { const m = D.molds.find(x => x.id === +parts[1]); m.docs[body.section] = [body.status, m.docs[body.section][1] || iso(TODAY)]; return { ok: true }; }
   if (base === 'sync') return { added: 0, message: '예시 모드에서는 메일을 받지 않습니다' };
+  if (parts[0] === 'ai' && parts[1] === 'review') {
+    const k = 'review:' + parts[2];
+    if (body) { DEMO_JOBS[k] = { state: 'running', t: Date.now() }; return { job: DEMO_JOBS[k] }; }
+    const j = DEMO_JOBS[k];
+    if (j && j.state === 'running' && Date.now() - j.t > 2500) { j.state = 'done'; j.result = { text: DEMO_REVIEW, at: iso(TODAY) + 'T' + new Date().toTimeString().slice(0, 5) }; }
+    return { available: true, job: j || null, saved: j && j.state === 'done' ? j.result : null };
+  }
+  if (parts[0] === 'ai' && parts[1] === 'eo') {
+    const mm = D.mails.find(x => x.id === +parts[2]);
+    return { job: { state: 'done', result: { by: 'Claude', items: [{ eo_no: 'EO26-0871', car: 'NX5 HEV', part_no: (mm && mm.part_nos) || '84634-NX100', part_name: 'BRKT ASSY-CONSOLE CTR MTG', change_desc: 'IN-LINE 볼트 형상 변경, PAD 32x12 → 40x25x0.5t', customer: 'MSV설계', apply_point: 'LP2', review_due: addDays(5), note: '금형 수정 가능 여부·일정 회신 필요' }] } } };
+  }
+  if (base === 'sentmove') return body ? { show: false, sent_today: 3 } : { show: true, sent_today: 0 };
   return { ok: true, demo: true };
 }
+const DEMO_JOBS = {};
+const DEMO_REVIEW = `### 1) 요약
+- 발신: 이준호 책임 (고객사 품질) · 회신 기한 **11/12(목)**
+- LP2 이벤트에서 FR 도어트림 암레스트 코너 R부 감싸기 주름 재발 (6/40)
+- M단계 대책(접착제 도포량 증가) 적용 여부 확인 요청
+
+### 2) 요청사항 · 검토 항목
+| No | 요청 내용 | 검토 주체 | 기한 | 비고 |
+|---|---|---|---|---|
+| 1 | 주름 원인 분석 | 설계·생산기술 | 11/10 | 코너 R 기재 형상 |
+| 2 | M단계 대책 적용 여부 확인 | 생산 | 11/9 | 도포량 기록 확인 |
+| 3 | 개선대책 회신 | 개발 | 11/12 | |
+
+### 5) 고객사 회신 초안
+안녕하십니까. 개발3팀 OOO입니다.
+LP2 FR 도어트림 감싸기 주름 건 관련하여, M단계 대책 적용 여부와 원인 분석 결과를 정리하여 11/12(목)까지 회신드리겠습니다.
+감사합니다.`;
 const GUIDE_SINK = '■ 싱크 - 원인·대책 가이드\n[대책 우선순위] ① 조건 → ② 금형 → ③ 설계(E.O) → ④ 재질\n 1. 보압·보압 시간 증가 (게이트 실 시간 확인)\n 2. 금형 온도 하향, 냉각 시간 증가\n 3. 게이트 확대 또는 후육부 가까이 이동\n 4. 해당 부위 냉각 채널 보강·버블러\n 5. 리브/보스 두께 축소, 코어 빼기 → E.O';
 
 // ================= 공통 UI =================
@@ -493,7 +550,7 @@ document.addEventListener('click', (e) => { const b = e.target.closest('[data-co
 
 function drawer(title, html, onReady, wide) {
   const L = $('#layer');
-  L.innerHTML = `<div class="drawer-bg" data-close></div><aside class="drawer${wide ? ' wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+  L.innerHTML = `<div class="drawer-bg" data-close></div><aside class="drawer${wide ? ' wide' : ''}${wide === 'flush' ? ' flush' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="drawer-h"><h2>${title}</h2><button class="btn sm" data-close type="button">닫기</button></div><div class="drawer-b">${html}</div></aside>`;
   L.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { L.innerHTML = ''; }));
   onReady && onReady(L);
@@ -608,21 +665,131 @@ async function openMail(id, V) {
       <button class="btn sm" data-mark="업체검토중" type="button">업체 검토중</button>
       ${LIVE ? '<button class="btn sm" id="view-orig" type="button">원본 보기</button><button class="btn sm" id="open-orig" type="button">Outlook에서 열기</button>' : ''}
     </div>
-    ${claudeBox('/mail-review ' + m.id, '검토·회신 초안')}
-    ${isEO ? '<div style="height:8px"></div>' + claudeBox('/eo-update ' + m.id, 'E.O 반영') : ''}
-    ${isTO ? '<div style="height:8px"></div>' + claudeBox('/to-update ' + m.id, 'T/O 반영') : ''}
+    <div class="ai-bar">
+      <button class="btn primary sm" id="ai-review" type="button">✦ 검토·회신 초안</button>
+      ${isEO ? '<button class="btn sm" id="ai-eo" type="button">✦ E.O 반영 (자동 기입)</button>' : ''}
+      <span class="sub" id="ai-note"></span></div>
+    <div id="ai-out"></div>
+    ${isTO ? claudeBox('/to-update ' + m.id, 'T/O 반영') : ''}
     ${isMold ? '<div style="height:8px"></div>' + claudeBox('/mold-update ' + m.id, '이관 반영') : ''}
     <div style="height:16px"></div>
     <div class="body-text">${esc(m.body || '')}</div>
     ${m.att_text ? `<details class="att"><summary>첨부파일 안의 글자 보기</summary><pre>${esc(m.att_text)}</pre></details>` : ''}`;
   $('#back', R).addEventListener('click', () => V.classList.remove('reading'));
+  setupReview(m, R);
+  const eb = $('#ai-eo', R); if (eb) eb.addEventListener('click', () => startEO(m, eb));
   R.querySelectorAll('[data-mark]').forEach(b => b.addEventListener('click', async () => {
     await api(`mail/${id}/mark`, { status: b.dataset.mark }); toast(LIVE ? `#${id} '${b.dataset.mark}' 로 기록했습니다` : `예시 화면이라 저장되지 않습니다 ('${b.dataset.mark}')`); route();
   }));
   const oo = $('#open-orig', R); if (oo) oo.addEventListener('click', async () => {
     try { await api(`mail/${id}/open`, {}); toast('Outlook으로 열었습니다. 열리지 않으면 [원본 보기]를 쓰세요'); } catch (err) { toast(err.message); } });
   const vo = $('#view-orig', R); if (vo) vo.addEventListener('click', () => drawer(esc(m.subject),
-    `<iframe class="orig" sandbox title="메일 원본" src="/api/mail/${id}/original"></iframe>`, null, true));
+    `<iframe class="orig" sandbox title="메일 원본" src="/api/mail/${id}/original"></iframe>`, null, 'flush'));
+}
+
+// ================= Claude: 검토 초안 · E.O 자동 기입 =================
+function mdToHtml(src) {
+  const lines = esc(src).replace(/\r/g, '').split('\n');
+  const inline = (t) => t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  let out = '', i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^```/.test(l)) { let j = i + 1, buf = []; while (j < lines.length && !/^```/.test(lines[j])) buf.push(lines[j++]); out += `<pre>${buf.join('\n')}</pre>`; i = j + 1; continue; }
+    if (/^\s*\|.*\|\s*$/.test(l)) {
+      const rows = []; while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(lines[i++]);
+      const cells = (r) => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const body = rows.filter(r => !/^\s*\|[\s:\-|]+\|\s*$/.test(r));
+      out += '<table>' + body.map((r, k) => `<tr>${cells(r).map(c => k === 0 ? `<th>${inline(c)}</th>` : `<td>${inline(c)}</td>`).join('')}</tr>`).join('') + '</table>';
+      continue;
+    }
+    let m;
+    if ((m = l.match(/^(#{1,4})\s+(.*)$/))) { const n = Math.min(3, m[1].length + 1); out += `<h${n}>${inline(m[2])}</h${n}>`; i++; continue; }
+    if (/^\s*([-*]|\d+[.)])\s+/.test(l)) {
+      const ordered = /^\s*\d/.test(l); const items = [];
+      while (i < lines.length && /^\s*([-*]|\d+[.)])\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+[.)])\s+/, ''));
+      out += (ordered ? '<ol>' : '<ul>') + items.map(x => `<li>${inline(x)}</li>`).join('') + (ordered ? '</ol>' : '</ul>');
+      continue;
+    }
+    if (!l.trim()) { i++; continue; }
+    const para = []; while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|\s*\||```|\s*([-*]|\d+[.)])\s)/.test(lines[i])) para.push(lines[i++]);
+    out += `<p>${inline(para.join('<br>'))}</p>`;
+  }
+  return out;
+}
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+async function waitJob(path, onTick) {
+  for (let k = 0; k < 400; k++) {
+    const r = await api(path);
+    if (r.job && r.job.state !== 'running') return r;
+    onTick && onTick(k);
+    await sleep(3000);
+  }
+  throw new Error('시간이 너무 오래 걸립니다');
+}
+function showReview(R, m, data) {
+  const out = $('#ai-out', R);
+  out.innerHTML = `<section class="ai-panel"><div class="panel-h"><h2>✦ 검토 · 회신 초안</h2>
+      <div class="chips"><span class="sub">${esc((data.at || '').replace('T', ' '))}</span>
+      <button class="btn sm" id="ai-copy" type="button">전체 복사</button><button class="btn sm" id="ai-again" type="button">다시 만들기</button></div></div>
+    <div class="ai-body">${mdToHtml(data.text)}</div></section>`;
+  $('#ai-copy', out).addEventListener('click', async () => { try { await navigator.clipboard.writeText(data.text); toast('초안을 복사했습니다. 그룹웨어 메일에 붙여 넣으세요'); } catch { toast('복사가 막혀 있습니다. 내용을 직접 선택해 복사하세요'); } });
+  $('#ai-again', out).addEventListener('click', () => runReview(m, R));
+}
+async function setupReview(m, R) {
+  const btn = $('#ai-review', R);
+  btn.addEventListener('click', () => runReview(m, R));
+  try {
+    const st = await api(`ai/review/${m.id}`);
+    if (st.job && st.job.state === 'running') return runReview(m, R, true);
+    if (st.saved) { btn.textContent = '✦ 검토 결과 보기'; btn.onclick = () => { showReview(R, m, st.saved); btn.textContent = '✦ 검토·회신 초안'; btn.onclick = null; }; }
+    if (!st.available) $('#ai-note', R).textContent = 'Claude Code를 찾지 못했습니다 - 아래 명령으로 실행하세요';
+  } catch { /* 상태 확인 실패는 무시 */ }
+}
+async function runReview(m, R, already) {
+  const out = $('#ai-out', R), note = $('#ai-note', R), btn = $('#ai-review', R);
+  btn.disabled = true;
+  out.innerHTML = `<section class="ai-panel"><div class="ai-body"><span class="spin"></span> Claude가 메일과 관련 이력을 읽고 초안을 쓰는 중입니다 (보통 1~3분). 다른 메일을 봐도 계속 진행됩니다.</div></section>`;
+  try {
+    if (!already) { const st = await api(`ai/review/${m.id}`, {}); if (st.job.state === 'error') throw new Error(st.job.error); }
+    const r = await waitJob(`ai/review/${m.id}`, (k) => { note.textContent = `${(k + 1) * 3}초 경과`; });
+    if (r.job.state === 'error') throw new Error(r.job.error);
+    note.textContent = '';
+    if ($('#ai-out', R) === out && document.body.contains(out)) showReview(R, m, r.job.result);
+  } catch (err) {
+    out.innerHTML = `<section class="ai-panel"><div class="ai-body">초안을 만들지 못했습니다: ${esc(err.message)}<div style="height:8px"></div>${claudeBox('/mail-review ' + m.id, '명령 복사')}</div></section>`;
+  } finally { btn.disabled = false; }
+}
+const EO_FIELDS = [['eo_no', 'E.O No'], ['car', '차종'], ['part_no', '품번'], ['part_name', '품명'], ['change_desc', '변경 내용', 1], ['customer', '발행처'], ['apply_point', '적용 시점'], ['review_due', '검토 회신 기한 (YYYY-MM-DD)'], ['note', '확인할 점', 1]];
+async function startEO(m, btn) {
+  btn.disabled = true; const label = btn.textContent; btn.innerHTML = '<span class="spin"></span> 항목 뽑는 중…';
+  try {
+    const st = await api(`ai/eo/${m.id}`, {});
+    let r = st;
+    if (st.job.state === 'running') r = await waitJob(`ai/eo/${m.id}`);
+    if (r.job.state === 'error') throw new Error(r.job.error);
+    eoForm(m, r.job.result);
+  } catch (err) { toast('자동 기입 실패: ' + err.message); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+function eoForm(m, res) {
+  const items = res.items || [];
+  drawer(`E.O 반영 · #${m.id}`, `
+    <div class="sub">${esc(res.by === 'Claude' ? 'Claude가 메일과 첨부에서 뽑은 항목입니다.' : '메일의 품번으로 기본값을 채웠습니다.')} 확인·수정한 뒤 등록할 항목만 체크하세요.</div>
+    <div class="eo-form">${items.length ? items.map((it, k) => `
+      <div class="eo-item" data-k="${k}"><div class="hd"><input type="checkbox" id="eo-on-${k}" checked><label for="eo-on-${k}" style="color:var(--fg);font-size:13px">항목 ${k + 1}</label>
+        ${/기존 E\d+/.test(it.note || '') ? '<span class="chip warn">이미 등록됨?</span>' : ''}</div>
+        <div class="grid">${EO_FIELDS.map(([f, l, wide]) => `<label class="${wide ? 'wide' : ''}">${l}<input type="text" id="eo-${f}-${k}" value="${esc(it[f] || '')}"></label>`).join('')}</div></div>`).join('') : '<div class="empty">뽑힌 항목이 없습니다</div>'}</div>
+    <div class="edit-row"><button class="btn primary" id="eo-reg" type="button">선택 항목 E.O 리스트에 등록</button></div>`, (L) => {
+      L.querySelectorAll('.eo-item input[type=checkbox]').forEach(cb => cb.addEventListener('change', () => cb.closest('.eo-item').classList.toggle('off', !cb.checked)));
+      $('#eo-reg', L).addEventListener('click', async () => {
+        const sel = items.map((_, k) => k).filter(k => $(`#eo-on-${k}`, L).checked).map(k => Object.fromEntries(EO_FIELDS.map(([f]) => [f, $(`#eo-${f}-${k}`, L).value.trim()])));
+        if (!sel.length) return toast('등록할 항목을 체크하세요');
+        try {
+          const r = await api('eo/add', { mail_id: m.id, items: sel.map(x => { const { note, ...rest } = x; return { ...rest, note }; }) });
+          L.innerHTML = ''; toast(LIVE ? `E.O ${r.ids.length}건 등록했습니다 (E${r.ids.join(', E')})` : '예시 화면이라 저장되지 않습니다');
+        } catch (err) { toast('등록 실패: ' + err.message); }
+      });
+    }, true);
 }
 
 // ================= 화면: 업체 요청 =================
@@ -843,6 +1010,16 @@ $('#sync-btn').addEventListener('click', async () => {
   catch (err) { toast('메일 받기 실패: ' + err.message); }
   finally { b.disabled = false; b.lastChild.textContent = ' 새 메일 받기'; }
 });
+async function refreshSent() {
+  try { const st = await api('sentmove'); $('#sent-bar').hidden = !st.show; } catch { /* 무시 */ }
+}
+$('#sent-done').addEventListener('click', async () => {
+  const b = $('#sent-done'); b.disabled = true; b.textContent = '수집 중…';
+  try { const st = await api('sentmove', {}); toast(st.sent_today ? `오늘 보낸 메일 ${st.sent_today}건을 백업했습니다` : '아직 보낸 메일이 들어오지 않았습니다. 받은편지함으로 옮겼는지 확인하세요'); $('#sent-bar').hidden = !st.show; await refreshSummary(); route(); }
+  catch (err) { toast('수집 실패: ' + err.message); }
+  finally { b.disabled = false; b.textContent = '옮겼어요 · 지금 수집'; }
+});
+setInterval(refreshSent, 5 * 60 * 1000);
 async function refreshSummary() {
   try { const s = await api('summary'); window.__counts = s.counts; renderNav(s.counts);
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
@@ -858,6 +1035,7 @@ async function start() {
   $('#mode-text').textContent = LIVE ? '내 PC 데이터 연결됨' : '예시 데이터';
   $('#demo-bar').hidden = LIVE;
   await refreshSummary();
+  refreshSent();
   route();
 }
 start();
