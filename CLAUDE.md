@@ -33,7 +33,8 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   `mold set <M번호> --status ..`, `mold export data/MOLD_TRANSFER.xlsx`. 메일 반영 절차는 `/mold-update`
 - 결과가 적으면 동의어/영문 표기(E.O ↔ EO ↔ 설계변경, T/O ↔ TRY OUT ↔ 트라이)와 품번으로 다시 검색한다.
 
-- 앱 화면: `python -m mailhub app` (mailhub/web/index.html + mailhub/webapp.py, 127.0.0.1 전용). 화면을 바꾸면 같은 파일이
+- 앱 화면: `python -m mailhub app` (mailhub/web/index.html + mailhub/webapp.py, 127.0.0.1 전용). 화면이나 API 를 바꾸면 두 파일의
+  APP_VERSION 을 같이 올린다 (예전 엔진이 켜져 있으면 새 실행이 자동으로 교체). 화면을 바꾸면 같은 파일이
   아티팩트 예시(가상 데이터)로도 쓰이므로 예시 데이터(buildDemo)와 API 응답 형태를 함께 맞춘다.
 
 ## 원칙

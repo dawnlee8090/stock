@@ -81,7 +81,8 @@ class WebAppTest(unittest.TestCase):
     def test_pages_and_reads(self):
         html = self.get("/").decode()
         self.assertTrue(html.startswith("<!doctype html>") and "<title>개발 업무 비서</title>" in html)
-        self.assertEqual(self.get("/api/ping"), {"ok": True})
+        from mailhub.webapp import APP_VERSION
+        self.assertEqual(self.get("/api/ping"), {"ok": True, "version": APP_VERSION})
         s = self.get("/api/summary")
         self.assertEqual((s["counts"]["todo"], s["counts"]["req_late"], s["counts"]["eo_late"], s["counts"]["to_late"],
                           s["counts"]["mold_alert"]), (1, 1, 1, 1, 1))
@@ -185,3 +186,54 @@ class OriginalViewTest(unittest.TestCase):
             finally:
                 srv.shutdown()
                 srv.server_close()
+
+
+class RestartTest(unittest.TestCase):
+    def test_old_engine_is_replaced(self):
+        import socket
+        from unittest import mock
+        from mailhub import webapp
+        with tempfile.TemporaryDirectory() as d:
+            cfg = load_config(Path(d) / "none.toml")
+            cfg["archive"]["db_path"] = str(Path(d) / "m.db")
+            s = socket.socket()
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+            s.close()
+            from http.server import BaseHTTPRequestHandler
+
+            class OldEngine(BaseHTTPRequestHandler):   # 예전 버전 엔진 흉내 (ping 버전이 다르고 shutdown 지원)
+                def log_message(self, *a):
+                    pass
+
+                def _ok(self, obj):
+                    b = json.dumps(obj).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(b)))
+                    self.end_headers()
+                    self.wfile.write(b)
+
+                def do_GET(self):
+                    self._ok({"ok": True, "version": "예전"})
+
+                def do_POST(self):
+                    self._ok({"ok": True})
+                    threading.Thread(target=self.server.shutdown, daemon=True).start()
+
+            old = ThreadingHTTPServer(("127.0.0.1", port), OldEngine)
+            threading.Thread(target=old.serve_forever, daemon=True).start()
+            orig_shutdown = webapp._shutdown_old
+
+            def shutdown_and_close(p):
+                orig_shutdown(p)
+                old.server_close()
+            with mock.patch.object(webapp, "APP_VERSION", "새버전"), \
+                    mock.patch.object(webapp, "load_config", return_value=cfg), \
+                    mock.patch.object(webapp.ThreadingHTTPServer, "serve_forever", side_effect=KeyboardInterrupt), \
+                    mock.patch("mailhub.sentmove.Scheduler.start"), \
+                    mock.patch.object(webapp, "_shutdown_old", side_effect=shutdown_and_close):
+                logs = []
+                webapp.serve(None, port=port, open_window=False, log=logs.append)
+            self.assertTrue(any("예전 버전 앱 엔진" in x for x in logs), logs)
+            self.assertTrue(any("업무 비서 앱: " in x for x in logs), logs)   # 새 엔진으로 시작

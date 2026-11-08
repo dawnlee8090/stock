@@ -1113,7 +1113,7 @@ async function route() {
     mailState.filter = f[2];
     fn = viewMail;
   }
-  renderNav(window.__counts || {});
+  try { renderNav(window.__counts || {}); } catch (e) { console.error(e); }
   $('#layer').innerHTML = '';
   try { await fn($('#view')); } catch (e) { $('#view').innerHTML = `<div class="empty">화면을 불러오지 못했습니다: ${esc(e.message)}</div>`; }
 }
@@ -1145,18 +1145,42 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
+const APP_VERSION = '2026-11-08.3';   // webapp.py 의 APP_VERSION 과 같게
+// 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
+function showFatal(msg) {
+  const V = $('#view');
+  if (!V) return;
+  V.className = 'view';
+  V.innerHTML = `<div class="panel" style="max-width:720px;padding:18px 20px;border-color:var(--crit)">
+    <h2 style="color:var(--crit)">화면을 그리는 중 오류가 났습니다</h2>
+    <p class="sub" style="margin:8px 0">앱을 완전히 껐다 켜면 대부분 해결됩니다: 작업 표시줄의 작은 검은 창 <b>업무 비서</b>를 닫고 다시 실행하세요.
+    그래도 같으면 아래 내용을 캡처해서 보내 주세요.</p>
+    <pre style="white-space:pre-wrap;background:var(--surface-2);padding:10px;border-radius:6px;font-size:12px;margin:0">${esc(msg)}</pre>
+    <div style="margin-top:12px"><button class="btn sm" type="button" onclick="location.reload()">다시 불러오기</button></div></div>`;
+}
+window.addEventListener('error', (e) => showFatal((e.message || '') + (e.filename ? `\n${e.filename}:${e.lineno}` : '')));
+window.addEventListener('unhandledrejection', (e) => showFatal(String((e.reason && (e.reason.stack || e.reason.message)) || e.reason)));
 async function start() {
+  let serverVersion = '';
   try {
     const ctl = new AbortController(); setTimeout(() => ctl.abort(), 1500);
     const r = await fetch('/api/ping', { signal: ctl.signal });
-    if (r.ok && (await r.json()).ok) LIVE = true;
+    if (r.ok) { const j = await r.json(); LIVE = !!j.ok; serverVersion = j.version || '예전 버전'; }
   } catch { LIVE = false; }
   $('#mode-dot').className = 'dot ' + (LIVE ? 'live' : 'demo');
   $('#mode-text').textContent = LIVE ? '내 PC 데이터 연결됨' : '예시 데이터';
   $('#demo-bar').hidden = LIVE;
+  if (LIVE && serverVersion !== APP_VERSION) {   // 업데이트했는데 예전 엔진이 켜져 있는 경우
+    const bar = $('#demo-bar');
+    bar.hidden = false;
+    bar.innerHTML = `<b>앱을 다시 켜 주세요</b> · 화면은 새 버전인데 앱 엔진은 예전 버전(${esc(serverVersion)})입니다. 작업 표시줄의 작은 검은 창 <b>업무 비서</b>를 닫고 바탕화면 아이콘으로 다시 실행하세요.`;
+  }
+  renderNav({});
+  route();                       // 화면 먼저, 건수는 뒤에서 채움
   await refreshSummary();
+  const h1 = $('.list-pane h1');   // 차종 폴더 이름(BC4 → BC4t)은 건수를 받은 뒤 알 수 있음
+  if (h1 && !mailState.q && curHash().startsWith('mail')) h1.textContent = folderTitle(mailState.filter);
   refreshSent();
-  route();
 }
 start();
 })();

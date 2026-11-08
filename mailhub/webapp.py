@@ -23,6 +23,9 @@ from . import db
 from .config import load_config
 
 WEB = Path(__file__).parent / "web" / "index.html"
+# 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
+# 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
+APP_VERSION = "2026-11-08.3"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -514,7 +517,7 @@ def make_handler(data: Data, port: int):
             q = parse_qs(u.query)
             try:
                 if parts == ["ping"]:
-                    return self._json({"ok": True})
+                    return self._json({"ok": True, "version": APP_VERSION})
                 if parts == ["img"]:
                     p = Path(unquote((q.get("path") or [""])[0])).resolve()
                     if img_root not in p.parents or not p.is_file():
@@ -590,6 +593,9 @@ def make_handler(data: Data, port: int):
             except json.JSONDecodeError:
                 return self._send(400, b"bad json", "text/plain")
             try:
+                if parts == ["shutdown"]:   # 새 버전 앱이 예전 엔진을 끌 때
+                    threading.Thread(target=self.server.shutdown, daemon=True).start()
+                    return self._json({"ok": True})
                 if parts == ["sync"]:
                     return self._json(data.sync())
                 if parts[0] == "ai" and len(parts) == 3:
@@ -637,19 +643,50 @@ def open_app_window(url: str) -> None:
     webbrowser.open(url)
 
 
+def _running_version(port: int) -> str | None:
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/ping", timeout=2) as r:
+            return json.loads(r.read()).get("version") or "예전 버전"
+    except Exception:
+        return None
+
+
+def _shutdown_old(port: int) -> None:
+    import time
+    import urllib.request
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/shutdown", data=b"{}", method="POST",
+                                     headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=3).read()
+    except Exception:
+        pass
+    time.sleep(1.5)
+
+
 def serve(cfg_path: str | None = None, port: int = 8765, open_window: bool = True, log=print) -> None:
     cfg = load_config(cfg_path)
     data = Data(cfg, cfg_path)
     data.conn().close()  # 표 준비 확인
     url = f"http://127.0.0.1:{port}/"
-    try:
-        srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(data, port))
-    except OSError:
-        # 이미 실행 중이면 창만 다시 연다
-        log(f"업무 비서 앱이 이미 실행 중입니다: {url}")
-        if open_window:
-            open_app_window(url)
-        return
+    srv = None
+    for attempt in range(2):
+        try:
+            srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(data, port))
+            break
+        except OSError:
+            running = _running_version(port)
+            if running == APP_VERSION or attempt == 1:
+                if running and running != APP_VERSION:
+                    log("예전 버전 앱 엔진이 켜져 있어 끄지 못했습니다. 작은 검은 창 '업무 비서'를 닫고 다시 실행하거나,\n"
+                        f"PowerShell 에서: Get-NetTCPConnection -LocalPort {port} | % {{ Stop-Process -Id $_.OwningProcess -Force }}")
+                else:
+                    log(f"업무 비서 앱이 이미 실행 중입니다: {url}")
+                if open_window:
+                    open_app_window(url)
+                return
+            log(f"예전 버전 앱 엔진({running or '알 수 없음'})을 끄고 새 버전({APP_VERSION})으로 시작합니다...")
+            _shutdown_old(port)
     log(f"업무 비서 앱: {url}  (이 PC 에서만 열립니다. 끄려면 이 창에서 Ctrl+C)")
     from . import sentmove
     sentmove.Scheduler(data.conn, cfg, data.sync, log).start()   # 평일 19~22시 보낸메일 옮기기 알림
