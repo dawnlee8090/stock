@@ -25,6 +25,18 @@ def html_to_text(s: str) -> str:
     return re.sub(r"\n\s*\n+", "\n\n", s).strip()
 
 
+_HTML_TAG = re.compile(r"<\s*/?\s*(table|tr|td|th|div|p|br|span|font|a|img|tbody|style|html|body)\b", re.I)
+
+
+def looks_html(s: str) -> bool:
+    """본문이 HTML 코드 그대로인지 (그룹웨어 대용량 첨부 안내 표 등)."""
+    return len(_HTML_TAG.findall((s or "")[:20000])) >= 3
+
+
+def readable_body(s: str) -> str:
+    return clean_body(html_to_text(s)) if looks_html(s) else (s or "")
+
+
 def clean_body(s: str) -> str:
     s = (s or "").replace("\r\n", "\n").replace("\r", "\n")
     s = re.sub(r"[ \t\xa0]+\n", "\n", s)

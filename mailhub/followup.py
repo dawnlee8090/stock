@@ -227,7 +227,8 @@ def open_draft(to: str, cc: str, subject: str, body: str, send: bool, draft_dir:
     p = draft_dir / f"{datetime.now():%Y%m%d_%H%M%S}_재요청.eml"
     p.write_bytes(bytes(msg))
     if os.name == "nt":
-        os.startfile(str(p))  # type: ignore[attr-defined]
+        from .winopen import open_file
+        open_file(p)
     return f"초안 파일: {p}"
 
 

@@ -884,7 +884,8 @@ def cmd_open(args, cfg, conn):
         if open_in_outlook(r["entry_id"], r["store_id"]):
             return
     if r["file_path"] and os.path.exists(r["file_path"]):
-        os.startfile(r["file_path"])  # type: ignore[attr-defined]  (Windows)
+        from .winopen import open_file
+        open_file(r["file_path"])
         return
     sys.exit("원본을 열 수 없습니다 (아웃룩에서 삭제되었고 .msg 사본도 없음). 'show' 로 내용은 확인 가능합니다.")
 
@@ -917,7 +918,14 @@ def cmd_retag(args, cfg, conn):
     n = 0
     rows = conn.execute("SELECT id, subject, body, attachments, sender_name, sender_email, to_addr, cc_addr, "
                         "folder, att_text FROM mails").fetchall()
+    from .textutil import looks_html, readable_body
+    fixed = 0
     for r in rows:
+        if looks_html(r["body"]):  # 그룹웨어가 HTML 을 그대로 넣은 본문 → 글자만
+            body = readable_body(r["body"])
+            conn.execute("UPDATE mails SET body=? WHERE id=?", (body, r["id"]))
+            r = dict(r) | {"body": body}
+            fixed += 1
         c = clf.classify(dict(r))
         conn.execute("UPDATE mails SET tags=?, part_nos=?, needs_action=?, is_mine=?, thread_key=?, quotes_me=? "
                      "WHERE id=?", (c["tags"], c["part_nos"], c["needs_action"], c["is_mine"], c["thread_key"],
@@ -926,7 +934,7 @@ def cmd_retag(args, cfg, conn):
         if n % 5000 == 0:
             _out(f"  ... {n:,}/{len(rows):,}")
     conn.commit()
-    _out(f"{n}건 재분류 완료 (config.toml 의 태그/키워드 기준)")
+    _out(f"{n}건 재분류 완료 (config.toml 의 태그/키워드 기준)" + (f", HTML 본문 {fixed}건 정리" if fixed else ""))
 
 
 def cmd_stats(args, cfg, conn):

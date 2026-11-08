@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import attach, db
 from .classify import Classifier
-from .textutil import INLINE_IMAGE, clean_body, html_to_text, iso, safe_filename
+from .textutil import INLINE_IMAGE, clean_body, html_to_text, iso, looks_html, safe_filename
 
 
 def parse_eml_bytes(data: bytes, with_att_text: bool = True) -> tuple[str, dict]:
@@ -35,6 +35,8 @@ def parse_eml_bytes(data: bytes, with_att_text: bool = True) -> tuple[str, dict]
             except (LookupError, UnicodeDecodeError, AssertionError):
                 content = (part.get_payload(decode=True) or b"").decode("utf-8", "replace")
             body = html_to_text(content) if part.get_content_type() == "text/html" else content
+            if looks_html(body):  # text/plain 이라면서 HTML 이 들어 있는 경우
+                body = html_to_text(body)
     except Exception:
         body = ""
     attachments, att_items = [], []

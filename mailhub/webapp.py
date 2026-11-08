@@ -61,9 +61,10 @@ class Data:
     @staticmethod
     def mail_row(r, q: str = "") -> dict:
         from .search import snippet
+        from .textutil import readable_body
         return {k: r[k] for k in ("id", "sent_at", "sender_name", "sender_email", "subject", "tags", "part_nos",
                                   "attachments", "needs_action", "status")} | {
-            "snippet": snippet(r["body"], q, att_text=r["att_text"])}
+            "snippet": snippet(readable_body(r["body"]), q, att_text=r["att_text"])}
 
     def img_url(self, path: str) -> str:
         return "/api/img?path=" + quote(path)
@@ -148,7 +149,8 @@ class Data:
         if not r:
             raise KeyError(f"#{mid} 메일이 없습니다")
         d = self.mail_row(r)
-        d.update(body=r["body"][:30000], att_text=(r["att_text"] or "")[:20000])
+        from .textutil import readable_body
+        d.update(body=readable_body(r["body"])[:30000], att_text=(r["att_text"] or "")[:20000])
         return d
 
     # ---- 업체 요청 ----
@@ -255,9 +257,9 @@ class Data:
                 from .ingest_outlook import open_in_outlook
                 if open_in_outlook(r["entry_id"], r["store_id"]):
                     return {"ok": True}
-            if r and r["file_path"] and os.path.exists(r["file_path"]) and os.name == "nt":
-                os.startfile(r["file_path"])  # type: ignore[attr-defined]
-                return {"ok": True}
+            if r and r["file_path"] and os.path.exists(r["file_path"]):
+                from .winopen import open_file
+                return {"ok": True, "message": open_file(r["file_path"])}
             raise KeyError("원본을 열 수 없습니다 (PST 가 아웃룩에 연결되어 있는지 확인)")
         if path[0] == "req" and path[2] == "":
             rid = int(path[1])
