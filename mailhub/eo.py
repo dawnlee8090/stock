@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import csv
+import re
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
@@ -74,6 +75,23 @@ HEADERS = {
     "verify_due": "검증목표", "verified_at": "검증완료일", "apply_point": "적용시점", "cost": "수정비",
     "delay": "지연", "mails": "관련메일", "note": "메모",
 }
+
+
+PART_RE = re.compile(r"(\d{5})((?:/\d{1,2})*)-([A-Z0-9]{5})")
+
+
+def expand_parts(text: str) -> list[str]:
+    """'86525/26-BNGA0, 86553-BNGA0' → ['86525-BNGA0', '86526-BNGA0', '86553-BNGA0'] (LH/RH 줄임 표기 풀기)"""
+    out: list[str] = []
+    for base, alts, suffix in PART_RE.findall((text or "").upper()):
+        out.append(f"{base}-{suffix}")
+        for a in [x for x in alts.split("/") if x]:
+            out.append(f"{base[:5 - len(a)]}{a}-{suffix}")
+    seen: list[str] = []
+    for p in out:
+        if p not in seen:
+            seen.append(p)
+    return seen
 
 
 def ensure(conn: sqlite3.Connection) -> None:
@@ -246,12 +264,12 @@ def sync(conn) -> list[tuple[int, int, str]]:
             cands += [(m[0], "E.O번호") for m in conn.execute(
                 "SELECT id FROM mails WHERE sent_at >= ? AND (subject LIKE ? OR body LIKE ? OR att_text LIKE ?)",
                 (since, *[f"%{r['eo_no']}%"] * 3))]
-        if r["part_no"]:
+        for pn in (expand_parts(r["part_no"]) or ([r["part_no"]] if r["part_no"] else [])):
             cands += [(m[0], "품번") for m in conn.execute(
                 "SELECT id FROM mails WHERE sent_at >= ? AND (part_nos LIKE ? OR subject LIKE ?) "
                 "AND ((',' || tags || ',') LIKE '%,E.O,%' OR (',' || tags || ',') LIKE '%,금형수정,%' "
                 "OR (',' || tags || ',') LIKE '%,T/O,%' OR (',' || tags || ',') LIKE '%,검사구,%')",
-                (since, f"%{r['part_no']}%", f"%{r['part_no']}%"))]
+                (since, f"%{pn}%", f"%{pn}%"))]
         cands += [(m[0], "같은 건") for m in conn.execute(
             "SELECT m2.id FROM eo_mails em JOIN mails m1 ON m1.id = em.mail_id "
             "JOIN mails m2 ON m2.thread_key = m1.thread_key AND m1.thread_key != '' "

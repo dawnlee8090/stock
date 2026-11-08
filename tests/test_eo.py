@@ -141,3 +141,21 @@ class EoReqTest(unittest.TestCase):
             log = conn.execute("SELECT note FROM eo_log WHERE eo_id=? ORDER BY id DESC", (eid,)).fetchone()[0]
             self.assertIn("업체 회신 도착", log)
             conn.close()
+
+
+class PartExpandTest(unittest.TestCase):
+    def test_expand(self):
+        self.assertEqual(E.expand_parts("86525/26-BNGA0"), ["86525-BNGA0", "86526-BNGA0"])
+        self.assertEqual(E.expand_parts("86595/96-BNQA0 MOLDING, 86531-bnqa0"),
+                         ["86595-BNQA0", "86596-BNQA0", "86531-BNQA0"])
+        self.assertEqual(E.expand_parts("83931/41-BN100"), ["83931-BN100", "83941-BN100"])
+        self.assertEqual(E.expand_parts("RR BUMPER BACKBEAM"), [])
+
+    def test_sync_with_lh_rh(self):
+        with tempfile.TemporaryDirectory() as d:
+            conn = db.connect(Path(d) / "t.db")
+            eid = E.add(conn, today=date(2026, 11, 1), car="CUV", part_no="86525/26-BNGA0", received_at="2026-11-01")
+            m = mail(conn, "x", "86526-BNGA0 후크 금형수정 검토서", "2026-11-05T09:00:00", tags="금형수정",
+                     part_nos="86526-BNGA0")
+            self.assertEqual([(e, mid) for e, mid, _ in E.sync(conn)], [(eid, m)])
+            conn.close()
