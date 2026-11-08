@@ -355,6 +355,7 @@ def ask_reminders(conn, cfg: dict, targets: list, asker=ask_popup, sender=None, 
                 sender(r["to_addrs"], r["cc_addrs"], subject, body, False, draft_dir)
                 mark_reminded(conn, r["id"])
                 log(f"→ R{r['id']} 재요청 메일을 아웃룩 창에 띄움")
+                action = "outlook"
             elif action == "extend":
                 new_due = parse_due("+2영업일", today)
                 conn.execute("UPDATE requests SET due_date=? WHERE id=?", (new_due, r["id"]))

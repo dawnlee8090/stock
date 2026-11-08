@@ -126,7 +126,8 @@ class CliTest(unittest.TestCase):
             text = out.getvalue()
             self.assertIn("확인창 시험", text)
             self.assertIn("기한 지남", text)
-            self.assertIn("[재요청]", text)
+            self.assertIn("제목: [재요청", text)
+            self.assertIn("아웃룩 창 1", text)
             self.assertIn("취소", text)
             if os.name != "nt":  # 창을 못 띄우면 안전하게 초안 파일로
                 self.assertTrue(list((Path(d) / "drafts").glob("*.eml")))
