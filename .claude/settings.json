@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m mailhub search:*)",
+      "Bash(python -m mailhub s:*)",
+      "Bash(python -m mailhub show:*)",
+      "Bash(python -m mailhub todo:*)",
+      "Bash(python -m mailhub stats:*)"
+    ]
+  }
+}

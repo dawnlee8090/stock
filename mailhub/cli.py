@@ -368,7 +368,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None):
     try:
-        sys.stdout.reconfigure(errors="replace")  # 콘솔 인코딩 문제로 멈추지 않게
+        if sys.stdout.isatty():
+            sys.stdout.reconfigure(errors="replace")  # 콘솔 인코딩 문제로 멈추지 않게
+        else:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Claude Code 등 다른 프로그램이 읽을 때 한글 유지
     except Exception:
         pass
     args = build_parser().parse_args(argv)
