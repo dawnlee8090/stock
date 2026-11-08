@@ -153,6 +153,44 @@ class Data:
         d.update(body=readable_body(r["body"])[:30000], att_text=(r["att_text"] or "")[:20000])
         return d
 
+    def original_html(self, c, mid: int) -> str:
+        """메일 원본의 HTML(표·서식·본문 이미지 포함). 스크립트·외부 연결은 응답 헤더(CSP)로 막는다."""
+        import base64
+        import email
+        import html as _html
+        from email import policy
+        r = c.execute("SELECT file_path, entry_id, store_id, body, subject FROM mails WHERE id=?", (mid,)).fetchone()
+        if not r:
+            raise KeyError(f"#{mid} 메일이 없습니다")
+        fp = r["file_path"] or ""
+        doc = ""
+        if fp.lower().endswith(".eml") and os.path.exists(fp):
+            msg = email.message_from_bytes(Path(fp).read_bytes(), policy=policy.default)
+            part = msg.get_body(preferencelist=("html", "plain"))
+            if part is not None:
+                content = part.get_content()
+                if part.get_content_type() == "text/html":
+                    doc = content
+                    for sub in msg.walk():   # 본문에 붙여 넣은 그림(cid:) → data URI
+                        cid = (sub.get("Content-ID") or "").strip("<> ")
+                        if cid and sub.get_content_maintype() == "image":
+                            data = base64.b64encode(sub.get_payload(decode=True) or b"").decode()
+                            doc = doc.replace(f"cid:{cid}", f"data:{sub.get_content_type()};base64,{data}")
+                else:
+                    doc = f"<pre>{_html.escape(content)}</pre>"
+        elif r["entry_id"] and os.name == "nt":
+            try:
+                import win32com.client  # type: ignore
+                ns = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+                doc = ns.GetItemFromID(r["entry_id"], r["store_id"] or None).HTMLBody
+            except Exception:
+                doc = ""
+        if not doc:
+            doc = f"<pre>{_html.escape(r['body'] or '')}</pre>"
+        style = ("<meta charset='utf-8'><style>body{font-family:'Malgun Gothic',sans-serif;font-size:14px;margin:16px;"
+                 "background:#fff;color:#111}pre{white-space:pre-wrap}img{max-width:100%;height:auto}</style>")
+        return style + doc
+
     # ---- 업체 요청 ----
     def reqs(self, c) -> list:
         today = date.today()
@@ -382,6 +420,18 @@ def make_handler(data: Data, port: int):
                         return self._json(data.summary(c))
                     if parts == ["mails"]:
                         return self._json(data.mails(c, q))
+                    if parts[0] == "mail" and len(parts) == 3 and parts[2] == "original":
+                        body = data.original_html(c, int(parts[1])).encode("utf-8")
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/html; charset=utf-8")
+                        self.send_header("Content-Length", str(len(body)))
+                        # 메일 HTML 안의 스크립트·외부 이미지·폼 차단 (data: 그림과 인라인 서식만 허용)
+                        self.send_header("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'; "
+                                         "font-src data:; form-action 'none'; base-uri 'none'")
+                        self.send_header("X-Content-Type-Options", "nosniff")
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
                     if parts[0] == "mail" and len(parts) == 2:
                         return self._json(data.mail(c, int(parts[1])))
                     if parts == ["reqs"]:

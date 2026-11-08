@@ -17,6 +17,9 @@ class OpenTest(unittest.TestCase):
             msg.write_text("x")
             self.assertEqual(winopen.open_file(eml), "Outlook")
             self.assertEqual(popen.call_args[0][0][:2], [r"C:\Office16\OUTLOOK.EXE", "/eml"])
+            opened = popen.call_args[0][0][2]                    # 영문 임시 이름 복사본
+            self.assertTrue(Path(opened).name.startswith("mail_") and Path(opened).name.isascii())
+            self.assertEqual(Path(opened).read_text(), "x")
             winopen.open_file(msg)
             self.assertEqual(popen.call_args[0][0][1], "/f")
 

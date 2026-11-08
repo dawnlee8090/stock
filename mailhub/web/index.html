@@ -200,6 +200,9 @@ table.t td.c { text-align: center; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--surface); z-index: 41;
   border-left: 1px solid var(--line); display: flex; flex-direction: column;
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.drawer.wide { width: min(1000px, 100%); }
+.drawer.wide .drawer-b { padding: 0; display: block; overflow: hidden; flex: 1; }
+iframe.orig { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
 .drawer-h { display: flex; align-items: flex-start; gap: 10px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
 .drawer-h h2 { font-size: 16px; line-height: 1.4; flex: 1; }
 .drawer-b { overflow-y: auto; padding: 16px 20px 28px; display: grid; gap: 18px; }
@@ -488,9 +491,9 @@ async function copyCmd(text) {
 const claudeBox = (cmd, label) => `<div class="copybox"><span class="eyebrow">Claude</span><code>${esc(cmd)}</code><button class="btn sm" data-copy="${esc(cmd)}" type="button">${esc(label || '복사')}</button></div>`;
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-copy]'); if (b) copyCmd(b.dataset.copy); });
 
-function drawer(title, html, onReady) {
+function drawer(title, html, onReady, wide) {
   const L = $('#layer');
-  L.innerHTML = `<div class="drawer-bg" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+  L.innerHTML = `<div class="drawer-bg" data-close></div><aside class="drawer${wide ? ' wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="drawer-h"><h2>${title}</h2><button class="btn sm" data-close type="button">닫기</button></div><div class="drawer-b">${html}</div></aside>`;
   L.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { L.innerHTML = ''; }));
   onReady && onReady(L);
@@ -603,7 +606,7 @@ async function openMail(id, V) {
       <button class="btn primary sm" data-mark="완료" type="button">처리 완료</button>
       <button class="btn sm" data-mark="진행중" type="button">진행중</button>
       <button class="btn sm" data-mark="업체검토중" type="button">업체 검토중</button>
-      ${LIVE ? '<button class="btn sm" id="open-orig" type="button">원본 열기</button>' : ''}
+      ${LIVE ? '<button class="btn sm" id="view-orig" type="button">원본 보기</button><button class="btn sm" id="open-orig" type="button">Outlook에서 열기</button>' : ''}
     </div>
     ${claudeBox('/mail-review ' + m.id, '검토·회신 초안')}
     ${isEO ? '<div style="height:8px"></div>' + claudeBox('/eo-update ' + m.id, 'E.O 반영') : ''}
@@ -616,7 +619,10 @@ async function openMail(id, V) {
   R.querySelectorAll('[data-mark]').forEach(b => b.addEventListener('click', async () => {
     await api(`mail/${id}/mark`, { status: b.dataset.mark }); toast(LIVE ? `#${id} '${b.dataset.mark}' 로 기록했습니다` : `예시 화면이라 저장되지 않습니다 ('${b.dataset.mark}')`); route();
   }));
-  const oo = $('#open-orig', R); if (oo) oo.addEventListener('click', async () => { await api(`mail/${id}/open`, {}); toast('아웃룩(또는 원본 파일)으로 열었습니다'); });
+  const oo = $('#open-orig', R); if (oo) oo.addEventListener('click', async () => {
+    try { await api(`mail/${id}/open`, {}); toast('Outlook으로 열었습니다. 열리지 않으면 [원본 보기]를 쓰세요'); } catch (err) { toast(err.message); } });
+  const vo = $('#view-orig', R); if (vo) vo.addEventListener('click', () => drawer(esc(m.subject),
+    `<iframe class="orig" sandbox title="메일 원본" src="/api/mail/${id}/original"></iframe>`, null, true));
 }
 
 // ================= 화면: 업체 요청 =================

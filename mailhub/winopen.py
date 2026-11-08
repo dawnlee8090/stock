@@ -36,6 +36,17 @@ def find_outlook() -> str | None:
     return None
 
 
+def _ascii_copy(p: str, ext: str) -> str:
+    import hashlib
+    import shutil
+    import tempfile
+    d = Path(tempfile.gettempdir()) / "mailhub_open"
+    d.mkdir(parents=True, exist_ok=True)
+    dst = d / f"mail_{hashlib.sha1(p.encode('utf-8')).hexdigest()[:12]}{ext}"
+    shutil.copyfile(p, dst)
+    return str(dst)
+
+
 def open_file(path: str | os.PathLike) -> str:
     """파일 열기. 메일 파일은 클래식 Outlook, 나머지는 Windows 기본 앱. 무엇으로 열었는지 반환."""
     p = str(Path(path).resolve())
@@ -43,7 +54,10 @@ def open_file(path: str | os.PathLike) -> str:
     if ext in (".eml", ".msg"):
         exe = find_outlook()
         if exe:
-            subprocess.Popen([exe, "/eml" if ext == ".eml" else "/f", p])
+            # 경로·제목의 한글·공백·특수문자(' 件 등) 때문에 Outlook 이 '작업을 수행하지 못했습니다' 를 내므로
+            # 영문 임시 파일 이름으로 복사해서 연다
+            safe = _ascii_copy(p, ext)
+            subprocess.Popen([exe, "/eml" if ext == ".eml" else "/f", safe])
             return "Outlook"
     if os.name == "nt":
         os.startfile(p)  # type: ignore[attr-defined]

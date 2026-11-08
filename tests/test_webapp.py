@@ -142,3 +142,38 @@ class WebAppTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OriginalViewTest(unittest.TestCase):
+    def test_original_html_is_sandboxed(self):
+        import email.message
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            cfg = load_config(d / "none.toml")
+            cfg["archive"]["db_path"] = str(d / "m.db")
+            m = email.message.EmailMessage()
+            m["Subject"], m["From"], m["Date"] = "WIR'G 件", "a@b.c", "Mon, 02 Nov 2026 09:00:00 +0900"
+            m.set_content("plain")
+            m.add_alternative('<table><tr><td>결재 문서</td></tr></table><img src="cid:img1"><script>alert(1)</script>',
+                              subtype="html")
+            m.get_payload()[1].add_related(b"\x89PNG fake", maintype="image", subtype="png", cid="<img1>")
+            (d / "a.eml").write_bytes(bytes(m))
+            c = db.connect(cfg["archive"]["db_path"])
+            db.insert_mail(c, "k", {"subject": "x", "file_path": str(d / "a.eml"), "body": "plain"})
+            c.commit()
+            c.close()
+            srv = ThreadingHTTPServer(("127.0.0.1", 0), None)
+            port = srv.server_address[1]
+            srv.RequestHandlerClass = make_handler(Data(cfg), port)
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/mail/1/original") as r:
+                    html = r.read().decode()
+                    csp = r.headers["Content-Security-Policy"]
+                self.assertIn("결재 문서", html)
+                self.assertIn("data:image/png;base64,", html)          # 본문 그림 포함
+                self.assertIn("default-src 'none'", csp)               # 스크립트·외부 연결 차단
+                self.assertNotIn("script-src", csp)
+            finally:
+                srv.shutdown()
+                srv.server_close()
