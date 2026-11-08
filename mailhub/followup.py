@@ -56,7 +56,9 @@ def ensure(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(requests)")}
     if "last_asked_at" not in cols:
         conn.execute("ALTER TABLE requests ADD COLUMN last_asked_at TEXT")
-        conn.commit()
+    if "eo_id" not in cols:
+        conn.execute("ALTER TABLE requests ADD COLUMN eo_id INTEGER")  # 연결된 E.O 항목
+    conn.commit()
 
 
 # ---------- 날짜 ----------
@@ -108,16 +110,17 @@ def _domains(addrs: str) -> list[str]:
 
 def add(conn, to: str, subject: str, due: str, cc: str = "", vendor: str = "", req_type: str = "",
         part_no: str = "", mail_id: int | None = None, note: str = "", requested: str | None = None,
-        today: date | None = None) -> int:
+        eo_id: int | None = None, today: date | None = None) -> int:
     ensure(conn)
     today = today or date.today()
     if not _domains(to):
         raise ValueError("--to 에 업체 담당자 메일 주소를 넣어 주세요 (예: kim@abc-mold.co.kr)")
     cur = conn.execute(
         "INSERT INTO requests (created_at, requested_at, due_date, to_addrs, cc_addrs, vendor, subject, thread_key, "
-        "req_type, part_no, mail_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "req_type, part_no, mail_id, note, eo_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (datetime.now().isoformat(timespec="seconds"), parse_due(requested, today) if requested else today.isoformat(),
-         parse_due(due, today), to, cc, vendor, subject, thread_key(subject), req_type, part_no, mail_id, note))
+         parse_due(due, today), to, cc, vendor, subject, thread_key(subject), req_type, part_no, mail_id, note,
+         eo_id))
     conn.commit()
     return cur.lastrowid
 
@@ -148,6 +151,13 @@ def check(conn, cfg: dict, today: date | None = None) -> dict:
         if rep:
             conn.execute("UPDATE requests SET status='회신받음', reply_mail_id=?, replied_at=? WHERE id=?",
                          (rep["id"], rep["sent_at"], r["id"]))
+            if r["eo_id"]:  # E.O 항목에도 회신 메일 연결 + 이력
+                conn.execute("INSERT OR IGNORE INTO eo_mails (eo_id, mail_id, how, linked_at) VALUES (?,?,?,?)",
+                             (r["eo_id"], rep["id"], "업체회신", datetime.now().isoformat(timespec="seconds")))
+                conn.execute("INSERT INTO eo_log (eo_id, at, from_status, to_status, note, mail_id) "
+                             "SELECT id, ?, status, status, ?, ? FROM eos WHERE id=?",
+                             (datetime.now().isoformat(timespec="seconds"), f"업체 회신 도착 (R{r['id']})",
+                              rep["id"], r["eo_id"]))
             out["replied"].append((r, rep))
             continue
         due = date.fromisoformat(r["due_date"])

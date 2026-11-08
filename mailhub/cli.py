@@ -137,13 +137,15 @@ def _req_line(r) -> str:
 
 
 def cmd_req(args, cfg, conn):
+    from . import eo as E
     from . import followup as fu
     fu.ensure(conn)
+    E.ensure(conn)
     a = args.req_cmd
     if a == "add":
         rid = fu.add(conn, args.to, args.subject, args.due, cc=args.cc or "", vendor=args.vendor or "",
                      req_type=args.type or "", part_no=args.part or "", mail_id=args.mail, note=args.note or "",
-                     requested=args.requested)
+                     requested=args.requested, eo_id=args.eo)
         r = conn.execute("SELECT * FROM requests WHERE id=?", (rid,)).fetchone()
         _out("요청 등록:\n  " + _req_line(r))
         return
@@ -231,6 +233,153 @@ def cmd_req(args, cfg, conn):
             conn.execute("UPDATE requests SET note=? WHERE id=?", (args.note, args.id))
         conn.commit()
         _out(_req_line(conn.execute("SELECT * FROM requests WHERE id=?", (args.id,)).fetchone()))
+        return
+
+
+def _eo_line(conn, r) -> str:
+    from . import eo as E
+    from .followup import dday
+    dl = E.delay_of(r)
+    soon = E.soon_of(r)
+    flag = f" ⚠{dl}" if dl else (f" ⏰{soon}" if soon else "")
+    nm = E.new_mail_count(conn, r)
+    new = f"  ✉새 관련메일 {nm}" if nm else ""
+    due = ""
+    for f, label in (("review_due", "검토"), ("mold_due", "수정"), ("verify_due", "검증")):
+        if r[f] and r["status"] not in E.CLOSED:
+            due += f" {label}:{dday(r[f]).split(' ')[0]}"
+    name = " ".join(x for x in (r["car"], r["part_no"], r["part_name"]) if x)
+    return (f"E{r['id']:<4} [{r['status']}] {name[:50]}"
+            f"{'  EO:' + r['eo_no'] if r['eo_no'] else ''}{'  /' + r['mold_vendor'] if r['mold_vendor'] else ''}"
+            f"{due}{flag}{new}\n       {r['change_desc'][:90]}")
+
+
+def _eo_fields(args) -> dict:
+    keys = ["eo_no", "car", "part_no", "part_name", "change_desc", "customer", "received_at", "mold_vendor",
+            "mold_action", "cf_impact", "cf_vendor", "apply_point", "cost", "review_due", "mold_due", "verify_due",
+            "reviewed_at", "ordered_at", "mold_done_at", "verified_at"]
+    return {k: getattr(args, k) for k in keys if getattr(args, k, None) is not None}
+
+
+def cmd_eo(args, cfg, conn):
+    from . import eo as E
+    E.ensure(conn)
+    a = args.eo_cmd
+    if a == "add":
+        eid = E.add(conn, status=args.status or "접수", mail_id=args.mail, note=args.note or "", **_eo_fields(args))
+        _out("E.O 등록:\n" + _eo_line(conn, conn.execute("SELECT * FROM eos WHERE id=?", (eid,)).fetchone()))
+        return
+    if a == "set":
+        r = E.update(conn, args.id, status=args.status, note=args.note, mail_id=args.mail, **_eo_fields(args))
+        _out(_eo_line(conn, r))
+        return
+    if a == "link":
+        for m in args.mails:
+            E.link(conn, args.id, m, "수동")
+        conn.commit()
+        _out(f"E{args.id} 에 메일 {', '.join('#' + str(m) for m in args.mails)} 연결")
+        return
+    if a == "list":
+        rows = E.listing(conn, args.status, car=args.car, q=args.q)
+        if args.json:
+            out = []
+            for r in rows:
+                d = dict(r)
+                d["delay"] = E.delay_of(r)
+                d["soon"] = E.soon_of(r)
+                d["new_mails"] = E.new_mail_count(conn, r)
+                out.append(d)
+            _out(json.dumps(out, ensure_ascii=False, indent=1))
+            return
+        for r in rows:
+            _out(_eo_line(conn, r))
+        n_delay = sum(1 for r in rows if E.delay_of(r))
+        _out(f"\n총 {len(rows)}건 / 지연 {n_delay}건" + ("  (진행 중만. 전체: --status all)" if args.status == "open" else ""))
+        return
+    if a == "show":
+        r = conn.execute("SELECT * FROM eos WHERE id=?", (args.id,)).fetchone()
+        if not r:
+            sys.exit(f"E{args.id} 항목이 없습니다.")
+        mails = conn.execute(
+            "SELECT m.id, m.sent_at, m.sender_name, m.subject, em.how FROM eo_mails em JOIN mails m ON m.id=em.mail_id "
+            "WHERE em.eo_id=? ORDER BY m.sent_at", (args.id,)).fetchall()
+        logs = conn.execute("SELECT * FROM eo_log WHERE eo_id=? ORDER BY id", (args.id,)).fetchall()
+        from . import followup as fu
+        fu.ensure(conn)
+        reqs = conn.execute("SELECT * FROM requests WHERE eo_id=? ORDER BY id", (args.id,)).fetchall()
+        if args.json:
+            _out(json.dumps({"eo": dict(r), "delay": E.delay_of(r), "mails": [dict(m) for m in mails],
+                             "log": [dict(x) for x in logs], "requests": [dict(q) for q in reqs]},
+                            ensure_ascii=False, indent=1))
+        else:
+            _out(_eo_line(conn, r))
+            for k in E.FIELDS:
+                if r[k] and k not in ("change_desc",):
+                    _out(f"  {E.HEADERS.get(k, k):<10}: {r[k]}")
+            _out("\n[이력]")
+            for x in logs:
+                _out(f"  {x['at'][:16].replace('T', ' ')}  {x['from_status'] or '-'} → {x['to_status']}  {x['note'] or ''}"
+                     f"{'  #' + str(x['mail_id']) if x['mail_id'] else ''}")
+            if reqs:
+                _out("\n[업체 요청]")
+                for q in reqs:
+                    _out("  " + _req_line(q))
+            _out("\n[관련 메일]")
+            seen = r["seen_mail_max"] or 0
+            for m in mails:
+                _out(f"  {'★' if m['id'] > seen else ' '}#{m['id']:<6} {m['sent_at'][:10]}  {m['sender_name'][:14]:<14} "
+                     f"| {m['subject'][:60]}  ({m['how']})")
+        E.mark_seen(conn, args.id)
+        return
+    if a == "inbox":
+        from datetime import timedelta
+        since = args.since or (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d")
+        rows = E.inbox(conn, since, args.limit)
+        if args.json:
+            _out(json.dumps([_row_dict(r) for r in rows], ensure_ascii=False, indent=1))
+            return
+        _print_rows(rows, "")
+        _out(f"↑ E.O 관련인데 아직 E.O 리스트에 연결되지 않은 메일 ({since} 이후, 같은 건은 1통만)\n"
+             "  등록: python -m mailhub eo add --mail <번호> --car .. --part-no .. --desc ..  /  기존 항목에 연결: eo link <E번호> <메일번호>")
+        return
+    if a == "sync":
+        added = E.sync(conn)
+        for eid, mid, how in added:
+            _out(f"E{eid} ← #{mid} ({how})")
+        _out(f"새로 연결된 메일 {len(added)}건")
+        return
+    if a == "check":
+        added = E.sync(conn)
+        rows = E.listing(conn, "open")
+        delayed = [(r, E.delay_of(r)) for r in rows if E.delay_of(r)]
+        soon = [(r, E.soon_of(r)) for r in rows if E.soon_of(r) and not E.delay_of(r)]
+        news = [r for r in rows if E.new_mail_count(conn, r)]
+        for r, d in delayed:
+            _out(f"! 지연   E{r['id']} {r['car']} {r['part_no']} {r['part_name']} - {d}")
+        for r, d in soon:
+            _out(f"- 임박   E{r['id']} {r['car']} {r['part_no']} {r['part_name']} - {d}")
+        for r in news:
+            _out(f"✉ 새 메일 E{r['id']} {r['car']} {r['part_no']} {r['part_name']} - 관련 메일 {E.new_mail_count(conn, r)}건 (eo show {r['id']})")
+        if not (delayed or soon or news):
+            _out("E.O: 지연·임박·새 관련 메일 없음")
+        n_inbox = len(E.inbox(conn, (datetime.now().replace(day=1)).strftime("%Y-%m-01"), 200))
+        if n_inbox:
+            _out(f"? 미등록 E.O 메일 {n_inbox}건 (이번 달) → python -m mailhub eo inbox")
+        if args.notify and (delayed or soon):
+            from .followup import notify
+            r0, d0 = (delayed or soon)[0]
+            notify(f"E.O 지연 {len(delayed)}건 / 임박 {len(soon)}건",
+                   f"E{r0['id']} {r0['car']} {r0['part_name'] or r0['part_no']} - {d0}")
+        return
+    if a == "export":
+        p = E.export(conn, args.path, args.status)
+        _out(f"E.O 리스트 저장: {p.resolve()}")
+        if args.open and os.name == "nt":
+            os.startfile(str(p.resolve()))  # type: ignore[attr-defined]
+        return
+    if a == "import":
+        ids = E.import_csv(conn, args.path)
+        _out(f"{len(ids)}건 가져옴 (E{ids[0]}~E{ids[-1]})" if ids else "가져온 항목이 없습니다 (열 이름 확인)")
         return
 
 
@@ -433,6 +582,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--mail", type=int, help="관련 메일 번호 (고객사 요청 메일 등)")
     r.add_argument("--note", help="메모")
     r.add_argument("--requested", help="요청한 날 (기본: 오늘)")
+    r.add_argument("--eo", type=int, help="연결할 E.O 항목 번호 (E번호의 숫자)")
     r = rs.add_parser("list", help="진행 중인 요청 목록")
     r.add_argument("--all", action="store_true", help="완료·회신받음 포함 전체")
     r.add_argument("--json", action="store_true")
@@ -449,6 +599,66 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--status", help="요청 / 회신받음 / 완료 / 취소")
     r.add_argument("--note")
     s.set_defaults(func=cmd_req)
+
+    s = sp.add_parser("eo", help="E.O 리스트 관리 (접수→검토→금형수정→검증→완료, 지연 알림, 엑셀)")
+    es = s.add_subparsers(dest="eo_cmd", required=True)
+
+    def eo_field_args(p):
+        p.add_argument("--eo-no", dest="eo_no", help="E.O 번호")
+        p.add_argument("--car", help="차종")
+        p.add_argument("--part-no", dest="part_no", help="품번")
+        p.add_argument("--part-name", dest="part_name", help="품명")
+        p.add_argument("--desc", dest="change_desc", help="변경 내용")
+        p.add_argument("--customer", help="발행처 (고객사/설계팀)")
+        p.add_argument("--received", dest="received_at", help="접수일")
+        p.add_argument("--mold-vendor", dest="mold_vendor", help="금형업체")
+        p.add_argument("--mold-action", dest="mold_action", help="육성 / 가공 / 입자교체 / 신규 / 수정불필요")
+        p.add_argument("--cf", dest="cf_impact", help="검사구 영향: 필요 / 불필요 / 검토중")
+        p.add_argument("--cf-vendor", dest="cf_vendor", help="검사구업체")
+        p.add_argument("--apply", dest="apply_point", help="적용 시점")
+        p.add_argument("--cost", help="수정비")
+        p.add_argument("--review-due", dest="review_due", help="업체 검토 회신 기한 (11/12, +3, +3영업일)")
+        p.add_argument("--mold-due", dest="mold_due", help="금형 수정 완료 목표")
+        p.add_argument("--verify-due", dest="verify_due", help="검증(T/O) 목표")
+        p.add_argument("--reviewed", dest="reviewed_at", help="검토 완료일")
+        p.add_argument("--ordered", dest="ordered_at", help="수정 요청일")
+        p.add_argument("--mold-done", dest="mold_done_at", help="수정 완료일")
+        p.add_argument("--verified", dest="verified_at", help="검증 완료일")
+        p.add_argument("--mail", type=int, help="관련 메일 번호")
+        p.add_argument("--note", help="메모 (set 에서는 이력에 날짜와 함께 추가)")
+        p.add_argument("--status", help="접수/검토중/수정요청/수정중/수정완료/검증중/완료/수정불필요/보류/취소")
+
+    e = es.add_parser("add", help="E.O 항목 등록 (품번별 1건)")
+    eo_field_args(e)
+    e = es.add_parser("set", help="상태·기한·내용 변경 (예: eo set 3 --status 수정요청 --mold-due 11/20)")
+    e.add_argument("id", type=int)
+    eo_field_args(e)
+    e = es.add_parser("link", help="E.O 항목에 메일 연결")
+    e.add_argument("id", type=int)
+    e.add_argument("mails", type=int, nargs="+")
+    e = es.add_parser("list", help="E.O 리스트 (기본: 진행 중)")
+    e.add_argument("--status", default="open", help="open(기본) / all / 특정 상태")
+    e.add_argument("--car", help="차종")
+    e.add_argument("--q", help="E.O번호·품번·품명·내용·업체 검색")
+    e.add_argument("--json", action="store_true")
+    e = es.add_parser("show", help="항목 상세 (이력, 관련 메일)")
+    e.add_argument("id", type=int)
+    e.add_argument("--json", action="store_true")
+    e = es.add_parser("inbox", help="리스트에 아직 없는 E.O 메일 (누락 방지)")
+    e.add_argument("--days", type=int, default=60)
+    e.add_argument("--since")
+    e.add_argument("--limit", type=int, default=50)
+    e.add_argument("--json", action="store_true")
+    es.add_parser("sync", help="E.O 번호·품번이 나오는 새 메일 자동 연결")
+    e = es.add_parser("check", help="지연·임박·새 관련 메일·미등록 메일 확인 (매일 자동)")
+    e.add_argument("--notify", action="store_true")
+    e = es.add_parser("export", help="엑셀(.xlsx) 또는 CSV 로 저장")
+    e.add_argument("path", nargs="?", default="data/EO_LIST.xlsx")
+    e.add_argument("--status", default="all")
+    e.add_argument("--open", action="store_true", help="저장 후 열기")
+    e = es.add_parser("import", help="CSV(UTF-8) E.O 리스트 가져오기 (열 이름은 export 와 동일)")
+    e.add_argument("path")
+    s.set_defaults(func=cmd_eo)
 
     s = sp.add_parser("ingest-files", help=".eml/.msg 파일 폴더 가져오기")
     s.add_argument("paths", nargs="+")

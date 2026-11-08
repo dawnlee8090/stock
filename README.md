@@ -17,7 +17,9 @@
 | **3. Claude Code 검토 보조** | `/mail-search`, `/mail-review`, `/mail-todo` 로 이력 요약 · 요청사항 표 · 업체 전달문/회신 초안 | ✅ 이번 버전 (사람이 실행) |
 | 4. 매일 자동 수집 | 작업 스케줄러로 매일 수집 + 아침에 할 일 목록 | ✅ 스크립트 제공 (`scripts/daily_sync.bat`) |
 | 5. 첨부파일 내용 검색 | 엑셀/워드/PPT/PDF 첨부 안의 글자·품번까지 검색 (E.O 리스트, T/O 보고서) | ✅ `index-attachments` |
-| 6. 이력 DB 연계 | E.O 리스트 · T/O 문제점/개선 이력 · 금형 이관 체크리스트를 메일과 자동 연결 | ⏳ 예정 |
+| 6-1. E.O 리스트 관리 | 접수→검토→금형수정→검증 단계·기한·지연 알림, 미등록 E.O 메일 표시, 관련 메일 자동 연결, 엑셀 | ✅ `eo`, `/eo-update` |
+| 6-2. T/O 문제점·개선 이력 DB | T/O 문제점→원인→대책→결과 이력, 유사 문제 개선 사례 조언 | ⏳ 다음 |
+| 6-3. 금형 이관 체크리스트 | 현지 법인 이관 금형별 사양·서류·선적 준비 상태 관리 | ⏳ 예정 |
 | 7. 초안 자동 생성 → 아웃룩 임시보관함 | 새 메일 도착 시 검토 초안을 아웃룩 **임시보관함**에 만들어 두기 (발송은 본인이 확인 후) | ⏳ 예정 |
 
 자동 발송은 의도적으로 하지 않습니다. 고객사/업체 대응은 **초안까지 자동, 발송은 사람 확인** 이 원칙입니다.
@@ -166,7 +168,34 @@ python -m mailhub req update 3 --status 완료
 - `--subject` 는 업체에 **실제로 보낸 메일 제목**과 같아야 회신을 자동으로 찾습니다.
 - 재요청 문구·서명은 `config.toml` 의 `[me] intro / signature`, `[reminder]` 에서 설정.
 
-## 9. 분류 기준 수정
+## 9. E.O 리스트 관리
+
+품번(부품)별로 E.O 를 등록하고 **접수 → 검토중 → 수정요청 → 수정중 → 수정완료 → 검증중 → 완료**
+(또는 수정불필요 / 보류 / 취소) 단계로 관리합니다. 단계가 바뀌면 날짜와 이력이 자동으로 남습니다.
+
+```powershell
+# 등록 (E.O 메일 번호를 같이 주면 그 메일이 연결됨)
+python -m mailhub eo add --mail 19162 --eo-no EO26-1234 --car "BC4t CUV" --part-no 86511-BN200 --part-name "FR BUMPER UPR" --desc "스크류 보스 높이 2mm 상향" --review-due 11/12
+
+# 진행
+python -m mailhub eo set 3 --status 수정요청 --mold-vendor ABC정밀 --mold-action 육성 --mold-due 11/25 --note "수정비 협의 중"
+python -m mailhub eo set 3 --status 수정완료
+python -m mailhub eo set 3 --status 완료 --note "T/O 치수 OK"
+
+python -m mailhub eo list                    # 진행 중 (⚠지연 ⏰임박 ✉새 관련메일)
+python -m mailhub eo show 3                  # 이력 + 관련 메일 + 업체 요청
+python -m mailhub eo inbox                   # 리스트에 아직 없는 E.O 메일 (누락 방지)
+python -m mailhub eo export data\EO_LIST.xlsx --open   # 엑셀 (상태별 색, 지연 빨간색, 필터)
+```
+
+- **누락 방지**: E.O 태그 메일 중 리스트에 연결 안 된 메일은 `eo inbox` 와 매일 확인에 표시됩니다.
+- **관련 메일 자동 연결**: 등록된 E.O 의 번호·품번이 나오는 메일, 연결된 메일의 회신(RE:/FW:)은 자동으로 연결되고 `✉` 로 표시됩니다.
+- **지연 알림**: 현재 단계의 기한(검토 회신 / 금형 수정 / 검증)이 지나면 매일 아침 알림.
+- **업체 요청 연결**: `req add ... --eo 3` 으로 등록하면 업체 회신이 오는 즉시 E.O 이력에 "업체 회신 도착"이 남습니다.
+- **Claude Code** `/eo-update`: 미등록 E.O 메일과 첨부 E.O LIST 를 읽어 품번별 등록안, 새 메일 기준 상태 변경안을 표로 제안 → 확인한 것만 반영.
+- 기존 엑셀 E.O 리스트가 있으면 `eo export x.csv` 와 같은 열 이름으로 맞춰 CSV(UTF-8) 저장 후 `eo import 파일.csv`.
+
+## 10. 분류 기준 수정
 
 `config.toml` 의 `[tags]`, `[action]`, `[part_number]` 를 고친 뒤:
 ```powershell
