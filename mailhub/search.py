@@ -5,7 +5,8 @@ import re
 import shlex
 import sqlite3
 
-TEXT_COLS = ["subject", "sender_name", "sender_email", "to_addr", "cc_addr", "body", "attachments", "tags", "part_nos"]
+TEXT_COLS = ["subject", "sender_name", "sender_email", "to_addr", "cc_addr", "body", "attachments", "tags",
+             "part_nos", "att_text"]
 
 
 def split_terms(query: str) -> list[str]:
@@ -93,15 +94,27 @@ def _merge_fts(where: list[str], params: list) -> tuple[list[str], list]:
     return out_w, out_p
 
 
-def snippet(body: str, query: str, width: int = 70) -> str:
-    body = re.sub(r"\s+", " ", body or "")
+def _find(text: str, query: str, width: int) -> str:
+    text = re.sub(r"\s+", " ", text or "")
     for t in split_terms(query):
         if t.startswith("-"):
             continue
-        i = body.lower().find(t.lower())
+        i = text.lower().find(t.lower())
         if i >= 0:
-            s, e = max(0, i - width), min(len(body), i + len(t) + width)
-            return ("…" if s else "") + body[s:e] + ("…" if e < len(body) else "")
+            s, e = max(0, i - width), min(len(text), i + len(t) + width)
+            return ("…" if s else "") + text[s:e] + ("…" if e < len(text) else "")
+    return ""
+
+
+def snippet(body: str, query: str, width: int = 70, att_text: str = "") -> str:
+    """검색어가 나온 부분 미리보기. 본문에 없고 첨부 내용에 있으면 [첨부내용] 으로 표시."""
+    hit = _find(body, query, width)
+    if hit:
+        return hit
+    hit = _find(att_text, query, width)
+    if hit:
+        return "[첨부내용] " + hit
+    body = re.sub(r"\s+", " ", body or "")
     return body[: width * 2] + ("…" if len(body) > width * 2 else "")
 
 

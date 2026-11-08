@@ -8,7 +8,8 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   - 공백 = AND, `"정확한 구문"`, `-제외어`
   - 옵션: `--from 보낸사람`, `--since/--until YYYY-MM-DD`, `--tag E.O|T/O|금형수정|검사구|품질문제|금형이관|일정|설계반영`,
     `--part 품번`, `--attach 첨부파일명`, `--subject`(제목만), `--todo`(조치필요만), `--sort relevance`
-- `python -m mailhub show <id> --json --max-chars 8000` : 본문 전체
+- `python -m mailhub show <id> --json --max-chars 8000` : 본문 전체 + `att_text`(첨부 엑셀/PPT/PDF 내용)
+  - 검색 결과 snippet 이 `[첨부내용]` 으로 시작하면 첨부파일 안에서 찾은 것이다
 - `python -m mailhub todo --json [--days 30] [--include-replied]` : 미회신 조치필요 메일
 - `python -m mailhub mark <id> --status <상태> --note "<메모>"` : 상태 기록 (사용자 확인 후에만)
 - 결과가 적으면 동의어/영문 표기(E.O ↔ EO ↔ 설계변경, T/O ↔ TRY OUT ↔ 트라이)와 품번으로 다시 검색한다.

@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS mails (
     is_mine       INTEGER DEFAULT 0,         -- 1: 내가 보낸 메일
     thread_key    TEXT DEFAULT '',           -- RE:/FW: 뗀 제목 (같은 건 묶음)
     quotes_me     INTEGER DEFAULT 0,         -- 1: 내 회신에 대한 답장 (= 내가 회신했다는 증거)
+    att_text      TEXT DEFAULT '',           -- 첨부파일(엑셀/워드/PPT/PDF) 안의 글자
+    att_indexed   INTEGER DEFAULT 0,         -- 1: 첨부 내용 추출 완료
     status        TEXT DEFAULT '',           -- 사용자가 관리: 진행중/완료/보류 ...
     note          TEXT DEFAULT '',
     ingested_at   TEXT DEFAULT ''
@@ -39,30 +41,50 @@ CREATE TABLE IF NOT EXISTS mails (
 CREATE INDEX IF NOT EXISTS idx_mails_sent_at ON mails(sent_at);
 CREATE INDEX IF NOT EXISTS idx_mails_sender ON mails(sender_email);
 
-CREATE VIRTUAL TABLE IF NOT EXISTS mails_fts USING fts5(
-    subject, sender_name, sender_email, to_addr, cc_addr, body, attachments, tags, part_nos,
-    content='mails', content_rowid='id', tokenize='trigram'
-);
-
-CREATE TRIGGER IF NOT EXISTS mails_ai AFTER INSERT ON mails BEGIN
-  INSERT INTO mails_fts(rowid, subject, sender_name, sender_email, to_addr, cc_addr, body, attachments, tags, part_nos)
-  VALUES (new.id, new.subject, new.sender_name, new.sender_email, new.to_addr, new.cc_addr, new.body, new.attachments, new.tags, new.part_nos);
-END;
-CREATE TRIGGER IF NOT EXISTS mails_ad AFTER DELETE ON mails BEGIN
-  INSERT INTO mails_fts(mails_fts, rowid, subject, sender_name, sender_email, to_addr, cc_addr, body, attachments, tags, part_nos)
-  VALUES ('delete', old.id, old.subject, old.sender_name, old.sender_email, old.to_addr, old.cc_addr, old.body, old.attachments, old.tags, old.part_nos);
-END;
-CREATE TRIGGER IF NOT EXISTS mails_au AFTER UPDATE OF subject, sender_name, sender_email, to_addr, cc_addr, body, attachments, tags, part_nos ON mails BEGIN
-  INSERT INTO mails_fts(mails_fts, rowid, subject, sender_name, sender_email, to_addr, cc_addr, body, attachments, tags, part_nos)
-  VALUES ('delete', old.id, old.subject, old.sender_name, old.sender_email, old.to_addr, old.cc_addr, old.body, old.attachments, old.tags, old.part_nos);
-  INSERT INTO mails_fts(rowid, subject, sender_name, sender_email, to_addr, cc_addr, body, attachments, tags, part_nos)
-  VALUES (new.id, new.subject, new.sender_name, new.sender_email, new.to_addr, new.cc_addr, new.body, new.attachments, new.tags, new.part_nos);
-END;
 """
 
 FIELDS = ["source", "folder", "subject", "sender_name", "sender_email", "to_addr", "cc_addr",
           "sent_at", "body", "attachments", "entry_id", "store_id", "file_path",
-          "tags", "part_nos", "needs_action", "is_mine", "thread_key", "quotes_me"]
+          "tags", "part_nos", "needs_action", "is_mine", "thread_key", "quotes_me", "att_text", "att_indexed"]
+
+# 전문 검색 대상 열 (바뀌면 connect() 가 검색 인덱스를 자동으로 다시 만든다)
+FTS_COLS = ["subject", "sender_name", "sender_email", "to_addr", "cc_addr", "body", "attachments",
+            "tags", "part_nos", "att_text"]
+
+
+def _fts_sql() -> str:
+    cols = ", ".join(FTS_COLS)
+    new = ", ".join(f"new.{c}" for c in FTS_COLS)
+    old = ", ".join(f"old.{c}" for c in FTS_COLS)
+    return f"""
+CREATE VIRTUAL TABLE mails_fts USING fts5({cols}, content='mails', content_rowid='id', tokenize='trigram');
+CREATE TRIGGER mails_ai AFTER INSERT ON mails BEGIN
+  INSERT INTO mails_fts(rowid, {cols}) VALUES (new.id, {new});
+END;
+CREATE TRIGGER mails_ad AFTER DELETE ON mails BEGIN
+  INSERT INTO mails_fts(mails_fts, rowid, {cols}) VALUES ('delete', old.id, {old});
+END;
+CREATE TRIGGER mails_au AFTER UPDATE OF {cols} ON mails BEGIN
+  INSERT INTO mails_fts(mails_fts, rowid, {cols}) VALUES ('delete', old.id, {old});
+  INSERT INTO mails_fts(rowid, {cols}) VALUES (new.id, {new});
+END;
+"""
+
+
+def _ensure_fts(conn: sqlite3.Connection) -> None:
+    have = [r[1] for r in conn.execute("PRAGMA table_info(mails_fts)")]
+    if have == FTS_COLS:
+        return
+    n = conn.execute("SELECT COUNT(*) FROM mails").fetchone()[0]
+    if have and n:
+        print(f"[안내] 검색 인덱스를 새 형식으로 다시 만듭니다 (메일 {n:,}건, 수 분 걸릴 수 있음)...", flush=True)
+    conn.executescript("""
+DROP TRIGGER IF EXISTS mails_ai; DROP TRIGGER IF EXISTS mails_ad; DROP TRIGGER IF EXISTS mails_au;
+DROP TABLE IF EXISTS mails_fts;
+""" + _fts_sql())
+    if n:
+        conn.execute("INSERT INTO mails_fts(mails_fts) VALUES ('rebuild')")
+    conn.commit()
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
@@ -75,11 +97,13 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     # 이전 버전 DB 업그레이드 (새 열 추가 → 'retag' 로 값 채움)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(mails)")}
     for col, ddl in (("is_mine", "INTEGER DEFAULT 0"), ("thread_key", "TEXT DEFAULT ''"),
-                     ("quotes_me", "INTEGER DEFAULT 0")):
+                     ("quotes_me", "INTEGER DEFAULT 0"), ("att_text", "TEXT DEFAULT ''"),
+                     ("att_indexed", "INTEGER DEFAULT 0")):
         if col not in cols:
             conn.execute(f"ALTER TABLE mails ADD COLUMN {col} {ddl}")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_mails_thread ON mails(thread_key, sent_at)")
     conn.commit()
+    _ensure_fts(conn)
     return conn
 
 
@@ -119,7 +143,7 @@ def insert_mail(conn: sqlite3.Connection, key: str, rec: dict) -> int | None:
             conn.execute(f"UPDATE mails SET {sets} WHERE id=?", (*updates.values(), row["id"]))
         return None
     cols = ["msg_key", *FIELDS, "ingested_at"]
-    vals = [key, *[rec.get(f, 0 if f in ("needs_action", "is_mine", "quotes_me") else "") for f in FIELDS],
+    vals = [key, *[rec.get(f, 0 if f in ("needs_action", "is_mine", "quotes_me", "att_indexed") else "") for f in FIELDS],
             datetime.now().isoformat(timespec="seconds")]
     cur = conn.execute(
         f"INSERT INTO mails ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})", vals)

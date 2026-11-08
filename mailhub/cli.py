@@ -23,9 +23,9 @@ def _out(s: str = ""):
 
 def _row_dict(r, with_body=False, query=""):
     d = {k: r[k] for k in LIST_COLS}
-    d["snippet"] = snippet(r["body"], query)
+    d["snippet"] = snippet(r["body"], query, att_text=r["att_text"])
     if with_body:
-        d.update({"to_addr": r["to_addr"], "cc_addr": r["cc_addr"], "body": r["body"],
+        d.update({"to_addr": r["to_addr"], "cc_addr": r["cc_addr"], "body": r["body"], "att_text": r["att_text"],
                   "file_path": r["file_path"], "source": r["source"]})
     return d
 
@@ -47,7 +47,7 @@ def _print_rows(rows, query, as_json=False):
                                      f"품번:{r['part_nos']}" if r["part_nos"] else ""] if x)
         if meta:
             _out(f"         {meta}")
-        _out(f"         {snippet(r['body'], query)}")
+        _out(f"         {snippet(r['body'], query, att_text=r['att_text'])}")
     _out(f"\n총 {len(rows)}건 (★ = 검토/회신 필요)")
 
 
@@ -91,6 +91,17 @@ def cmd_ingest_pop(args, cfg, conn):
          f" / 이미 있음 {st['skipped']:,} / 기간 밖 {st['old']:,} / 오류 {st['errors']}")
 
 
+def cmd_index_attachments(args, cfg, conn):
+    from .index_attach import index_attachments
+    st = index_attachments(conn, cfg, since=args.since, use_outlook=args.outlook, limit=args.limit, log=_out)
+    _out(f"\n{'중단' if st['interrupted'] else '완료'}: 대상 {st['target']:,} / 처리 {st['done']:,} / "
+         f"내용 추출 {st['with_text']:,} / 원본 없음 {st['no_source']:,} / 오류 {st['errors']:,}")
+    if st["with_text"]:
+        _out("첨부 안의 품번까지 품번 검색(--part)에 반영하려면: python -m mailhub retag")
+    if st["no_source"] and not args.outlook:
+        _out("원본 없음 = 아웃룩(PST)에서 가져온 메일입니다. 아웃룩을 켠 상태에서 --outlook 을 붙여 실행하세요.")
+
+
 def cmd_ingest_files(args, cfg, conn):
     from .ingest_files import ingest_folder
     for p in args.paths:
@@ -130,6 +141,7 @@ def cmd_show(args, cfg, conn):
         d = _row_dict(r, with_body=True)
         if args.max_chars:
             d["body"] = d["body"][: args.max_chars]
+            d["att_text"] = d["att_text"][: args.max_chars]
         _out(json.dumps(d, ensure_ascii=False, indent=1))
         return
     _out(f"#{r['id']}  {r['subject']}")
@@ -145,6 +157,10 @@ def cmd_show(args, cfg, conn):
     _out("-" * 80)
     body = r["body"]
     _out(body if args.full or len(body) <= 3000 else body[:3000] + "\n… (전체 보기: --full)")
+    if r["att_text"]:
+        _out("\n" + "=" * 30 + " 첨부파일 내용 " + "=" * 30)
+        at = r["att_text"]
+        _out(at if args.full or len(at) <= 2000 else at[:2000] + "\n… (전체 보기: --full)")
 
 
 def cmd_open(args, cfg, conn):
@@ -186,7 +202,7 @@ def cmd_retag(args, cfg, conn):
     clf = Classifier(cfg)
     n = 0
     rows = conn.execute("SELECT id, subject, body, attachments, sender_name, sender_email, to_addr, cc_addr, "
-                        "folder FROM mails").fetchall()
+                        "folder, att_text FROM mails").fetchall()
     for r in rows:
         c = clf.classify(dict(r))
         conn.execute("UPDATE mails SET tags=?, part_nos=?, needs_action=?, is_mine=?, thread_key=?, quotes_me=? "
@@ -261,6 +277,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--save-eml", action="store_true", help="원본을 data/eml 에 .eml 로 보관")
     s.add_argument("--no-prompt", action="store_true", help="비밀번호를 묻지 않음 (자동 실행용)")
     s.set_defaults(func=cmd_ingest_pop)
+
+    s = sp.add_parser("index-attachments", help="첨부파일(엑셀/워드/PPT/PDF) 내용을 검색 가능하게 추출")
+    s.add_argument("--outlook", action="store_true", help="PST 메일은 아웃룩에서 첨부를 읽음 [Windows]")
+    s.add_argument("--since", help="이 날짜 이후 메일만 YYYY-MM-DD")
+    s.add_argument("--limit", type=int, default=0, help="이번에 처리할 최대 건수 (시험용)")
+    s.set_defaults(func=cmd_index_attachments)
 
     s = sp.add_parser("ingest-files", help=".eml/.msg 파일 폴더 가져오기")
     s.add_argument("paths", nargs="+")

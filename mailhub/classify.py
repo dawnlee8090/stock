@@ -101,10 +101,10 @@ class Classifier:
         text = f"{subject}\n{latest}\n{attach}\n{people}".lower()
         tags = [name for name, match in self.tags.items() if match(text)]
 
-        # 품번은 전체 본문에서 (이력 추적용)
+        # 품번은 전체 본문 + 첨부 내용에서 (이력 추적용)
         part_nos: list[str] = []
         for rx in self.part_res:
-            for m in rx.findall(f"{subject}\n{body}\n{attach}"):
+            for m in rx.findall(f"{subject}\n{body}\n{attach}\n{rec.get('att_text', '') or ''}"):
                 m = m if isinstance(m, str) else m[0]
                 if m not in part_nos:
                     part_nos.append(m)

@@ -16,7 +16,7 @@
 | **2. 자동 분류 · 할 일 관리** | 태그(E.O·T/O·금형수정·검사구·품질·이관·일정·설계반영), 품번 추출, ★조치필요 판정, 상태/메모 관리 | ✅ 이번 버전 (규칙 기반) |
 | **3. Claude Code 검토 보조** | `/mail-search`, `/mail-review`, `/mail-todo` 로 이력 요약 · 요청사항 표 · 업체 전달문/회신 초안 | ✅ 이번 버전 (사람이 실행) |
 | 4. 매일 자동 수집 | 작업 스케줄러로 매일 수집 + 아침에 할 일 목록 | ✅ 스크립트 제공 (`scripts/daily_sync.bat`) |
-| 5. 첨부파일 내용 검색 | PDF/엑셀/PPT 첨부 안의 글자까지 검색 (E.O 리스트, T/O 보고서) | ⏳ 다음 단계 |
+| 5. 첨부파일 내용 검색 | 엑셀/워드/PPT/PDF 첨부 안의 글자·품번까지 검색 (E.O 리스트, T/O 보고서) | ✅ `index-attachments` |
 | 6. 이력 DB 연계 | E.O 리스트 · T/O 문제점/개선 이력 · 금형 이관 체크리스트를 메일과 자동 연결 | ⏳ 예정 |
 | 7. 초안 자동 생성 → 아웃룩 임시보관함 | 새 메일 도착 시 검토 초안을 아웃룩 **임시보관함**에 만들어 두기 (발송은 본인이 확인 후) | ⏳ 예정 |
 
@@ -127,7 +127,21 @@ python -m mailhub search --todo --tag E.O                # E.O 관련 미결
 `scripts/daily_sync.bat` 을 Windows **작업 스케줄러**에 등록 (예: 매일 08:00 / 12:00 / 17:00).
 그룹웨어 메일 서버에서 새 메일만 가져오고 `data/sync.log` 에 할 일 목록을 남깁니다 (먼저 `imap-setup` 필요).
 
-## 7. 분류 기준 수정
+## 7. 첨부파일 내용 검색
+
+새로 수집되는 메일(POP3/IMAP/.eml/.msg)은 첨부 내용이 **자동으로** 검색됩니다.
+이미 들어있는 메일은 한 번 추출해 주세요 (중간에 멈춰도 다시 실행하면 이어서 진행):
+
+```powershell
+python -m mailhub index-attachments              # 원본(.eml) 보관된 메일
+python -m mailhub index-attachments --outlook    # 아웃룩(PST) 메일 - 아웃룩 켠 상태에서
+python -m mailhub retag                          # 첨부 안의 품번을 --part 검색에 반영
+```
+
+- 대상: `.xlsx .xlsm .docx .pptx .pdf .txt .csv` (옛날 형식 xls/doc/ppt, 이미지, 도면 파일은 파일명으로만 검색)
+- 검색 결과에서 본문이 아니라 첨부에서 찾은 경우 `[첨부내용]` 으로 표시되고, `show 번호` 아래쪽에 첨부 내용이 나옵니다.
+
+## 8. 분류 기준 수정
 
 `config.toml` 의 `[tags]`, `[action]`, `[part_number]` 를 고친 뒤:
 ```powershell

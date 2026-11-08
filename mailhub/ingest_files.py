@@ -6,12 +6,12 @@ from email import policy
 from email.utils import getaddresses, parseaddr, parsedate_to_datetime
 from pathlib import Path
 
-from . import db
+from . import attach, db
 from .classify import Classifier
 from .textutil import INLINE_IMAGE, clean_body, html_to_text, iso, safe_filename
 
 
-def parse_eml_bytes(data: bytes) -> tuple[str, dict]:
+def parse_eml_bytes(data: bytes, with_att_text: bool = True) -> tuple[str, dict]:
     """메일 원문(RFC822 바이트) → (Message-ID, 레코드). .eml 파일과 IMAP 수집에서 공통 사용."""
     msg = email.message_from_bytes(data, policy=policy.default)
 
@@ -37,10 +37,18 @@ def parse_eml_bytes(data: bytes) -> tuple[str, dict]:
             body = html_to_text(content) if part.get_content_type() == "text/html" else content
     except Exception:
         body = ""
+    attachments, att_items = [], []
     try:
-        attachments = [a.get_filename() or "" for a in msg.iter_attachments()]
+        for a in msg.iter_attachments():
+            fname = a.get_filename() or ""
+            attachments.append(fname)
+            if with_att_text and fname and Path(fname).suffix.lower() in attach.SUPPORTED:
+                try:
+                    att_items.append((fname, attach.extract_text(fname, a.get_payload(decode=True) or b"")))
+                except Exception:
+                    pass
     except Exception:
-        attachments = []
+        pass
 
     def addrs(h: str) -> str:
         try:
@@ -52,6 +60,7 @@ def parse_eml_bytes(data: bytes) -> tuple[str, dict]:
         "subject": header("Subject"), "sender_name": name, "sender_email": addr.lower(),
         "to_addr": addrs("To"), "cc_addr": addrs("Cc"), "sent_at": sent, "body": clean_body(body),
         "attachments": "\n".join(a for a in attachments if a and not INLINE_IMAGE.match(a)),
+        "att_text": attach.combine(att_items), "att_indexed": int(with_att_text),
     }
     return header("Message-ID"), rec
 
@@ -74,14 +83,20 @@ def parse_msg(path: Path) -> tuple[str, dict]:
         if not body.strip() and getattr(m, "htmlBody", None):
             hb = m.htmlBody
             body = html_to_text(hb.decode("utf-8", "replace") if isinstance(hb, bytes) else hb)
-        attachments = [getattr(a, "longFilename", None) or getattr(a, "shortFilename", None) or ""
-                       for a in m.attachments]
+        attachments, att_items = [], []
+        for a in m.attachments:
+            fname = getattr(a, "longFilename", None) or getattr(a, "shortFilename", None) or ""
+            attachments.append(fname)
+            data = getattr(a, "data", None)
+            if fname and isinstance(data, bytes) and Path(fname).suffix.lower() in attach.SUPPORTED:
+                att_items.append((fname, attach.extract_text(fname, data)))
         rec = {
             "source": "msg", "folder": str(path.parent), "subject": m.subject or "",
             "sender_name": name, "sender_email": addr.lower(), "to_addr": m.to or "", "cc_addr": m.cc or "",
             "sent_at": iso(m.date) if m.date else "", "body": clean_body(body),
             "attachments": "\n".join(a for a in attachments if a and not INLINE_IMAGE.match(a)),
             "file_path": str(path.resolve()),
+            "att_text": attach.combine(att_items), "att_indexed": 1,
         }
         return (m.messageId or ""), rec
     finally:
