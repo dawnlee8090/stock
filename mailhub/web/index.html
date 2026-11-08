@@ -505,7 +505,7 @@ async function demoApi(path, body) {
       cars: [['NX5', D.mails.filter(m => carOf(m) === 'NX5').length], ['AB3', 1]].map(([key, count]) => ({ key, name: key, count, tags: tagsOf(key) })) };
   }
   if (base === 'mails') {
-    let r = D.mails.slice();
+    let r = D.mails.slice().sort((a, b) => b.sent_at.localeCompare(a.sent_at));   // 최근 메일이 맨 위
     const q = (p.get('q') || '').trim().toLowerCase();
     if (q) r = r.filter(m => q.split(/\s+/).every(t => (m.subject + m.body + m.sender_name + m.part_nos + m.att_text + m.attachments).toLowerCase().includes(t)));
     if (p.get('todo') === '1') r = r.filter(m => m.needs_action && m.status !== '완료');
@@ -1245,7 +1245,7 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-08.8';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-08.9';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');

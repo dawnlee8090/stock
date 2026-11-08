@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-08.8"
+APP_VERSION = "2026-11-08.9"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -160,8 +160,7 @@ class Data:
         elif (q.get("todo") or [""])[0] == "1" and not query:
             rows = todo(c, _iso(date.today() - timedelta(days=30)), limit)
         else:
-            rows = search(c, query, tag=(q.get("tag") or [None])[0], limit=limit,
-                          sort="relevance" if query else "date")
+            rows = search(c, query, tag=(q.get("tag") or [None])[0], limit=limit, sort="date")   # 검색도 최근 메일이 맨 위
         return [self.mail_row(r, query) for r in rows]
 
     def autoway_senders(self) -> list[str]:
