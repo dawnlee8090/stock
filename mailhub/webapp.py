@@ -124,12 +124,15 @@ class Data:
                 agenda.append({"date": s["eta"], "kind": "도착", "text": f"{m['mold_no']} ETA {s['port_to']}"})
         agenda = sorted([a for a in agenda if lo <= a["date"] <= hi], key=lambda a: a["date"])
         recent = c.execute("SELECT * FROM mails WHERE is_mine=0 ORDER BY sent_at DESC LIMIT 6").fetchall()
+        progress = c.execute("SELECT * FROM mails WHERE status IN ('진행중', '업체검토중') ORDER BY sent_at DESC").fetchall()
         last = c.execute("SELECT MAX(ingested_at) FROM mails").fetchone()[0]
         return {
             "counts": {"todo": len(todo_rows), "req_late": len(req_late), "req_open": len(reqs), "eo_late": len(eo_late),
                        "eo_open": len(eos), "to_late": len(to_late), "to_open": len(tos), "mold_alert": len(mold_al),
-                       "mold_open": len(molds)},
+                       "mold_open": len(molds), "mail_progress": sum(1 for r in progress if r["status"] == "진행중"),
+                       "mail_vendor": sum(1 for r in progress if r["status"] == "업체검토중")},
             "priority": prio, "agenda": agenda, "recent": [self.mail_row(r) for r in recent], "last_sync": last,
+            "progress": [self.mail_row(r) for r in progress[:12]],
         }
 
     # ---- 메일 ----
@@ -137,7 +140,10 @@ class Data:
         from .search import search, todo
         query = (q.get("q") or [""])[0]
         limit = int((q.get("limit") or ["60"])[0])
-        if (q.get("todo") or [""])[0] == "1" and not query:
+        status = (q.get("status") or [""])[0]
+        if status:   # 내가 표시한 진행 상태 (진행중 / 업체검토중 / 완료)
+            rows = search(c, query, status=status, limit=limit, sort="date")
+        elif (q.get("todo") or [""])[0] == "1" and not query:
             rows = todo(c, _iso(date.today() - timedelta(days=30)), limit)
         else:
             rows = search(c, query, tag=(q.get("tag") or [None])[0], limit=limit,

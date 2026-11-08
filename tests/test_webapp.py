@@ -107,6 +107,12 @@ class WebAppTest(unittest.TestCase):
         self.assertEqual(len(self.get("/api/molds")), 1)
 
     def test_writes(self):
+        self.post("/api/mail/1/mark", {"status": "업체검토중"})
+        self.assertEqual([m["id"] for m in self.get("/api/mails?status=" + urllib.request.quote("업체검토중"))], [1])
+        s = self.get("/api/summary")
+        self.assertEqual((s["counts"]["mail_vendor"], [m["id"] for m in s["progress"]]), (1, [1]))
+        self.post("/api/mail/1/mark", {"status": ""})                       # 해제
+        self.assertEqual(self.get("/api/summary")["progress"], [])
         self.post("/api/mail/1/mark", {"status": "완료"})
         self.assertEqual(self.get("/api/mail/1")["status"], "완료")
         self.post(f"/api/eo/{self.eid}", {"status": "검토중", "note": "업체 검토 요청"})

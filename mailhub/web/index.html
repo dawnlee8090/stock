@@ -246,6 +246,8 @@ table.matrix td.doc { text-align: center; font-weight: 600; font-size: 12.5px; w
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60;
   background: var(--fg); color: var(--surface); padding: 10px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px);
   box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+.btn.mark.on { background: var(--accent-weak); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.filter b { font-weight: 700; margin-left: 2px; }
 .ai-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
 .ai-panel { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); margin: 4px 0 14px; max-width: 920px; }
 .ai-panel .panel-h { background: var(--accent-weak); }
@@ -350,11 +352,11 @@ function buildDemo() {
   const T = (n, h = 9, m = 0) => addDays(n) + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':00';
   const mails = [
     { id: 30412, sent_at: T(0, 8, 41), sender_name: '이준호 책임 (고객사 품질)', sender_email: 'jh.lee@oem-example.com', subject: '[NX5 CUV] 도어트림 감싸기 주름 개선대책 회신 요청 (~11/12)', tags: 'T/O,품질문제,일정', part_nos: '82305-NX100', attachments: '도어트림 주름 사진.pptx', needs_action: 1, status: '', snippet: 'LP2 이벤트에서 FR 도어트림 암레스트 감싸기 주름이 재발했습니다. 원인과 개선대책을 11/12까지 회신 부탁드립니다.', body: '안녕하십니까. 고객사 품질팀 이준호입니다.\n\nLP2 이벤트에서 FR 도어트림 암레스트 감싸기 주름이 재발했습니다 (발생률 6/40).\n첨부 사진 참고하시어 원인과 개선대책을 11/12(목)까지 회신 부탁드립니다.\n\n1. 발생 부위: 암레스트 앞쪽 코너 R부\n2. 지난 M단계 대책(접착제 도포량 증가) 적용 여부 확인 필요\n\n감사합니다.', att_text: '[첨부: 도어트림 주름 사진.pptx]\n암레스트 코너 R부 주름 / 발생 6EA / 40EA 중' },
-    { id: 30398, sent_at: T(-1, 17, 12), sender_name: '박성민 과장 (한빛정밀)', sender_email: 'sm.park@hanbit-mold.example', subject: 'RE: [NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청', tags: 'E.O,금형수정', part_nos: '86511-NX200', attachments: '금형수정 검토서_86511.pdf', needs_action: 0, status: '', snippet: '검토서 송부드립니다. 육성 후 재가공, 수정 기간 7일, 비용 180만원입니다.', body: '안녕하십니까. 한빛정밀 박성민입니다.\n\n요청하신 보스 높이 2mm 상향 건 검토서 송부드립니다.\n- 수정 방식: 코어측 육성 후 재가공\n- 수정 기간: 착수 후 7일\n- 비용: 180만원 (VAT 별도)\n- 검사구 영향: 보스 체크핀 위치 수정 필요\n\n확인 부탁드립니다.', att_text: '[첨부: 금형수정 검토서_86511.pdf]\n수정 부위 보스 4EA / 육성 2.0mm / 재가공 / 일정 7일' },
+    { id: 30398, sent_at: T(-1, 17, 12), sender_name: '박성민 과장 (한빛정밀)', sender_email: 'sm.park@hanbit-mold.example', subject: 'RE: [NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청', tags: 'E.O,금형수정', part_nos: '86511-NX200', attachments: '금형수정 검토서_86511.pdf', needs_action: 0, status: '업체검토중', snippet: '검토서 송부드립니다. 육성 후 재가공, 수정 기간 7일, 비용 180만원입니다.', body: '안녕하십니까. 한빛정밀 박성민입니다.\n\n요청하신 보스 높이 2mm 상향 건 검토서 송부드립니다.\n- 수정 방식: 코어측 육성 후 재가공\n- 수정 기간: 착수 후 7일\n- 비용: 180만원 (VAT 별도)\n- 검사구 영향: 보스 체크핀 위치 수정 필요\n\n확인 부탁드립니다.', att_text: '[첨부: 금형수정 검토서_86511.pdf]\n수정 부위 보스 4EA / 육성 2.0mm / 재가공 / 일정 7일' },
     { id: 30377, sent_at: T(-1, 10, 5), sender_name: '최유진 대리 (MSV설계)', sender_email: 'yj.choi@design-example.com', subject: '[NX5 HEV] 콘솔 브라켓 E.O 통보 (EO26-0871)', tags: 'E.O,설계반영', part_nos: '84634-NX100', attachments: 'EO26-0871.pdf, EO LIST.xlsx', needs_action: 1, status: '', snippet: '콘솔 CTR MTG 브라켓 볼트 형상 변경 E.O 통보드립니다. 금형 수정 가능 여부와 일정 회신 부탁드립니다.', body: '안녕하세요. MSV설계 최유진입니다.\n\nEO26-0871 통보드립니다.\n- 품번: 84634-NX100 BRKT ASSY-CONSOLE CTR MTG\n- 변경: IN-LINE 볼트 형상 변경, PAD 32x12 → 40x25x0.5t\n\n금형 수정 가능 여부와 일정을 11/14까지 회신 부탁드립니다.', att_text: '[첨부: EO LIST.xlsx]\nEO26-0871 / 84634-NX100 / BRKT ASSY-CONSOLE CTR MTG / PAD 형상 변경' },
     { id: 30350, sent_at: T(-2, 15, 30), sender_name: 'Daniel Ruiz (멕시코 법인)', sender_email: 'd.ruiz@mx-plant.example', subject: 'RE: MD-2611 금형 이관 KD LIST 확인 요청', tags: '금형이관', part_nos: '', attachments: 'KD LIST_MD-2611.xlsx', needs_action: 1, status: '', snippet: 'Please confirm KD list. Hot runner nozzle will be LP. Need final list by Nov 14.', body: 'Hello,\n\nPlease find attached the KD list for MD-2611.\nHot runner nozzle will be locally procured (LP).\nWe need the final list by Nov 14 for customs.\n\nBest regards,\nDaniel', att_text: '[첨부: KD LIST_MD-2611.xlsx]\nINSERT NUT M6 KD 4EA / HOT RUNNER NOZZLE LP 2EA' },
     { id: 30333, sent_at: T(-3, 11, 0), sender_name: '정다은 사원 (생산기술)', sender_email: 'de.jung@example-corp.com', subject: '[공유] 11월 금형 정기 점검 일정', tags: '일정', part_nos: '', attachments: '', needs_action: 0, status: '', snippet: '11월 금형 정기 점검 일정 공유드립니다.', body: '11월 금형 정기 점검 일정 공유드립니다.\n- 11/18~19 프레스동\n- 11/20 사출동', att_text: '' },
-    { id: 30310, sent_at: T(-4, 9, 20), sender_name: '김태현 차장 (누리검사구)', sender_email: 'th.kim@nuri-cf.example', subject: 'RE: 헤드라이닝 검사구 수정 일정', tags: '검사구,일정', part_nos: '85310-NX000', attachments: '', needs_action: 0, status: '', snippet: '검사구 수정 11/15 완료 예정입니다.', body: '검사구 수정 11/15 완료 예정입니다. 완료 후 R&R 결과 같이 송부드리겠습니다.', att_text: '' },
+    { id: 30310, sent_at: T(-4, 9, 20), sender_name: '김태현 차장 (누리검사구)', sender_email: 'th.kim@nuri-cf.example', subject: 'RE: 헤드라이닝 검사구 수정 일정', tags: '검사구,일정', part_nos: '85310-NX000', attachments: '', needs_action: 0, status: '진행중', snippet: '검사구 수정 11/15 완료 예정입니다.', body: '검사구 수정 11/15 완료 예정입니다. 완료 후 R&R 결과 같이 송부드리겠습니다.', att_text: '' },
   ];
   const reqs = [
     { id: 7, vendor: '한빛정밀', to_addrs: 'sm.park@hanbit-mold.example', subject: '[NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청 (회신 11/7)', requested_at: addDays(-6), due_date: addDays(-1), status: '회신받음', remind_count: 0, reply_mail_id: 30398, req_type: '금형수정검토', eo_id: 3 },
@@ -450,9 +452,9 @@ function demoSummary() {
   for (const r of D.tos) if (r.status !== '종결') { if (r.due) agenda.push({ date: r.due, kind: 'T/O', text: `${r.part_name} ${r.defect_type} 대책` }); if (r.verify_due) agenda.push({ date: r.verify_due, kind: 'T/O', text: `${r.part_name} 효과 확인` }); }
   for (const m of D.molds) { if (m.ship.etd && !m.ship.atd) agenda.push({ date: m.ship.etd, kind: '선적', text: `${m.mold_no} ETD → ${m.dest}` }); if (m.ship.eta && !m.ship.ata) agenda.push({ date: m.ship.eta, kind: '도착', text: `${m.mold_no} ETA ${m.ship.port_to}` }); }
   return {
-    counts: { todo: todo.length, req_late: reqLate.length, req_open: D.reqs.filter(r => r.status === '요청').length, eo_late: eoLate.length, eo_open: D.eos.filter(r => !['완료', '취소', '수정불필요'].includes(r.status)).length, to_late: toLate.length, to_open: D.tos.filter(r => r.status !== '종결').length, mold_alert: moldAl.length, mold_open: D.molds.filter(m => m.status !== '이관완료').length },
+    counts: { todo: todo.length, req_late: reqLate.length, req_open: D.reqs.filter(r => r.status === '요청').length, eo_late: eoLate.length, mail_progress: D.mails.filter(m => m.status === '진행중').length, mail_vendor: D.mails.filter(m => m.status === '업체검토중').length, eo_open: D.eos.filter(r => !['완료', '취소', '수정불필요'].includes(r.status)).length, to_late: toLate.length, to_open: D.tos.filter(r => r.status !== '종결').length, mold_alert: moldAl.length, mold_open: D.molds.filter(m => m.status !== '이관완료').length },
     priority: prio, agenda: agenda.filter(a => days(a.date) >= -3 && days(a.date) <= 14).sort((a, b) => a.date.localeCompare(b.date)),
-    recent: D.mails.slice(0, 5), last_sync: D.last_sync,
+    recent: D.mails.slice(0, 5), last_sync: D.last_sync, progress: D.mails.filter(m => ['진행중', '업체검토중'].includes(m.status)),
   };
 }
 
@@ -470,6 +472,7 @@ async function demoApi(path, body) {
     if (q) r = r.filter(m => q.split(/\s+/).every(t => (m.subject + m.body + m.sender_name + m.part_nos + m.att_text + m.attachments).toLowerCase().includes(t)));
     if (p.get('todo') === '1') r = r.filter(m => m.needs_action && m.status !== '완료');
     if (p.get('tag')) r = r.filter(m => (',' + m.tags + ',').includes(',' + p.get('tag') + ','));
+    if (p.get('status')) r = r.filter(m => m.status === p.get('status'));
     return r;
   }
   if (parts[0] === 'mail' && parts.length === 2) return D.mails.find(m => m.id === +parts[1]);
@@ -538,7 +541,7 @@ const ago = (s) => { if (!s) return ''; const n = days(s.slice(0, 10)); if (n ==
 function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2600); }
 const STATE_CLASS = { '접수': 'warn', '검토중': 'warn', '수정요청': 'info', '수정중': 'info', '수정완료': 'ok', '검증중': 'ok', '완료': '', '수정불필요': '', '보류': 'crit', '취소': '',
   '발생': 'crit', '원인분석': 'warn', '대책수립': 'warn', '대책적용': 'info', '효과확인': 'ok', '종결': '',
-  '요청': 'info', '회신받음': 'ok', '제작중': '', 'T/O': 'warn', '이관준비': 'warn', '선적대기': 'info', '선적': 'info', '현지도착': 'ok', '현지T/O': 'ok', '이관완료': '' };
+  '요청': 'info', '회신받음': 'ok', '진행중': 'info', '업체검토중': 'warn', '제작중': '', 'T/O': 'warn', '이관준비': 'warn', '선적대기': 'info', '선적': 'info', '현지도착': 'ok', '현지T/O': 'ok', '이관완료': '' };
 const pill = (s) => `<span class="chip ${STATE_CLASS[s] ?? ''}">${esc(s)}</span>`;
 const SYMBOL = { '확정': '●', '검토중': '◐', '접수': '◐', '요청': '○', '미접수': '✕', '해당없음': '－' };
 async function copyCmd(text) {
@@ -608,29 +611,38 @@ async function viewToday(V) {
           <div class="agenda">${Object.keys(byDay).length ? Object.entries(byDay).map(([d, items]) => `
             <div class="ag-day"><div class="ag-date ${days(d) === 0 ? 'today' : ''}">${md(d)} <small>${days(d) === 0 ? '오늘' : wd(d) + (days(d) < 0 ? ' · 지남' : '')}</small></div>
               <div class="ag-items">${items.map(a => `<div class="ag-item"><span class="chip ${kindChip[a.kind] || ''}">${esc(a.kind)}</span><span>${esc(a.text)}</span></div>`).join('')}</div></div>`).join('') : '<div class="empty">2주 안에 기한이 없습니다</div>'}</div></section>
+        <section class="panel"><div class="panel-h"><h2>진행 중인 메일</h2><span class="sub">진행중 ${c.mail_progress || 0} · 업체 검토중 ${c.mail_vendor || 0}</span></div>
+          <ul class="rows">${(s.progress || []).length ? s.progress.map(m => `<li class="row" data-go="#mail" data-id="${m.id}" data-st="${esc(m.status)}"><span class="sev ${m.status === '업체검토중' ? 'warn' : 'info'}"></span>
+            <div style="min-width:0"><div class="t">${esc(m.subject)}</div><div class="m">${esc(m.sender_name)}</div></div><div class="r">${pill(m.status)}<span class="sub num">${ago(m.sent_at)}</span></div></li>`).join('')
+            : '<li class="empty">메일 화면에서 [진행중]·[업체 검토중]을 누르면 여기에 모입니다</li>'}</ul></section>
         <section class="panel"><div class="panel-h"><h2>최근 받은 메일</h2><a class="sub" href="#mail">메일함 →</a></div>
           <ul class="rows">${s.recent.map(m => `<li class="row" data-go="#mail" data-id="${m.id}"><span class="sev ${m.needs_action && m.status !== '완료' ? 'info' : ''}"></span>
             <div style="min-width:0"><div class="t">${esc(m.subject)}</div><div class="m">${esc(m.sender_name)}</div></div><div class="r"><span class="sub num">${ago(m.sent_at)}</span></div></li>`).join('')}</ul></section>
       </div></div>`;
-  V.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => { PENDING = { view: el.dataset.go.slice(1), id: +el.dataset.id }; location.hash = el.dataset.go; if (location.hash === el.dataset.go) route(); }));
+  V.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => {
+    PENDING = { view: el.dataset.go.slice(1), id: +el.dataset.id };
+    if (el.dataset.go === '#mail') mailState.filter = el.dataset.st ? '@' + el.dataset.st : '';
+    location.hash = el.dataset.go; if (location.hash === el.dataset.go) route(); }));
 }
 let PENDING = null;
 
 // ================= 화면: 메일함 =================
-const MAIL_FILTERS = [['todo', '회신 필요'], ['', '전체'], ['E.O', 'E.O'], ['T/O', 'T/O'], ['금형수정', '금형수정'], ['검사구', '검사구'], ['품질문제', '품질문제'], ['금형이관', '금형이관']];
+const MAIL_FILTERS = [['todo', '회신 필요'], ['@진행중', '진행중'], ['@업체검토중', '업체 검토중'], ['', '전체'], ['E.O', 'E.O'], ['T/O', 'T/O'], ['금형수정', '금형수정'], ['검사구', '검사구'], ['품질문제', '품질문제'], ['금형이관', '금형이관'], ['@완료', '처리 완료']];
 let mailState = { filter: 'todo', q: '', sel: null };
 async function viewMail(V) {
   V.className = 'view split';
   const q = mailState.q;
   const params = new URLSearchParams({ limit: 60 });
   if (q) params.set('q', q);
-  if (mailState.filter === 'todo' && !q) params.set('todo', '1'); else if (mailState.filter && mailState.filter !== 'todo') params.set('tag', mailState.filter);
+  if (mailState.filter.startsWith('@')) params.set('status', mailState.filter.slice(1));
+  else if (mailState.filter === 'todo' && !q) params.set('todo', '1'); else if (mailState.filter && mailState.filter !== 'todo') params.set('tag', mailState.filter);
   const rows = await api('mails?' + params);
   if (PENDING && PENDING.view === 'mail') { mailState.sel = PENDING.id; PENDING = null; }
   V.innerHTML = `
     <section class="list-pane"><div class="pane-h">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><h1>${q ? '검색 결과' : '메일함'}</h1><span class="sub num">${rows.length}건</span></div>
-      ${q ? `<div class="chips"><span class="chip acc">"${esc(q)}"</span><button class="btn sm" id="clear-q" type="button">검색 지우기</button></div>` : `<div class="filters">${MAIL_FILTERS.map(([k, l]) => `<button class="filter" type="button" data-f="${k}" aria-pressed="${mailState.filter === k}">${l}</button>`).join('')}</div>`}
+      ${q ? `<div class="chips"><span class="chip acc">"${esc(q)}"</span><button class="btn sm" id="clear-q" type="button">검색 지우기</button></div>` : `<div class="filters">${MAIL_FILTERS.map(([k, l]) => { const cnt = { '@진행중': (window.__counts || {}).mail_progress, '@업체검토중': (window.__counts || {}).mail_vendor }[k];
+        return `<button class="filter" type="button" data-f="${k}" aria-pressed="${mailState.filter === k}">${l}${cnt ? ` <b class="num">${cnt}</b>` : ''}</button>`; }).join('')}</div>`}
     </div><div class="list-scroll">${rows.length ? rows.map(m => `
       <div class="mrow" data-id="${m.id}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
         <div class="l1"><span class="from">${esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
@@ -660,9 +672,8 @@ async function openMail(id, V) {
       ${m.part_nos ? `<dt>품번</dt><dd class="mono">${esc(m.part_nos.split(',').slice(0, 8).join(', '))}</dd>` : ''}
       ${m.attachments ? `<dt>첨부</dt><dd>${esc(m.attachments.split(/\n|, /).join(' · '))}</dd>` : ''}</dl>
     <div class="actions">
-      <button class="btn primary sm" data-mark="완료" type="button">처리 완료</button>
-      <button class="btn sm" data-mark="진행중" type="button">진행중</button>
-      <button class="btn sm" data-mark="업체검토중" type="button">업체 검토중</button>
+      ${[['완료', '처리 완료'], ['진행중', '진행중'], ['업체검토중', '업체 검토중']].map(([v, l]) =>
+        `<button class="btn sm mark${m.status === v ? ' on' : ''}" data-mark="${v}" aria-pressed="${m.status === v}" type="button">${m.status === v ? '✓ ' : ''}${l}</button>`).join('')}
       ${LIVE ? '<button class="btn sm" id="view-orig" type="button">원본 보기</button><button class="btn sm" id="open-orig" type="button">Outlook에서 열기</button>' : ''}
     </div>
     <div class="ai-bar">
@@ -679,7 +690,11 @@ async function openMail(id, V) {
   setupReview(m, R);
   const eb = $('#ai-eo', R); if (eb) eb.addEventListener('click', () => startEO(m, eb));
   R.querySelectorAll('[data-mark]').forEach(b => b.addEventListener('click', async () => {
-    await api(`mail/${id}/mark`, { status: b.dataset.mark }); toast(LIVE ? `#${id} '${b.dataset.mark}' 로 기록했습니다` : `예시 화면이라 저장되지 않습니다 ('${b.dataset.mark}')`); route();
+    const v = b.dataset.mark, off = m.status === v;          // 같은 버튼을 다시 누르면 상태 해제
+    await api(`mail/${id}/mark`, { status: off ? '' : v });
+    const where = { '진행중': '메일함 [진행중]', '업체검토중': '메일함 [업체 검토중]', '완료': '메일함 [처리 완료]' }[v];
+    toast(!LIVE ? '예시 화면이라 저장되지 않습니다' : (off ? '상태를 해제했습니다' : `'${b.textContent.replace('✓ ', '')}'로 표시했습니다 · ${where} 과 [오늘] 화면에서 볼 수 있습니다`));
+    await refreshSummary(); route();
   }));
   const oo = $('#open-orig', R); if (oo) oo.addEventListener('click', async () => {
     try { await api(`mail/${id}/open`, {}); toast('Outlook으로 열었습니다. 열리지 않으면 [원본 보기]를 쓰세요'); } catch (err) { toast(err.message); } });
