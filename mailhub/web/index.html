@@ -162,7 +162,21 @@ h2 { font-size: 14px; margin: 0; font-weight: 600; }
 .ag-date small { display: block; font-weight: 500; font-size: 11px; color: var(--fg-3); }
 .ag-date.today { color: var(--accent); }
 .ag-items { display: grid; gap: 4px; min-width: 0; }
-.ag-item { font-size: 12.5px; display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.ag-item { font-size: 12.5px; display: flex; gap: 6px; align-items: baseline; min-width: 0; width: 100%; text-align: left; background: none; border: 0; padding: 3px 4px; margin: 0 -4px; border-radius: 6px; color: inherit; font: inherit; cursor: pointer; }
+.ag-item:hover { background: var(--surface-2); }
+.ag-item:hover span:last-child { color: var(--accent); text-decoration: underline; }
+.car-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 16px; }
+.tiles.car4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+button.tile { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.seg { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.seg [role=tab] { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; font: inherit; font-size: 13.5px; color: var(--fg-2); cursor: pointer; margin-bottom: -1px; }
+.seg [role=tab][aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.seg .seg-link { margin-left: auto; padding: 8px 4px; }
+.rel-list .row { cursor: pointer; }
+.rel-list .row[aria-selected="true"] { background: var(--accent-weak); }
+.rel-mail { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 14px; }
+.rel-mail h3 { font-size: 15px; margin: 0 0 8px; }
+.note-box { font-size: 12.5px; color: var(--fg-2); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
 .ag-item span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 메일 2단 */
@@ -301,6 +315,7 @@ table.matrix td.doc { text-align: center; font-weight: 600; font-size: 12.5px; w
 .copybox code { font-family: var(--mono); flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 @media (max-width: 1100px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .grid2 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .tiles.car4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .car-tabs { flex-wrap: nowrap; overflow-x: auto; } .car-tabs .filter { flex: none; } }
 @media (max-width: 820px) {
   .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .side { flex-direction: row; align-items: center; padding: 8px 12px; gap: 6px; overflow-x: auto;
@@ -469,21 +484,25 @@ function demoSummary() {
   const eoLate = D.eos.filter(r => eoDelay(r));
   const toLate = D.tos.filter(r => toDelay(r));
   const moldAl = D.molds.filter(m => moldAlerts(m).length);
+  const cv = (t) => [...new Set(((t || '').match(/\b(NX5|AB3|BC4)/g) || []))];   // 예시 차종
+  const mc = (m) => cv(m.subject);
   const prio = [];
-  for (const r of reqLate) prio.push({ kind: '업체 요청', sev: days(r.due_date) < 0 ? 'crit' : 'warn', title: r.subject, sub: r.vendor, alert: reqState(r) === '오늘' ? '오늘 회신 기한' : '회신 ' + reqState(r), go: '#req', id: r.id });
-  for (const r of eoLate) prio.push({ kind: 'E.O', sev: 'crit', title: `${r.car} ${r.part_name}`, sub: r.change_desc, alert: eoDelay(r), go: '#eo', id: r.id });
-  for (const r of toLate) prio.push({ kind: 'T/O', sev: 'crit', title: `${r.part_name} · ${r.defect_type}`, sub: r.phenomenon, alert: toDelay(r), go: '#to', id: r.id });
-  for (const m of moldAl) prio.push({ kind: '금형 이관', sev: 'warn', title: `${m.mold_no} ${m.part_name} → ${m.dest}`, sub: moldAlerts(m)[0], alert: '확인 필요', go: '#mold', id: m.id });
-  for (const m of todo) prio.push({ kind: '메일', sev: 'info', title: m.subject, sub: m.sender_name, alert: '회신 필요', go: '#mail', id: m.id });
+  for (const r of reqLate) prio.push({ kind: '업체 요청', sev: days(r.due_date) < 0 ? 'crit' : 'warn', title: r.subject, sub: r.vendor, alert: reqState(r) === '오늘' ? '오늘 회신 기한' : '회신 ' + reqState(r), go: '#req', id: r.id, cars: cv(r.subject) });
+  for (const r of eoLate) prio.push({ kind: 'E.O', sev: 'crit', title: `${r.car} ${r.part_name}`, sub: r.change_desc, alert: eoDelay(r), go: '#eo', id: r.id, cars: cv(r.car) });
+  for (const r of toLate) prio.push({ kind: 'T/O', sev: 'crit', title: `${r.part_name} · ${r.defect_type}`, sub: r.phenomenon, alert: toDelay(r), go: '#to', id: r.id, cars: cv(r.car) });
+  for (const m of moldAl) prio.push({ kind: '금형 이관', sev: 'warn', title: `${m.mold_no} ${m.part_name} → ${m.dest}`, sub: moldAlerts(m)[0], alert: '확인 필요', go: '#mold', id: m.id, cars: cv(m.car) });
+  for (const m of todo) prio.push({ kind: '메일', sev: 'info', title: m.subject, sub: m.sender_name, alert: '회신 필요', go: '#mail', id: m.id, cars: mc(m) });
   const agenda = [];
-  for (const r of D.reqs) if (r.status === '요청') agenda.push({ date: r.due_date, kind: '요청', text: `${r.vendor} 회신 기한` });
-  for (const r of D.eos) for (const [f, l] of [['review_due', '검토 회신'], ['mold_due', '금형 수정 완료'], ['verify_due', '검증']]) if (r[f] && !['완료', '취소', '수정불필요'].includes(r.status)) agenda.push({ date: r[f], kind: 'E.O', text: `${r.part_name} ${l}` });
-  for (const r of D.tos) if (r.status !== '종결') { if (r.due) agenda.push({ date: r.due, kind: 'T/O', text: `${r.part_name} ${r.defect_type} 대책` }); if (r.verify_due) agenda.push({ date: r.verify_due, kind: 'T/O', text: `${r.part_name} 효과 확인` }); }
-  for (const m of D.molds) { if (m.ship.etd && !m.ship.atd) agenda.push({ date: m.ship.etd, kind: '선적', text: `${m.mold_no} ETD → ${m.dest}` }); if (m.ship.eta && !m.ship.ata) agenda.push({ date: m.ship.eta, kind: '도착', text: `${m.mold_no} ETA ${m.ship.port_to}` }); }
+  for (const r of D.reqs) if (r.status === '요청') agenda.push({ date: r.due_date, kind: '요청', text: `${r.vendor} 회신 기한`, src: 'req', sid: r.id, cars: cv(r.subject) });
+  for (const r of D.eos) for (const [f, l] of [['review_due', '검토 회신'], ['mold_due', '금형 수정 완료'], ['verify_due', '검증']]) if (r[f] && !['완료', '취소', '수정불필요'].includes(r.status)) agenda.push({ date: r[f], kind: 'E.O', text: `${r.part_name} ${l}`, src: 'eo', sid: r.id, cars: cv(r.car) });
+  for (const r of D.tos) if (r.status !== '종결') { if (r.due) agenda.push({ date: r.due, kind: 'T/O', text: `${r.part_name} ${r.defect_type} 대책`, src: 'to', sid: r.id, cars: cv(r.car) }); if (r.verify_due) agenda.push({ date: r.verify_due, kind: 'T/O', text: `${r.part_name} 효과 확인`, src: 'to', sid: r.id, cars: cv(r.car) }); }
+  for (const m of D.molds) { if (m.ship.etd && !m.ship.atd) agenda.push({ date: m.ship.etd, kind: '선적', text: `${m.mold_no} ETD → ${m.dest}`, src: 'mold', sid: m.id, cars: cv(m.car) }); if (m.ship.eta && !m.ship.ata) agenda.push({ date: m.ship.eta, kind: '도착', text: `${m.mold_no} ETA ${m.ship.port_to}`, src: 'mold', sid: m.id, cars: cv(m.car) }); }
   return {
     counts: { todo: todo.length, req_late: reqLate.length, req_open: D.reqs.filter(r => r.status === '요청').length, eo_late: eoLate.length, mail_progress: D.mails.filter(m => m.status === '진행중').length, mail_vendor: D.mails.filter(m => m.status === '업체검토중').length, eo_open: D.eos.filter(r => !['완료', '취소', '수정불필요'].includes(r.status)).length, to_late: toLate.length, to_open: D.tos.filter(r => r.status !== '종결').length, mold_alert: moldAl.length, mold_open: D.molds.filter(m => m.status !== '이관완료').length },
     priority: prio, agenda: agenda.filter(a => days(a.date) >= -3 && days(a.date) <= 14).sort((a, b) => a.date.localeCompare(b.date)),
-    recent: D.mails.slice(0, 5), last_sync: D.last_sync, progress: D.mails.filter(m => ['진행중', '업체검토중'].includes(m.status)),
+    recent: D.mails.slice(0, 5).map(m => ({ ...m, cars: mc(m) })), last_sync: D.last_sync,
+    progress: D.mails.filter(m => ['진행중', '업체검토중'].includes(m.status)).map(m => ({ ...m, cars: mc(m) })),
+    todo_mails: todo.map(m => ({ ...m, cars: mc(m) })), cars: [{ key: 'NX5', name: 'NX5' }, { key: 'AB3', name: 'AB3' }],
   };
 }
 
@@ -494,6 +513,15 @@ async function demoApi(path, body) {
   const parts = base.split('/');
   await new Promise(r => setTimeout(r, 60));
   if (base === 'summary') return demoSummary();
+  if (parts[0] === 'related') {   // 예시: 품번·제목이 겹치는 메일을 관련 메일로
+    const src = parts[1], sid = +parts[2], pick = (fn) => D.mails.filter(fn).sort((a, b) => b.sent_at.localeCompare(a.sent_at)).map(m => ({ id: m.id, sent_at: m.sent_at, sender_name: m.sender_name, subject: m.subject }));
+    const byPart = (pn, name) => pick(m => (pn && m.part_nos.includes(pn)) || (name && m.subject.toUpperCase().includes(name.toUpperCase())));
+    if (src === 'eo') { const r = D.eos.find(x => x.id === sid); return { title: `E${sid} ${r.car} ${r.part_name}`, sub: `${r.eo_no} · ${r.change_desc}`, go: '#eo', mails: byPart(r.part_no, r.part_name), guessed: false }; }
+    if (src === 'to') { const r = D.tos.find(x => x.id === sid); return { title: `T${sid} ${r.part_name} · ${r.defect_type}`, sub: r.phenomenon, go: '#to', mails: byPart(r.part_no, r.part_name), guessed: false }; }
+    if (src === 'mold') { const r = D.molds.find(x => x.id === sid); return { title: `M${sid} ${r.mold_no} ${r.part_name} → ${r.dest}`, sub: r.status, go: '#mold', mails: pick(m => m.subject.includes(r.mold_no) || m.part_nos.includes(r.part_no)), guessed: false }; }
+    const r = D.reqs.find(x => x.id === sid), key = r.subject.replace(/^\[.*?\]\s*/, '').slice(0, 8);
+    return { title: `R${sid} ${r.vendor} · ${r.subject}`, sub: `회신 기한 ${r.due_date} · ${r.status}`, go: '#req', mails: pick(m => m.subject.includes(key) || (r.mail_id && m.id === r.mail_id)), guessed: false };
+  }
   if (base === 'eo/add') return { ok: true, ids: [] };
   if (base === 'mailcounts') {
     const carOf = (m) => (m.subject.match(/\[(NX5|AB3|BC4t?)\b/) || [])[1] || '';
@@ -683,51 +711,137 @@ function renderNav(counts = {}) {
 }
 
 // ================= 화면: 오늘 =================
+let todayState = { car: '', tab: 'agenda' };
+try { const t = JSON.parse(localStorage.getItem('todayState') || 'null'); if (t && typeof t.car === 'string') todayState = { car: t.car, tab: t.tab || 'agenda' }; } catch { /* 저장 안 됨: 무시 */ }
+const KIND_CHIP = { '요청': 'info', 'E.O': 'acc', 'T/O': 'crit', '선적': 'warn', '도착': 'ok' };
+function agendaHtml(list, emptyMsg) {
+  const byDay = {};
+  for (const a of list) (byDay[a.date] = byDay[a.date] || []).push(a);
+  return `<div class="agenda">${Object.keys(byDay).length ? Object.entries(byDay).map(([d, items]) => `
+    <div class="ag-day"><div class="ag-date ${days(d) === 0 ? 'today' : ''}">${md(d)} <small>${days(d) === 0 ? '오늘' : wd(d) + (days(d) < 0 ? ' · 지남' : '')}</small></div>
+      <div class="ag-items">${items.map(a => `<button class="ag-item" type="button" data-src="${esc(a.src || '')}" data-sid="${a.sid || ''}" title="관련 메일 보기"><span class="chip ${KIND_CHIP[a.kind] || ''}">${esc(a.kind)}</span><span>${esc(a.text)}</span></button>`).join('')}</div></div>`).join('')
+    : `<div class="empty">${emptyMsg}</div>`}</div>`;
+}
+function prioRows(list, emptyMsg) {
+  return `<ul class="rows">${list.length ? list.map(p => `
+    <li class="row" data-go="${p.go}" data-id="${p.id}" data-kind="${esc(p.kind)}"><span class="sev ${p.sev}"></span>
+      <div style="min-width:0"><div class="kind">${esc(p.kind)}</div><div class="t">${esc(p.title)}</div><div class="m"><span class="clip">${esc(p.sub || '')}</span></div></div>
+      <div class="r"><span class="chip ${p.sev === 'info' ? 'info' : p.sev}">${esc(p.alert)}</span></div></li>`).join('') : `<li class="empty">${emptyMsg}</li>`}</ul>`;
+}
+function mailRows(list, emptyMsg, kind) {
+  return `<ul class="rows">${list.length ? list.map(m => `<li class="row" data-go="#mail" data-id="${m.id}" data-st="${esc(m.status || '')}"${kind ? ` data-kind="${kind}"` : ''}><span class="sev ${m.status === '업체검토중' ? 'warn' : 'info'}"></span>
+    <div style="min-width:0"><div class="t">${esc(m.subject)}</div><div class="m">${esc(m.sender_name)}</div></div><div class="r">${m.status ? pill(m.status) : ''}<span class="sub num">${ago(m.sent_at)}</span></div></li>`).join('')
+    : `<li class="empty">${emptyMsg}</li>`}</ul>`;
+}
 async function viewToday(V) {
   const s = await api('summary');
   renderNav(s.counts);
   const c = s.counts;
   const now = TODAY;
   const hello = `${now.getMonth() + 1}월 ${now.getDate()}일 (${'일월화수목금토'[now.getDay()]})`;
-  const tiles = [
-    ['#mail', '회신·검토 필요 메일', c.todo, '받는사람이 나인 요청 메일', c.todo ? 'warn' : 'ok'],
-    ['#req', '업체 회신 기한 도래', c.req_late, `진행 중 요청 ${c.req_open}건`, c.req_late ? 'crit' : 'ok'],
-    ['#eo', 'E.O 지연', c.eo_late, `진행 중 ${c.eo_open}건`, c.eo_late ? 'crit' : 'ok'],
-    ['#to', 'T/O 대책 지연', c.to_late, `진행 중 ${c.to_open}건`, c.to_late ? 'crit' : 'ok'],
-    ['#mold', '금형 이관 확인 필요', c.mold_alert, `이관 진행 ${c.mold_open}벌`, c.mold_alert ? 'warn' : 'ok'],
-  ];
-  const byDay = {};
-  for (const a of s.agenda) (byDay[a.date] = byDay[a.date] || []).push(a);
-  const kindChip = { '요청': 'info', 'E.O': 'acc', 'T/O': 'crit', '선적': 'warn', '도착': 'ok' };
+  const has = (x) => (x.cars || []).includes(todayState.car);
+  // 차종별 건수 (일정 + 회신 필요 + 기한 지연 + 진행 중) → 할 일이 있는 차종만 탭으로
+  const per = {};
+  const bump = (x) => (x.cars || []).forEach(k => { per[k] = (per[k] || 0) + 1; });
+  s.agenda.forEach(bump); (s.todo_mails || []).forEach(bump); s.priority.filter(p => p.kind !== '메일').forEach(bump); (s.progress || []).forEach(bump);
+  const cars = (s.cars || []).filter(x => per[x.key]);
+  if (todayState.car && !cars.some(x => x.key === todayState.car)) todayState.car = '';
+  const carName = (k) => (cars.find(x => x.key === k) || { name: k }).name;
+  const carTabs = cars.length ? `<div class="car-tabs" role="tablist" aria-label="차종">
+    <button class="filter" type="button" role="tab" data-car="" aria-pressed="${!todayState.car}">전체</button>
+    ${cars.map(x => `<button class="filter" type="button" role="tab" data-car="${esc(x.key)}" aria-pressed="${todayState.car === x.key}">${esc(x.name)} <b class="num">${per[x.key]}</b></button>`).join('')}</div>` : '';
   V.className = 'view';
-  V.innerHTML = `
-    <div class="head"><div><div class="eyebrow">${esc(hello)}</div><h1>오늘 처리할 일</h1></div>
-      <div class="sub">아침 자동 수집 후 업체 회신 · E.O · T/O · 금형 이관 기한을 한 번에 모았습니다</div></div>
+  let body;
+  if (!todayState.car) {
+    const tiles = [
+      ['#mail', '회신·검토 필요 메일', c.todo, '받는사람이 나인 요청 메일', c.todo ? 'warn' : 'ok'],
+      ['#req', '업체 회신 기한 도래', c.req_late, `진행 중 요청 ${c.req_open}건`, c.req_late ? 'crit' : 'ok'],
+      ['#eo', 'E.O 지연', c.eo_late, `진행 중 ${c.eo_open}건`, c.eo_late ? 'crit' : 'ok'],
+      ['#to', 'T/O 대책 지연', c.to_late, `진행 중 ${c.to_open}건`, c.to_late ? 'crit' : 'ok'],
+      ['#mold', '금형 이관 확인 필요', c.mold_alert, `이관 진행 ${c.mold_open}벌`, c.mold_alert ? 'warn' : 'ok'],
+    ];
+    body = `
     <div class="tiles">${tiles.map(([h, k, v, d, sev]) => `<a class="tile ${sev}" href="${h}" style="text-decoration:none;color:inherit"><span class="k">${k}</span><span class="v">${v}</span><span class="d">${d}</span></a>`).join('')}</div>
     <div class="grid2">
       <section class="panel"><div class="panel-h"><h2>지금 처리할 일</h2><span class="sub">급한 순서 · 클릭하면 해당 화면으로</span></div>
-        <ul class="rows">${s.priority.length ? s.priority.map(p => `
-          <li class="row" data-go="${p.go}" data-id="${p.id}" data-kind="${esc(p.kind)}"><span class="sev ${p.sev}"></span>
-            <div style="min-width:0"><div class="kind">${esc(p.kind)}</div><div class="t">${esc(p.title)}</div><div class="m"><span class="clip">${esc(p.sub || '')}</span></div></div>
-            <div class="r"><span class="chip ${p.sev === 'info' ? 'info' : p.sev}">${esc(p.alert)}</span></div></li>`).join('') : '<li class="empty">급한 일이 없습니다</li>'}</ul></section>
+        ${prioRows(s.priority, '급한 일이 없습니다')}</section>
       <div class="stack">
-        <section class="panel"><div class="panel-h"><h2>다가오는 기한 · 일정</h2><span class="sub">2주</span></div>
-          <div class="agenda">${Object.keys(byDay).length ? Object.entries(byDay).map(([d, items]) => `
-            <div class="ag-day"><div class="ag-date ${days(d) === 0 ? 'today' : ''}">${md(d)} <small>${days(d) === 0 ? '오늘' : wd(d) + (days(d) < 0 ? ' · 지남' : '')}</small></div>
-              <div class="ag-items">${items.map(a => `<div class="ag-item"><span class="chip ${kindChip[a.kind] || ''}">${esc(a.kind)}</span><span>${esc(a.text)}</span></div>`).join('')}</div></div>`).join('') : '<div class="empty">2주 안에 기한이 없습니다</div>'}</div></section>
+        <section class="panel"><div class="panel-h"><h2>다가오는 기한 · 일정</h2><span class="sub">2주 · 누르면 관련 메일</span></div>
+          ${agendaHtml(s.agenda, '2주 안에 기한이 없습니다')}</section>
         <section class="panel"><div class="panel-h"><h2>진행 중인 메일</h2><span class="sub">진행중 ${c.mail_progress || 0} · 업체 검토중 ${c.mail_vendor || 0}</span></div>
-          <ul class="rows">${(s.progress || []).length ? s.progress.map(m => `<li class="row" data-go="#mail" data-id="${m.id}" data-st="${esc(m.status)}"><span class="sev ${m.status === '업체검토중' ? 'warn' : 'info'}"></span>
-            <div style="min-width:0"><div class="t">${esc(m.subject)}</div><div class="m">${esc(m.sender_name)}</div></div><div class="r">${pill(m.status)}<span class="sub num">${ago(m.sent_at)}</span></div></li>`).join('')
-            : '<li class="empty">메일 화면에서 [진행중]·[업체 검토중]을 누르면 여기에 모입니다</li>'}</ul></section>
+          ${mailRows((s.progress || []).slice(0, 12), '메일 화면에서 [진행중]·[업체 검토중]을 누르면 여기에 모입니다')}</section>
         <section class="panel"><div class="panel-h"><h2>최근 받은 메일</h2><a class="sub" href="#mail">메일함 →</a></div>
-          <ul class="rows">${s.recent.map(m => `<li class="row" data-go="#mail" data-id="${m.id}"><span class="sev ${m.needs_action && m.status !== '완료' ? 'info' : ''}"></span>
-            <div style="min-width:0"><div class="t">${esc(m.subject)}</div><div class="m">${esc(m.sender_name)}</div></div><div class="r"><span class="sub num">${ago(m.sent_at)}</span></div></li>`).join('')}</ul></section>
+          ${mailRows(s.recent, '받은 메일이 없습니다')}</section>
       </div></div>`;
+  } else {
+    const k = todayState.car;
+    const ag = s.agenda.filter(has), todo = (s.todo_mails || []).filter(has);
+    const late = s.priority.filter(p => p.kind !== '메일' && has(p)), prog = (s.progress || []).filter(has);
+    const tabs = [['agenda', '일정표', ag.length], ['todo', '회신 필요', todo.length], ['late', '기한·지연', late.length], ['progress', '진행 중 메일', prog.length]];
+    if (!tabs.some(t => t[0] === todayState.tab)) todayState.tab = 'agenda';
+    const panel = {
+      agenda: () => `<section class="panel"><div class="panel-h"><h2>${esc(carName(k))} 일정표</h2><span class="sub">지난 3일 ~ 2주 · 누르면 관련 메일</span></div>${agendaHtml(ag, '2주 안에 이 차종의 기한이 없습니다')}</section>`,
+      todo: () => `<section class="panel"><div class="panel-h"><h2>${esc(carName(k))} 회신 필요 메일</h2><span class="sub">최근 30일 · 아직 회신 안 함</span></div>${mailRows(todo, '회신이 필요한 메일이 없습니다', '메일')}</section>`,
+      late: () => `<section class="panel"><div class="panel-h"><h2>${esc(carName(k))} 기한 지남 · 지연</h2><span class="sub">업체 회신 · E.O · T/O · 금형 이관</span></div>${prioRows(late, '지난 기한이나 지연된 일이 없습니다')}</section>`,
+      progress: () => `<section class="panel"><div class="panel-h"><h2>${esc(carName(k))} 진행 중인 메일</h2><span class="sub">[진행중]·[업체 검토중] 표시한 메일</span></div>${mailRows(prog, '진행 중으로 표시한 메일이 없습니다')}</section>`,
+    };
+    body = `
+    <div class="tiles car4">${[['todo', '회신 필요', todo.length, todo.length ? 'warn' : 'ok'], ['late', '기한 지남 · 지연', late.length, late.length ? 'crit' : 'ok'],
+      ['agenda', '2주 안 일정', ag.length, 'ok'], ['progress', '진행 중 메일', prog.length, 'ok']].map(([t, l, v, sev]) =>
+      `<button class="tile ${sev}" type="button" data-tab="${t}"><span class="k">${l}</span><span class="v">${v}</span><span class="d">눌러서 보기</span></button>`).join('')}</div>
+    <div class="seg" role="tablist" aria-label="${esc(carName(k))} 보기">${tabs.map(([t, l, n]) => `<button type="button" role="tab" data-tab="${t}" aria-selected="${todayState.tab === t}">${l} <b class="num">${n}</b></button>`).join('')}
+      <a class="sub seg-link" href="#mail-car-${esc(k)}">${esc(carName(k))} 메일함 →</a></div>
+    ${panel[todayState.tab]()}`;
+  }
+  V.innerHTML = `
+    <div class="head"><div><div class="eyebrow">${esc(hello)}</div><h1>${todayState.car ? esc(carName(todayState.car)) + ' 처리할 일' : '오늘 처리할 일'}</h1></div>
+      <div class="sub">아침 자동 수집 후 업체 회신 · E.O · T/O · 금형 이관 기한을 한 번에 모았습니다</div></div>
+    ${carTabs}${body}`;
+  const save = () => { try { localStorage.setItem('todayState', JSON.stringify(todayState)); } catch { /* 무시 */ } };
+  V.querySelectorAll('[data-car]').forEach(b => b.addEventListener('click', () => { todayState.car = b.dataset.car; todayState.tab = 'agenda'; save(); viewToday(V); }));
+  V.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { todayState.tab = b.dataset.tab; save(); viewToday(V); }));
+  V.querySelectorAll('.ag-item[data-src]').forEach(b => b.addEventListener('click', () => { if (b.dataset.src) relatedPopup(b.dataset.src, +b.dataset.sid); }));
   V.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => {
     let go = el.dataset.go;
     PENDING = { view: go.slice(1), id: +el.dataset.id };
     if (go === '#mail') go = '#' + (el.dataset.st ? folderForFilter('@' + el.dataset.st) : (el.dataset.kind === '메일' ? 'mail-todo' : 'mail'));
     location.hash = go; if (location.hash === go) route(); }));
+}
+// 일정을 누르면 관련 메일을 팝업으로 (목록 + 고른 메일 본문)
+async function relatedPopup(src, sid) {
+  drawer('관련 메일', '<div class="empty">불러오는 중…</div>', null, true);
+  let r;
+  try { r = await api(`related/${src}/${sid}`); } catch (err) { $('#layer .drawer-b').innerHTML = `<div class="empty">불러오지 못했습니다: ${esc(err.message)}</div>`; return; }
+  const goLabel = { '#eo': 'E.O 화면', '#to': 'T/O 화면', '#mold': '금형 이관 화면', '#req': '업체 요청 화면' }[r.go] || '';
+  drawer(esc(r.title), `
+    <div class="sub" style="margin-bottom:10px">${esc(r.sub || '')}</div>
+    <div class="actions" style="margin-bottom:10px">${goLabel ? `<button class="btn sm" type="button" id="rel-go">${goLabel}으로 →</button>` : ''}</div>
+    ${r.guessed ? '<div class="note-box">연결된 메일이 없어 품번(금형번호)이 들어간 메일을 보여 드립니다.</div>' : ''}
+    ${r.mails.length ? `<ul class="rows rel-list">${r.mails.map(m => `<li class="row" data-mid="${m.id}" tabindex="0"><span class="sev info"></span>
+      <div style="min-width:0"><div class="t">${esc(m.subject)}</div><div class="m">${esc(m.sender_name)} · <span class="num">${esc((m.sent_at || '').replace('T', ' ').slice(0, 16))}</span> · <span class="mono">#${m.id}</span></div></div></li>`).join('')}</ul>
+      <div id="rel-mail"></div>` : '<div class="empty">연결된 메일이 없습니다</div>'}`, (L) => {
+    const g = $('#rel-go', L); if (g) g.addEventListener('click', () => { L.innerHTML = ''; PENDING = { view: r.go.slice(1), id: sid }; location.hash = r.go; if (location.hash === r.go) route(); });
+    const show = async (li) => {
+      L.querySelectorAll('.rel-list .row').forEach(x => x.setAttribute('aria-selected', x === li));
+      const box = $('#rel-mail', L); box.innerHTML = '<div class="empty">불러오는 중…</div>';
+      const id = +li.dataset.mid;
+      try {
+        const m = await api('mail/' + id);
+        box.innerHTML = `<div class="rel-mail"><h3>${esc(m.subject)}</h3>
+          <dl class="meta"><dt>보낸사람</dt><dd>${esc(m.sender_name)} <span class="sub">&lt;${esc(m.sender_email)}&gt;</span></dd>
+            ${m.to_addr ? `<dt>받는사람</dt><dd class="clip">${esc(m.to_addr)}</dd>` : ''}
+            <dt>받은 시각</dt><dd class="num">${esc((m.sent_at || '').replace('T', ' ').slice(0, 16))} · <span class="mono">#${m.id}</span></dd>
+            ${m.attachments ? `<dt>첨부</dt><dd>${esc(m.attachments.split(/\n|, /).join(' · '))}</dd>` : ''}</dl>
+          <div class="actions"><button class="btn sm primary" type="button" id="rel-open">메일함에서 열기</button>
+            ${LIVE ? '<button class="btn sm" type="button" id="rel-ol">Outlook에서 열기</button>' : ''}</div>
+          <div class="body-text">${esc(m.body || '')}</div></div>`;
+        $('#rel-open', box).addEventListener('click', () => { L.innerHTML = ''; PENDING = { view: 'mail', id }; mailState.filter = ''; mailState.q = ''; location.hash = '#mail'; if (location.hash === '#mail') route(); });
+        const ol = $('#rel-ol', box); if (ol) ol.addEventListener('click', async () => { try { await api(`mail/${id}/open`, {}); toast('Outlook으로 열었습니다'); } catch (err) { toast(err.message); } });
+      } catch (err) { box.innerHTML = `<div class="empty">메일을 불러오지 못했습니다: ${esc(err.message)}</div>`; }
+    };
+    L.querySelectorAll('.rel-list .row').forEach(li => { li.addEventListener('click', () => show(li)); li.addEventListener('keydown', e => { if (e.key === 'Enter') show(li); }); });
+    const first = L.querySelector('.rel-list .row'); if (first) show(first);   // 가장 최근 메일을 바로 보여줌
+  });
 }
 let PENDING = null;
 
@@ -1245,7 +1359,7 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-08.9';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-09.1';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');

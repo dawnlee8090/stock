@@ -106,6 +106,16 @@ class WebAppTest(unittest.TestCase):
         self.assertEqual(len(self.get("/api/eos")), 1)
         self.assertEqual(len(self.get("/api/tos")), 1)
         self.assertEqual(len(self.get("/api/molds")), 1)
+        # 오늘 화면: 일정을 누르면 관련 메일, 차종 탭용 정보
+        self.assertIn("todo_mails", s)
+        self.assertTrue(all("cars" in x for x in s["priority"] + s["agenda"]))
+        srcs = {a["src"] for a in s["agenda"]}
+        self.assertTrue({"req", "eo"} <= srcs, srcs)
+        for a in s["agenda"]:
+            rel = self.get(f"/api/related/{a['src']}/{a['sid']}")
+            self.assertTrue(rel["title"] and isinstance(rel["mails"], list))
+        eo_a = next(a for a in s["agenda"] if a["src"] == "eo")
+        self.assertTrue(self.get(f"/api/related/eo/{eo_a['sid']}")["mails"])
         mc = self.get("/api/mailcounts")
         self.assertEqual((mc["all"], mc["todo"], mc["tags"]["E.O"]), (1, 1, 1))
 

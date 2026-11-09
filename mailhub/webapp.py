@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-08.9"
+APP_VERSION = "2026-11-09.1"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -88,43 +88,51 @@ class Data:
         to_late = [r for r in tos if T.delay_of(r)]
         mold_al = [(m, M.alerts(c, m)) for m in molds]
         mold_al = [(m, a) for m, a in mold_al if a]
+        groups, car_of = self._car_resolver(c)
+        req_cars = {r["id"]: car_of(r["subject"], self._mail_cars(c, r["mail_id"])) for r in reqs}
         prio = []
         for r in req_late:
             n = (date.fromisoformat(r["due_date"]) - today).days
             prio.append({"kind": "업체 요청", "sev": "crit" if n < 0 else "warn", "title": r["subject"],
                          "sub": r["vendor"] or r["to_addrs"], "alert": "오늘 회신 기한" if n == 0 else f"회신 {-n}일 지남",
-                         "go": "#req", "id": r["id"]})
+                         "go": "#req", "id": r["id"], "cars": req_cars[r["id"]]})
         for r in eo_late:
             prio.append({"kind": "E.O", "sev": "crit", "title": f"{r['car']} {r['part_name'] or r['part_no']}",
-                         "sub": r["change_desc"], "alert": E.delay_of(r), "go": "#eo", "id": r["id"]})
+                         "sub": r["change_desc"], "alert": E.delay_of(r), "go": "#eo", "id": r["id"], "cars": car_of(r["car"])})
         for r in to_late:
             prio.append({"kind": "T/O", "sev": "crit", "title": f"{r['part_name'] or r['part_no']} · {r['defect_type']}",
-                         "sub": r["phenomenon"], "alert": T.delay_of(r), "go": "#to", "id": r["id"]})
+                         "sub": r["phenomenon"], "alert": T.delay_of(r), "go": "#to", "id": r["id"], "cars": car_of(r["car"])})
         for m, a in mold_al:
             prio.append({"kind": "금형 이관", "sev": "warn", "title": f"{m['mold_no']} {m['part_name']} → {m['dest']}",
-                         "sub": a[0], "alert": "확인 필요", "go": "#mold", "id": m["id"]})
+                         "sub": a[0], "alert": "확인 필요", "go": "#mold", "id": m["id"], "cars": car_of(m["car"])})
         for r in todo_rows[:30]:
             prio.append({"kind": "메일", "sev": "info", "title": r["subject"], "sub": r["sender_name"],
-                         "alert": "회신 필요", "go": "#mail", "id": r["id"]})
+                         "alert": "회신 필요", "go": "#mail", "id": r["id"], "cars": car_of(cars=r["cars"])})
         lo, hi = _iso(today - timedelta(days=3)), _iso(today + timedelta(days=14))
         agenda = []
         for r in reqs:
-            agenda.append({"date": r["due_date"], "kind": "요청", "text": f"{r['vendor'] or r['to_addrs']} 회신 기한"})
+            agenda.append({"date": r["due_date"], "kind": "요청", "text": f"{r['vendor'] or r['to_addrs']} 회신 기한",
+                           "src": "req", "sid": r["id"], "cars": req_cars[r["id"]]})
         for r in eos:
             for f, label in (("review_due", "검토 회신"), ("mold_due", "금형 수정 완료"), ("verify_due", "검증")):
                 if r[f]:
-                    agenda.append({"date": r[f], "kind": "E.O", "text": f"{r['part_name'] or r['part_no']} {label}"})
+                    agenda.append({"date": r[f], "kind": "E.O", "text": f"{r['part_name'] or r['part_no']} {label}",
+                                   "src": "eo", "sid": r["id"], "cars": car_of(r["car"])})
         for r in tos:
             if r["due"]:
-                agenda.append({"date": r["due"], "kind": "T/O", "text": f"{r['part_name'] or r['part_no']} {r['defect_type']} 대책"})
+                agenda.append({"date": r["due"], "kind": "T/O", "text": f"{r['part_name'] or r['part_no']} {r['defect_type']} 대책",
+                               "src": "to", "sid": r["id"], "cars": car_of(r["car"])})
             if r["verify_due"]:
-                agenda.append({"date": r["verify_due"], "kind": "T/O", "text": f"{r['part_name'] or r['part_no']} 효과 확인"})
+                agenda.append({"date": r["verify_due"], "kind": "T/O", "text": f"{r['part_name'] or r['part_no']} 효과 확인",
+                               "src": "to", "sid": r["id"], "cars": car_of(r["car"])})
         for m in molds:
             s = M.ship(c, m["id"])
             if s and s["etd"] and not s["atd"]:
-                agenda.append({"date": s["etd"], "kind": "선적", "text": f"{m['mold_no']} ETD → {m['dest']}"})
+                agenda.append({"date": s["etd"], "kind": "선적", "text": f"{m['mold_no']} ETD → {m['dest']}",
+                               "src": "mold", "sid": m["id"], "cars": car_of(m["car"])})
             if s and s["eta"] and not s["ata"]:
-                agenda.append({"date": s["eta"], "kind": "도착", "text": f"{m['mold_no']} ETA {s['port_to']}"})
+                agenda.append({"date": s["eta"], "kind": "도착", "text": f"{m['mold_no']} ETA {s['port_to']}",
+                               "src": "mold", "sid": m["id"], "cars": car_of(m["car"])})
         agenda = sorted([a for a in agenda if lo <= a["date"] <= hi], key=lambda a: a["date"])
         recent = c.execute("SELECT * FROM mails WHERE is_mine=0 ORDER BY sent_at DESC LIMIT 6").fetchall()
         progress = c.execute("SELECT * FROM mails WHERE status IN ('진행중', '업체검토중') ORDER BY sent_at DESC").fetchall()
@@ -134,9 +142,80 @@ class Data:
                        "eo_open": len(eos), "to_late": len(to_late), "to_open": len(tos), "mold_alert": len(mold_al),
                        "mold_open": len(molds), "mail_progress": sum(1 for r in progress if r["status"] == "진행중"),
                        "mail_vendor": sum(1 for r in progress if r["status"] == "업체검토중")},
-            "priority": prio, "agenda": agenda, "recent": [self.mail_row(r) for r in recent], "last_sync": last,
-            "progress": [self.mail_row(r) for r in progress[:12]],
+            "priority": prio, "agenda": agenda, "last_sync": last,
+            "recent": [self.mail_row(r) | {"cars": car_of(cars=r["cars"])} for r in recent],
+            "progress": [self.mail_row(r) | {"cars": car_of(cars=r["cars"])} for r in progress[:200]],
+            # 차종 탭에서 그 차종의 회신 필요 메일을 다 보여주기 위한 목록
+            "todo_mails": [{"id": r["id"], "sent_at": r["sent_at"], "subject": r["subject"], "sender_name": r["sender_name"],
+                            "status": r["status"], "cars": car_of(cars=r["cars"])} for r in todo_rows[:500]],
+            "cars": [{"key": k, "name": g["name"]} for k, g in sorted(groups.items(), key=lambda x: -x[1]["count"])],
         }
+
+    def _car_resolver(self, c):
+        """차종 표기(BC4t CUV, BC4 ...)를 차종 폴더 키(BC4)로. 폴더가 있는 차종만."""
+        from .classify import car_key
+        groups = self.car_groups(c)
+        alias = {v: k for k, vs in (self.cfg.get("cars", {}).get("aliases") or {}).items() for v in [k, *vs]}
+
+        def car_of(*texts, cars: str = "") -> list[str]:
+            toks = [t for t in (cars or "").split(",") if t]
+            for t in texts:
+                toks += re.findall(r"[A-Za-z]{1,3}\d{1,2}[A-Za-z]{0,3}", t or "")
+            out = []
+            for t in toks:
+                k = car_key(alias.get(t, t))
+                if k in groups and k not in out:
+                    out.append(k)
+            return out
+        return groups, car_of
+
+    @staticmethod
+    def _mail_cars(c, mail_id) -> str:
+        if not mail_id:
+            return ""
+        r = c.execute("SELECT subject, cars FROM mails WHERE id=?", (mail_id,)).fetchone()
+        return f"{r['cars'] or ''} {r['subject']}" if r else ""
+
+    def related(self, c, src: str, sid: int) -> dict:
+        """오늘 화면 일정을 누르면 띄우는 관련 메일 (E.O·T/O·금형 이관에 연결된 메일, 업체 요청의 요청·회신 메일)."""
+        from .search import search
+        cols = "m.id, m.sent_at, m.sender_name, m.subject"
+        link = {"eo": ("eos", "eo_mails", "eo_id"), "to": ("to_issues", "to_mails", "to_id"),
+                "mold": ("molds", "mold_mails", "mold_id")}
+        if src in link:
+            tbl, lt, fk = link[src]
+            r = c.execute(f"SELECT * FROM {tbl} WHERE id=?", (sid,)).fetchone()
+            if not r:
+                raise KeyError("항목이 없습니다")
+            mails = [dict(x) for x in c.execute(f"SELECT {cols} FROM {lt} x JOIN mails m ON m.id=x.mail_id "
+                                                f"WHERE x.{fk}=? ORDER BY m.sent_at DESC LIMIT 30", (sid,))]
+            if src == "eo":
+                title, sub = f"E{sid} {r['car']} {r['part_name'] or r['part_no']}", f"{r['eo_no']} · {r['change_desc']}"
+                key = r["part_no"]
+            elif src == "to":
+                title, sub = f"T{sid} {r['part_name'] or r['part_no']} · {r['defect_type']}", r["phenomenon"]
+                key = r["part_no"]
+            else:
+                title, sub = f"M{sid} {r['mold_no']} {r['part_name']} → {r['dest']}", r["status"]
+                key = r["mold_no"]
+            guessed = False
+            if not mails and key:   # 연결된 메일이 없으면 품번(금형번호)으로 찾은 메일
+                mails = [{k: x[k] for k in ("id", "sent_at", "sender_name", "subject")}
+                         for x in search(c, "", part_no=key, limit=15)]
+                guessed = bool(mails)
+            return {"title": title, "sub": sub or "", "go": "#" + src, "mails": mails, "guessed": guessed}
+        if src == "req":
+            r = c.execute("SELECT * FROM requests WHERE id=?", (sid,)).fetchone()
+            if not r:
+                raise KeyError("항목이 없습니다")
+            ids = [i for i in (r["mail_id"], r["reply_mail_id"]) if i]
+            q = f"SELECT {cols} FROM mails m WHERE " + " OR ".join(
+                (["m.id IN (" + ",".join("?" * len(ids)) + ")"] if ids else []) + (["m.thread_key=?"] if r["thread_key"] else [])
+                or ["0"]) + " ORDER BY m.sent_at DESC LIMIT 30"
+            mails = [dict(x) for x in c.execute(q, (*ids, *([r["thread_key"]] if r["thread_key"] else [])))]
+            return {"title": f"R{sid} {r['vendor'] or r['to_addrs']} · {r['subject']}",
+                    "sub": f"회신 기한 {r['due_date']} · {r['status']}", "go": "#req", "mails": mails, "guessed": False}
+        raise KeyError("알 수 없는 항목")
 
     # ---- 메일 ----
     def mails(self, c, q: dict) -> list:
@@ -554,6 +633,8 @@ def make_handler(data: Data, port: int):
                         return self._json(sentmove.status(c, data.cfg))
                     if parts == ["mailcounts"]:
                         return self._json(data.mailcounts(c))
+                    if parts[0] == "related" and len(parts) == 3:
+                        return self._json(data.related(c, parts[1], int(parts[2])))
                     if parts == ["summary"]:
                         return self._json(data.summary(c))
                     if parts == ["mails"]:
