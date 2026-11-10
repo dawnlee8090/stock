@@ -288,6 +288,15 @@ class SentMailTest(unittest.TestCase):
             self.assertEqual([x["id"] for x in rows], [mine])
             self.assertEqual(rows[0]["is_mine"], 1)
             self.assertEqual(data.mailcounts(c)["sent"], 1)
+            for i in range(5):   # 목록 '더 보기': offset 으로 이어서
+                db.insert_mail(c, f"s{i}", {"subject": f"보낸 {i}", "sender_email": "230419@corp.co.kr", "is_mine": 1,
+                                            "sender_name": "이도현", "sent_at": f"2026-11-0{i + 1}T10:00:00"})
+            c.commit()
+            p1 = data.mails(c, {"special": ["sent"], "limit": ["4"]})
+            p2 = data.mails(c, {"special": ["sent"], "limit": ["4"], "offset": ["4"]})
+            self.assertEqual((len(p1), len(p2)), (4, 2))
+            self.assertFalse({x["id"] for x in p1} & {x["id"] for x in p2})
+            self.assertTrue(p1[-1]["sent_at"] >= p2[0]["sent_at"])
             from mailhub.search import todo
             self.assertNotIn(other, [x["id"] for x in todo(c, "2026-01-01", 100)])   # 내가 회신한 건은 회신 필요에서 빠짐
             c.close()

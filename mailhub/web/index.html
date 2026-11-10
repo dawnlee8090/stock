@@ -194,6 +194,7 @@ button.tile { text-align: left; font: inherit; color: inherit; cursor: pointer; 
 .mrow .star { position: absolute; left: 5px; top: 14px; width: 5px; height: 5px; border-radius: 50%; background: var(--crit); }
 .mrow .pick, .bulk-h .pick { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; flex: none; align-self: center; }
 .mrow.picked { background: var(--accent-weak); }
+.list-scroll .btn.more { display: block; width: calc(100% - 32px); margin: 12px 16px 18px; }
 .mrow .sent-ico { color: var(--accent); font-weight: 700; margin-right: 4px; }
 .chip.sent { background: var(--accent-weak); color: var(--accent); }
 .bulk-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 28px; font-size: 12.5px; color: var(--fg-2); }
@@ -546,7 +547,7 @@ async function demoApi(path, body) {
     if (p.get('special') === 'sent') r = r.filter(m => m.is_mine);
     else if (p.get('special') === 'autoway') r = r.filter(m => /rpabot/i.test(m.sender_email));
     else if (p.get('car') || p.get('tag')) r = r.filter(m => !/rpabot/i.test(m.sender_email));
-    return r;
+    return r.slice(+(p.get('offset') || 0), +(p.get('offset') || 0) + +(p.get('limit') || 150));
   }
   if (parts[0] === 'mail' && parts.length === 2) return D.mails.find(m => m.id === +parts[1]);
   if (base === 'mails/mark') { body.ids.forEach(i => { const m = D.mails.find(x => x.id === i); if (m) { m.status = body.status; if (body.status === '완료') m.needs_action = 0; } }); return { ok: true, count: body.ids.length }; }
@@ -860,7 +861,7 @@ async function viewMail(V) {
   const q = mailState.q, seq = ++mailLoadSeq;
   const h = V.querySelector('.list-pane .pane-h h1'), sub = V.querySelector('.list-pane .pane-h .sub');
   if (h) { h.textContent = q ? '검색 중…' : folderTitle(mailState.filter); if (sub) sub.textContent = '불러오는 중…'; }
-  const params = new URLSearchParams({ limit: 150 });
+  const params = new URLSearchParams({ limit: PAGE });
   if (q) params.set('q', q);
   if (mailState.filter === 'auto:') params.set('special', 'autoway');
   else if (mailState.filter === 'sent:') params.set('special', 'sent');
@@ -868,11 +869,12 @@ async function viewMail(V) {
   else if (mailState.filter.startsWith('@')) params.set('status', mailState.filter.slice(1));
   else if (mailState.filter === 'todo' && !q) params.set('todo', '1'); else if (mailState.filter && mailState.filter !== 'todo') params.set('tag', mailState.filter);
   const rows = await api('mails?' + params);
-  if (seq !== mailLoadSeq) return;   // 그 사이 다른 폴더·검색을 눌렀으면 예전 결과로 덮어쓰지 않음
+  if (seq !== mailLoadSeq) return;
+  const total = () => q ? 0 : (+folderCount(folderOf(folderForFilter(mailState.filter))) || 0);   // 폴더 건수는 늦게 올 수 있음   // 그 사이 다른 폴더·검색을 눌렀으면 예전 결과로 덮어쓰지 않음
   if (PENDING && PENDING.view === 'mail') { mailState.sel = PENDING.id; PENDING = null; }
   V.innerHTML = `
     <section class="list-pane"><div class="pane-h">
-      <div style="display:flex;justify-content:space-between;align-items:baseline"><h1>${q ? '검색 결과' : esc(folderTitle(mailState.filter))}</h1><span class="sub num">${rows.length >= 150 ? '최근 150건' : rows.length + '건'}</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h1>${q ? '검색 결과' : esc(folderTitle(mailState.filter))}</h1><span class="sub num" id="list-cnt"></span></div>
       ${q ? `<div class="chips"><span class="chip acc">"${esc(q)}"</span><button class="btn sm" id="clear-q" type="button">검색 지우기</button></div>` : `<div class="filters mob">${folders().filter(f => Array.isArray(f)).map(f => {
         const c = folderCount(f); return `<button class="filter" type="button" data-f="${f[0]}" aria-pressed="${mailState.filter === f[2]}">${f[1]}${c ? ` <b class="num">${c}</b>` : ''}</button>`; }).join('')}</div>`}
       ${rows.length ? `<div class="bulk-h"><label><input type="checkbox" class="pick" id="pick-all" aria-label="전체 선택"><span id="pick-lbl">전체 선택</span></label>
@@ -880,24 +882,58 @@ async function viewMail(V) {
           ${[['완료', '처리 완료'], ['진행중', '진행중'], ['업체검토중', '업체 검토중'], ['', '상태 해제']].map(([v, l]) =>
             `<button class="btn sm${v === '완료' ? ' primary' : ''}" type="button" data-bulk="${v}">${l}</button>`).join('')}
           <button class="btn sm" type="button" id="pick-clear">선택 해제</button></div></div>` : ''}
-    </div><div class="list-scroll">${rows.length ? rows.map(m => `
-      <div class="mrow${m.is_mine ? ' mine' : ''}" data-id="${m.id}" data-tags="${esc(m.tags || '')}" data-mine="${m.is_mine ? 1 : 0}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
-        <div class="l1"><input type="checkbox" class="pick" data-pick="${m.id}" aria-label="선택" title="선택 (Shift+클릭: 범위 선택)"><span class="from">${m.is_mine ? `<span class="sent-ico" title="내가 보낸 메일">↗</span>${esc(firstTo(m.to_addr) || '(받는사람 없음)')}${(m.to_addr || '').split(/[;,]/).filter(x => x.trim()).length > 1 ? ` <span class="sub">외 ${(m.to_addr || '').split(/[;,]/).filter(x => x.trim()).length - 1}명</span>` : ''}` : esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
-        <div class="subj">${esc(m.subject)}</div><div class="snip">${esc(m.snippet || '')}</div>
-        <div class="chips row-chips"${(m.tags || m.status || m.is_mine) ? '' : ' hidden'}>${rowChips(m)}</div>
-      </div>`).join('') : `<div class="empty">${mailState.filter === 'sent:' && !q && !(window.__mailcounts || {}).me_set
+    </div><div class="list-scroll">${rows.length ? rows.map(mailRowHtml).join('') + (rows.length >= PAGE ? '<button class="btn more" id="more" type="button">더 보기</button>' : '') : `<div class="empty">${mailState.filter === 'sent:' && !q && !(window.__mailcounts || {}).me_set
         ? 'config.toml 의 [me] addresses(내 메일 주소)와 names(내 이름)를 넣고 앱을 다시 켜면<br>그룹웨어에서 받은편지함으로 옮긴 내 메일이 여기에 모입니다'
         : mailState.filter === 'sent:' && !q ? '아직 수집된 보낸 메일이 없습니다<br>그룹웨어 [보낸편지함] 메일을 [받은편지함]으로 옮긴 뒤 [새 메일 받기]를 누르세요' : '조건에 맞는 메일이 없습니다'}</div>`}</div></section>
     <section class="reader" id="reader"><div class="empty" style="margin-top:12vh">왼쪽에서 메일을 고르세요</div></section>`;
   V.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { mailState.sel = null; location.hash = '#' + b.dataset.f; }));
   const cq = $('#clear-q', V); if (cq) cq.addEventListener('click', () => { mailState.q = ''; $('#q').value = ''; route(); });
-  V.querySelectorAll('.mrow').forEach(el => el.addEventListener('click', () => openMail(+el.dataset.id, V)));
+  const LS = $('.list-scroll', V);
+  LS.addEventListener('click', (e) => {   // 나중에 '더 보기'로 붙는 줄도 같이 동작하도록 목록 전체에서 받음
+    if (e.target.closest('.pick')) return;
+    const row = e.target.closest('.mrow'); if (row) openMail(+row.dataset.id, V);
+  });
+  let shown = rows.length, done = rows.length < PAGE, busy = false;
+  const cnt = () => { const c = $('#list-cnt', V), t = total(); if (c) c.textContent = t > shown ? `${shown.toLocaleString()} / ${t.toLocaleString()}건` : `${shown.toLocaleString()}건${!done && !t ? '+' : ''}`; };
+  cnt(); window.__listCnt = cnt;
+  const more = $('#more', V);
+  const loadMore = async () => {   // 150건씩 이어서 불러오기 (스크롤이 끝에 닿으면 자동)
+    if (busy || done || !more) return;
+    busy = true; more.disabled = true; more.textContent = '불러오는 중…';
+    try {
+      params.set('offset', shown);
+      const next = await api('mails?' + params);
+      if (seq !== mailLoadSeq) return;
+      const have = new Set([...V.querySelectorAll('.mrow')].map(r => r.dataset.id));
+      const fresh = next.filter(m => !have.has(String(m.id)));
+      more.insertAdjacentHTML('beforebegin', fresh.map(mailRowHtml).join(''));
+      shown += fresh.length; done = next.length < PAGE;
+      if (done) more.remove(); else { more.disabled = false; more.textContent = '더 보기'; }
+      V._bulkSync && V._bulkSync();
+      cnt();
+    } catch (err) { more.disabled = false; more.textContent = '더 보기 (다시 시도)'; toast('불러오기 실패: ' + err.message); }
+    finally { busy = false; }
+  };
+  if (more) {
+    more.addEventListener('click', loadMore);
+    if ('IntersectionObserver' in window) new IntersectionObserver((es) => { if (es.some(x => x.isIntersecting)) loadMore(); }, { root: LS, rootMargin: '400px' }).observe(more);
+  }
   setupBulk(V);
   if (mailState.sel) {
     const row = V.querySelector(`.mrow[data-id="${mailState.sel}"]`);
     if (row) row.scrollIntoView({ block: 'center' });
     openMail(mailState.sel, V);          // 목록(최근 150건)에 없어도 메일은 연다
   }
+}
+const PAGE = 150;   // 목록은 150건씩 (끝까지 내리면 다음 150건)
+function mailRowHtml(m) {
+  const tos = (m.to_addr || '').split(/[;,]/).filter(x => x.trim()).length;
+  return `
+      <div class="mrow${m.is_mine ? ' mine' : ''}" data-id="${m.id}" data-tags="${esc(m.tags || '')}" data-mine="${m.is_mine ? 1 : 0}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
+        <div class="l1"><input type="checkbox" class="pick" data-pick="${m.id}" aria-label="선택" title="선택 (Shift+클릭: 범위 선택)"><span class="from">${m.is_mine ? `<span class="sent-ico" title="내가 보낸 메일">↗</span>${esc(firstTo(m.to_addr) || '(받는사람 없음)')}${tos > 1 ? ` <span class="sub">외 ${tos - 1}명</span>` : ''}` : esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
+        <div class="subj">${esc(m.subject)}</div><div class="snip">${esc(m.snippet || '')}</div>
+        <div class="chips row-chips"${(m.tags || m.status || m.is_mine) ? '' : ' hidden'}>${rowChips(m)}</div>
+      </div>`;
 }
 function readerChips(m, tags) {
   return `${m.is_mine ? '<span class="chip sent">내가 보낸 메일</span>' : ''}${m.needs_action && m.status !== '완료' && !m.is_mine ? '<span class="chip crit">회신 필요</span>' : ''}${m.status ? pill(m.status) : ''}${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}`;
@@ -924,27 +960,28 @@ let readerMail = null;   // 지금 열려 있는 메일 {m, tags, R} (여러 통
 // 목록 여러 통 선택 → 한 번에 처리 완료 / 진행중 / 업체 검토중 / 상태 해제
 function setupBulk(V) {
   const all = $('#pick-all', V); if (!all) return;
-  const boxes = [...V.querySelectorAll('.mrow .pick')];
+  const boxes = () => [...V.querySelectorAll('.mrow .pick')];   // '더 보기'로 늘어나도 항상 지금 목록 기준
   const acts = $('#bulk-acts', V), lbl = $('#pick-lbl', V);
   let last = -1;
   const sync = () => {
-    const n = boxes.filter(b => b.checked).length;
-    boxes.forEach(b => b.closest('.mrow').classList.toggle('picked', b.checked));
-    all.checked = n > 0 && n === boxes.length; all.indeterminate = n > 0 && n < boxes.length;
+    const bs = boxes(), n = bs.filter(b => b.checked).length;
+    bs.forEach(b => b.closest('.mrow').classList.toggle('picked', b.checked));
+    all.checked = n > 0 && n === bs.length; all.indeterminate = n > 0 && n < bs.length;
     acts.hidden = !n;
     lbl.innerHTML = n ? `<span class="cnt num">${n}</span>통 선택` : '전체 선택';
   };
-  boxes.forEach((b, i) => {
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();   // 체크만 하고 메일은 열지 않음
-      if (e.shiftKey && last >= 0) { const [a, z] = [Math.min(last, i), Math.max(last, i)]; for (let k = a; k <= z; k++) boxes[k].checked = b.checked; }
-      last = i; sync();
-    });
+  V._bulkSync = sync;
+  $('.list-scroll', V).addEventListener('click', (e) => {
+    const b = e.target.closest('.mrow .pick'); if (!b) return;
+    e.stopPropagation();   // 체크만 하고 메일은 열지 않음
+    const bs = boxes(), i = bs.indexOf(b);
+    if (e.shiftKey && last >= 0) { const [a, z] = [Math.min(last, i), Math.max(last, i)]; for (let k = a; k <= z; k++) bs[k].checked = b.checked; }
+    last = i; sync();
   });
-  all.addEventListener('change', () => { boxes.forEach(b => { b.checked = all.checked; }); last = -1; sync(); });
-  $('#pick-clear', V).addEventListener('click', () => { boxes.forEach(b => { b.checked = false; }); last = -1; sync(); });
+  all.addEventListener('change', () => { boxes().forEach(b => { b.checked = all.checked; }); last = -1; sync(); });
+  $('#pick-clear', V).addEventListener('click', () => { boxes().forEach(b => { b.checked = false; }); last = -1; sync(); });
   V.querySelectorAll('[data-bulk]').forEach(btn => btn.addEventListener('click', async () => {
-    const ids = boxes.filter(b => b.checked).map(b => +b.dataset.pick);
+    const ids = boxes().filter(b => b.checked).map(b => +b.dataset.pick);
     if (!ids.length) return;
     const st = btn.dataset.bulk;
     acts.querySelectorAll('button').forEach(x => { x.disabled = true; });
@@ -953,7 +990,7 @@ function setupBulk(V) {
     acts.querySelectorAll('button').forEach(x => { x.disabled = false; });
     ids.forEach(id => paintRow(V, id, st));
     if (readerMail && ids.includes(readerMail.m.id) && V.contains(readerMail.R)) { readerMail.m.status = st; paintReader(readerMail.R, readerMail.m, readerMail.tags); }
-    boxes.forEach(b => { b.checked = false; }); last = -1; sync();
+    boxes().forEach(b => { b.checked = false; }); last = -1; sync();
     toast(!LIVE ? '예시 화면이라 저장되지 않습니다' : (st ? `${ids.length}통을 '${btn.textContent}'로 표시했습니다` : `${ids.length}통의 상태를 해제했습니다`));
     refreshSummary();   // 왼쪽 폴더 건수만 새로
   }));
@@ -1365,13 +1402,13 @@ $('#sent-done').addEventListener('click', async () => {
 });
 setInterval(refreshSent, 5 * 60 * 1000);
 async function refreshSummary() {
-  try { window.__mailcounts = await api('mailcounts'); window.__mcErr = ''; }
+  try { window.__mailcounts = await api('mailcounts'); window.__mcErr = ''; if (window.__listCnt) window.__listCnt(); }
   catch (e) { window.__mcErr = e.message || String(e); }
   try { const s = await api('summary'); window.__counts = s.counts; renderNav(s.counts);
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-10.1';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-10.2';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');

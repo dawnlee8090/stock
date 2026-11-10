@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-10.1"
+APP_VERSION = "2026-11-10.2"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -222,26 +222,27 @@ class Data:
         from .search import search, todo
         query = (q.get("q") or [""])[0]
         limit = min(int((q.get("limit") or ["150"])[0]), 500)
+        off = max(int((q.get("offset") or ["0"])[0]), 0)   # 목록 '더 보기' (150건씩)
         status = (q.get("status") or [""])[0]
         car = (q.get("car") or [""])[0]
         tag = (q.get("tag") or [None])[0]
         auto = self.autoway_senders()
         if (q.get("special") or [""])[0] == "sent":      # 보낸 메일 (그룹웨어 보낸편지함 → 받은편지함으로 옮겨 수집한 것 포함)
-            rows = search(c, query, mine=True, limit=limit, sort="date")
+            rows = search(c, query, mine=True, limit=limit, offset=off, sort="date")
         elif (q.get("special") or [""])[0] == "autoway":   # 오토웨이 접수 (RPABOT)
-            rows = search(c, query, senders_any=auto, limit=limit, sort="date")
+            rows = search(c, query, senders_any=auto, limit=limit, offset=off, sort="date")
         elif car:      # 차종 폴더 (+ 분류)
             g = self.car_groups(c).get(car)
-            rows = search(c, query, cars=(g["variants"] if g else [car]), tag=tag, exclude_senders=auto, limit=limit,
+            rows = search(c, query, cars=(g["variants"] if g else [car]), tag=tag, exclude_senders=auto, limit=limit, offset=off,
                           sort="date")
         elif tag and not query:   # 분류 폴더
-            rows = search(c, query, tag=tag, exclude_senders=auto, limit=limit, sort="date")
+            rows = search(c, query, tag=tag, exclude_senders=auto, limit=limit, offset=off, sort="date")
         elif status:   # 내가 표시한 진행 상태 (진행중 / 업체검토중 / 완료)
-            rows = search(c, query, status=status, limit=limit, sort="date")
+            rows = search(c, query, status=status, limit=limit, offset=off, sort="date")
         elif (q.get("todo") or [""])[0] == "1" and not query:
-            rows = todo(c, _iso(date.today() - timedelta(days=30)), limit)
+            rows = todo(c, _iso(date.today() - timedelta(days=30)), limit, offset=off)
         else:
-            rows = search(c, query, tag=(q.get("tag") or [None])[0], limit=limit, sort="date")   # 검색도 최근 메일이 맨 위
+            rows = search(c, query, tag=(q.get("tag") or [None])[0], limit=limit, offset=off, sort="date")   # 검색도 최근 메일이 맨 위
         return [self.mail_row(r, query) for r in rows]
 
     def autoway_senders(self) -> list[str]:

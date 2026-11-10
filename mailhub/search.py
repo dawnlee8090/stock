@@ -25,7 +25,7 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
            needs_action: bool = False, status: str | None = None, part_no: str | None = None,
            sort: str = "date", limit: int = 50, mine: bool = False,
            to: str | None = None, cars: list[str] | None = None, senders_any: list[str] | None = None,
-           exclude_senders: list[str] | None = None, like_only: bool = False) -> list[sqlite3.Row]:
+           exclude_senders: list[str] | None = None, like_only: bool = False, offset: int = 0) -> list[sqlite3.Row]:
     where, params = [], []
     use_fts = False
     for raw in split_terms(query):
@@ -90,8 +90,8 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
     covered = not use_fts and not params_touch_text(where)
     if covered:   # 폴더 목록: 색인(idx_mails_meta)만 훑어 번호를 고르고 본문은 고른 메일만 읽음
         ids_sql = "SELECT m.id FROM mails m" + (" WHERE " + " AND ".join(where) if where else "") + \
-            " ORDER BY m.sent_at DESC LIMIT ?"
-        ids = [r[0] for r in conn.execute(ids_sql, [*params, limit])]
+            " ORDER BY m.sent_at DESC LIMIT ? OFFSET ?"
+        ids = [r[0] for r in conn.execute(ids_sql, [*params, limit, offset])]
         if not ids:
             return []
         rows = {r["id"]: r for r in conn.execute(
@@ -103,15 +103,15 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY " + ("bm25(mails_fts)" if (use_fts and sort == "relevance") else "m.sent_at DESC")
-    sql += " LIMIT ?"
-    params.append(limit)
+    sql += " LIMIT ? OFFSET ?"
+    params += [limit, offset]
     rows = conn.execute(sql, params).fetchall()
-    if not rows and use_fts:
+    if not rows and use_fts and not offset:
         # 검색 색인에서 못 찾으면 (색인이 어긋났거나 특수한 띄어쓰기) 제목·보낸사람·첨부명·품번을 직접 훑어 한 번 더 찾는다
         rows = search(conn, query, sender=sender, since=since, until=until, tag=tag, has_attach=has_attach,
                       attach_name=attach_name, subject_only=subject_only, needs_action=needs_action, status=status,
                       part_no=part_no, sort="date", limit=limit, mine=mine, to=to, cars=cars,
-                      senders_any=senders_any, exclude_senders=exclude_senders, like_only=True)
+                      senders_any=senders_any, exclude_senders=exclude_senders, like_only=True, offset=offset)
     return rows
 
 
@@ -174,7 +174,7 @@ TODO_SQL = """
 SELECT m.* FROM mails m
 WHERE m.needs_action = 1 AND m.status NOT IN ('완료', '제외') AND m.sent_at >= ?
   {replied}
-ORDER BY m.sent_at DESC LIMIT ?
+ORDER BY m.sent_at DESC LIMIT ? OFFSET ?
 """
 # 같은 건(스레드)에 내가 나중에 보낸 메일이 있거나, 나중에 온 메일이 '내 회신에 대한 답장'이면 회신한 것으로 보고 제외
 NOT_REPLIED = """AND NOT EXISTS (SELECT 1 FROM mails r WHERE r.thread_key = m.thread_key AND r.thread_key != ''
@@ -182,6 +182,6 @@ NOT_REPLIED = """AND NOT EXISTS (SELECT 1 FROM mails r WHERE r.thread_key = m.th
 
 
 def todo(conn: sqlite3.Connection, since: str = "", limit: int = 50,
-         include_replied: bool = False) -> list[sqlite3.Row]:
+         include_replied: bool = False, offset: int = 0) -> list[sqlite3.Row]:
     sql = TODO_SQL.format(replied="" if include_replied else NOT_REPLIED)
-    return conn.execute(sql, (since or "", limit)).fetchall()
+    return conn.execute(sql, (since or "", limit, offset)).fetchall()
