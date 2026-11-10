@@ -194,6 +194,8 @@ button.tile { text-align: left; font: inherit; color: inherit; cursor: pointer; 
 .mrow .star { position: absolute; left: 5px; top: 14px; width: 5px; height: 5px; border-radius: 50%; background: var(--crit); }
 .mrow .pick, .bulk-h .pick { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; flex: none; align-self: center; }
 .mrow.picked { background: var(--accent-weak); }
+.mrow .sent-ico { color: var(--accent); font-weight: 700; margin-right: 4px; }
+.chip.sent { background: var(--accent-weak); color: var(--accent); }
 .bulk-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 28px; font-size: 12.5px; color: var(--fg-2); }
 .bulk-h label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .bulk-h .bulk-acts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
@@ -393,6 +395,7 @@ async function api(path, opts) {
 function buildDemo() {
   const T = (n, h = 9, m = 0) => addDays(n) + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':00';
   const mails = [
+    { id: 30415, sent_at: T(0, 9, 5), is_mine: 1, sender_name: '나 (개발1팀)', sender_email: 'me@example-corp.com', to_addr: '박성민 과장 <sm.park@hanbit-mold.example>; 김태현 차장 <th.kim@nuri-cf.example>', subject: 'RE: [NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청', tags: 'E.O,금형수정', part_nos: '86511-NX200', attachments: '', needs_action: 0, status: '', snippet: '검토서 확인했습니다. 비용 협의 후 금일 중 착수 회신드리겠습니다.', body: '박성민 과장님 안녕하세요.\n\n검토서 확인했습니다. 수정 기간 7일 OK이며, 비용은 구매팀과 협의 후 금일 중 착수 여부 회신드리겠습니다.\n검사구 체크핀 위치 수정은 누리검사구에 별도 요청하겠습니다.\n\n감사합니다.', att_text: '' },
     { id: 30412, sent_at: T(0, 8, 41), sender_name: '이준호 책임 (고객사 품질)', sender_email: 'jh.lee@oem-example.com', subject: '[NX5 CUV] 도어트림 감싸기 주름 개선대책 회신 요청 (~11/12)', tags: 'T/O,품질문제,일정', part_nos: '82305-NX100', attachments: '도어트림 주름 사진.pptx', needs_action: 1, status: '', snippet: 'LP2 이벤트에서 FR 도어트림 암레스트 감싸기 주름이 재발했습니다. 원인과 개선대책을 11/12까지 회신 부탁드립니다.', body: '안녕하십니까. 고객사 품질팀 이준호입니다.\n\nLP2 이벤트에서 FR 도어트림 암레스트 감싸기 주름이 재발했습니다 (발생률 6/40).\n첨부 사진 참고하시어 원인과 개선대책을 11/12(목)까지 회신 부탁드립니다.\n\n1. 발생 부위: 암레스트 앞쪽 코너 R부\n2. 지난 M단계 대책(접착제 도포량 증가) 적용 여부 확인 필요\n\n감사합니다.', att_text: '[첨부: 도어트림 주름 사진.pptx]\n암레스트 코너 R부 주름 / 발생 6EA / 40EA 중' },
     { id: 30398, sent_at: T(-1, 17, 12), sender_name: '박성민 과장 (한빛정밀)', sender_email: 'sm.park@hanbit-mold.example', subject: 'RE: [NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청', tags: 'E.O,금형수정', part_nos: '86511-NX200', attachments: '금형수정 검토서_86511.pdf', needs_action: 0, status: '업체검토중', snippet: '검토서 송부드립니다. 육성 후 재가공, 수정 기간 7일, 비용 180만원입니다.', body: '안녕하십니까. 한빛정밀 박성민입니다.\n\n요청하신 보스 높이 2mm 상향 건 검토서 송부드립니다.\n- 수정 방식: 코어측 육성 후 재가공\n- 수정 기간: 착수 후 7일\n- 비용: 180만원 (VAT 별도)\n- 검사구 영향: 보스 체크핀 위치 수정 필요\n\n확인 부탁드립니다.', att_text: '[첨부: 금형수정 검토서_86511.pdf]\n수정 부위 보스 4EA / 육성 2.0mm / 재가공 / 일정 7일' },
     { id: 30377, sent_at: T(-1, 10, 5), sender_name: '최유진 대리 (MSV설계)', sender_email: 'yj.choi@design-example.com', subject: '[NX5 HEV] 콘솔 브라켓 E.O 통보 (EO26-0871)', tags: 'E.O,설계반영', part_nos: '84634-NX100', attachments: 'EO26-0871.pdf, EO LIST.xlsx', needs_action: 1, status: '', snippet: '콘솔 CTR MTG 브라켓 볼트 형상 변경 E.O 통보드립니다. 금형 수정 가능 여부와 일정 회신 부탁드립니다.', body: '안녕하세요. MSV설계 최유진입니다.\n\nEO26-0871 통보드립니다.\n- 품번: 84634-NX100 BRKT ASSY-CONSOLE CTR MTG\n- 변경: IN-LINE 볼트 형상 변경, PAD 32x12 → 40x25x0.5t\n\n금형 수정 가능 여부와 일정을 11/14까지 회신 부탁드립니다.', att_text: '[첨부: EO LIST.xlsx]\nEO26-0871 / 84634-NX100 / BRKT ASSY-CONSOLE CTR MTG / PAD 형상 변경' },
@@ -529,7 +532,7 @@ async function demoApi(path, body) {
     const tg = (t) => D.mails.filter(m => (',' + m.tags + ',').includes(',' + t + ',')).length, st = (v) => D.mails.filter(m => m.status === v).length;
     return { all: D.mails.length, todo: D.mails.filter(m => m.needs_action && m.status !== '완료').length, progress: st('진행중'), vendor: st('업체검토중'), done: st('완료'),
       tags: Object.fromEntries(['E.O', 'T/O', '금형수정', '검사구', '품질문제', '금형이관'].map(t => [t, tg(t)])),
-      autoway: D.mails.filter(m => /rpabot/i.test(m.sender_email)).length,
+      autoway: D.mails.filter(m => /rpabot/i.test(m.sender_email)).length, sent: D.mails.filter(m => m.is_mine).length, me_set: true,
       cars: [['NX5', D.mails.filter(m => carOf(m) === 'NX5').length], ['AB3', 1]].map(([key, count]) => ({ key, name: key, count, tags: tagsOf(key) })) };
   }
   if (base === 'mails') {
@@ -540,7 +543,8 @@ async function demoApi(path, body) {
     if (p.get('tag')) r = r.filter(m => (',' + m.tags + ',').includes(',' + p.get('tag') + ','));
     if (p.get('status')) r = r.filter(m => m.status === p.get('status'));
     if (p.get('car')) r = r.filter(m => m.subject.includes('[' + p.get('car')) || m.subject.includes(p.get('car') + ' '));
-    if (p.get('special') === 'autoway') r = r.filter(m => /rpabot/i.test(m.sender_email));
+    if (p.get('special') === 'sent') r = r.filter(m => m.is_mine);
+    else if (p.get('special') === 'autoway') r = r.filter(m => /rpabot/i.test(m.sender_email));
     else if (p.get('car') || p.get('tag')) r = r.filter(m => !/rpabot/i.test(m.sender_email));
     return r;
   }
@@ -647,6 +651,9 @@ const FOLDERS = [['mail', '전체 메일', '', 'all'], ['mail-todo', '회신 필
 // 차종 폴더는 메일에서 자동으로 생김 (/api/mailcounts 의 cars). 지금 보고 있는 차종은 분류별로 펼침
 const TAG_SLUG = { eo: 'E.O', to: 'T/O', fix: '금형수정', cf: '검사구', quality: '품질문제', transfer: '금형이관' };
 const AUTOWAY = ['mail-autoway', '오토웨이 접수', 'auto:', 'autoway'];
+const SENT = ['mail-sent', '보낸 메일', 'sent:', 'sent'];   // 그룹웨어 보낸편지함 → 받은편지함으로 옮겨 수집한 내 메일
+// 받는사람 칸에서 첫 사람 이름 (보낸 메일 목록에 '→ 받는사람' 으로 표시)
+function firstTo(addr) { const a = (addr || '').split(/[;,]/)[0].trim(); const m = a.match(/^"?([^"<]+?)"?\s*<[^>]+>$/); return (m ? m[1] : a).trim(); }
 const curHash = () => (location.hash || '#today').slice(1);
 function carFolders() {
   const cur = curHash();
@@ -659,7 +666,7 @@ function carFolders() {
 }
 function folders() {
   const cf = carFolders();
-  return [...FOLDERS.slice(0, 5), AUTOWAY, ...(cf.length ? [null, '차종', ...cf] : []), null, '분류', ...FOLDERS.slice(6)];
+  return [...FOLDERS.slice(0, 5), SENT, AUTOWAY, ...(cf.length ? [null, '차종', ...cf] : []), null, '분류', ...FOLDERS.slice(6)];
 }
 function folderOf(hash) {
   const f = folders().find(x => Array.isArray(x) && x[0] === hash);
@@ -856,6 +863,7 @@ async function viewMail(V) {
   const params = new URLSearchParams({ limit: 150 });
   if (q) params.set('q', q);
   if (mailState.filter === 'auto:') params.set('special', 'autoway');
+  else if (mailState.filter === 'sent:') params.set('special', 'sent');
   else if (mailState.filter.startsWith('car:')) { const [car, tag] = mailState.filter.slice(4).split('|'); params.set('car', car); if (tag) params.set('tag', tag); }
   else if (mailState.filter.startsWith('@')) params.set('status', mailState.filter.slice(1));
   else if (mailState.filter === 'todo' && !q) params.set('todo', '1'); else if (mailState.filter && mailState.filter !== 'todo') params.set('tag', mailState.filter);
@@ -873,11 +881,13 @@ async function viewMail(V) {
             `<button class="btn sm${v === '완료' ? ' primary' : ''}" type="button" data-bulk="${v}">${l}</button>`).join('')}
           <button class="btn sm" type="button" id="pick-clear">선택 해제</button></div></div>` : ''}
     </div><div class="list-scroll">${rows.length ? rows.map(m => `
-      <div class="mrow" data-id="${m.id}" data-tags="${esc(m.tags || '')}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
-        <div class="l1"><input type="checkbox" class="pick" data-pick="${m.id}" aria-label="선택" title="선택 (Shift+클릭: 범위 선택)"><span class="from">${esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
+      <div class="mrow${m.is_mine ? ' mine' : ''}" data-id="${m.id}" data-tags="${esc(m.tags || '')}" data-mine="${m.is_mine ? 1 : 0}" aria-selected="${mailState.sel === m.id}">${m.needs_action && m.status !== '완료' ? '<i class="star" title="회신 필요"></i>' : ''}
+        <div class="l1"><input type="checkbox" class="pick" data-pick="${m.id}" aria-label="선택" title="선택 (Shift+클릭: 범위 선택)"><span class="from">${m.is_mine ? `<span class="sent-ico" title="내가 보낸 메일">↗</span>${esc(firstTo(m.to_addr) || '(받는사람 없음)')}${(m.to_addr || '').split(/[;,]/).filter(x => x.trim()).length > 1 ? ` <span class="sub">외 ${(m.to_addr || '').split(/[;,]/).filter(x => x.trim()).length - 1}명</span>` : ''}` : esc(m.sender_name || m.sender_email)}</span><span class="date num">${ago(m.sent_at)}</span></div>
         <div class="subj">${esc(m.subject)}</div><div class="snip">${esc(m.snippet || '')}</div>
-        <div class="chips row-chips"${(m.tags || m.status) ? '' : ' hidden'}>${rowChips(m)}</div>
-      </div>`).join('') : '<div class="empty">조건에 맞는 메일이 없습니다</div>'}</div></section>
+        <div class="chips row-chips"${(m.tags || m.status || m.is_mine) ? '' : ' hidden'}>${rowChips(m)}</div>
+      </div>`).join('') : `<div class="empty">${mailState.filter === 'sent:' && !q && !(window.__mailcounts || {}).me_set
+        ? 'config.toml 의 [me] addresses(내 메일 주소)와 names(내 이름)를 넣고 앱을 다시 켜면<br>그룹웨어에서 받은편지함으로 옮긴 내 메일이 여기에 모입니다'
+        : mailState.filter === 'sent:' && !q ? '아직 수집된 보낸 메일이 없습니다<br>그룹웨어 [보낸편지함] 메일을 [받은편지함]으로 옮긴 뒤 [새 메일 받기]를 누르세요' : '조건에 맞는 메일이 없습니다'}</div>`}</div></section>
     <section class="reader" id="reader"><div class="empty" style="margin-top:12vh">왼쪽에서 메일을 고르세요</div></section>`;
   V.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { mailState.sel = null; location.hash = '#' + b.dataset.f; }));
   const cq = $('#clear-q', V); if (cq) cq.addEventListener('click', () => { mailState.q = ''; $('#q').value = ''; route(); });
@@ -890,7 +900,7 @@ async function viewMail(V) {
   }
 }
 function readerChips(m, tags) {
-  return `${m.needs_action && m.status !== '완료' ? '<span class="chip crit">회신 필요</span>' : ''}${m.status ? pill(m.status) : ''}${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}`;
+  return `${m.is_mine ? '<span class="chip sent">내가 보낸 메일</span>' : ''}${m.needs_action && m.status !== '완료' && !m.is_mine ? '<span class="chip crit">회신 필요</span>' : ''}${m.status ? pill(m.status) : ''}${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}`;
 }
 // 목록·본문에서 상태가 바뀐 곳만 고침 (화면 전체를 다시 그리지 않아 스크롤 위치 유지)
 function paintRow(V, id, status) {
@@ -898,7 +908,8 @@ function paintRow(V, id, status) {
   if (!row) return;
   const rc = row.querySelector('.row-chips');
   const tags = row.dataset.tags || '';
-  rc.innerHTML = rowChips({ status, tags }); rc.hidden = !(tags || status);
+  const is_mine = row.dataset.mine === '1';
+  rc.innerHTML = rowChips({ status, tags, is_mine }); rc.hidden = !(tags || status || is_mine);
   const star = row.querySelector('.star');
   if (star && status === '완료') star.remove();
 }
@@ -948,7 +959,7 @@ function setupBulk(V) {
   }));
 }
 function rowChips(m) {
-  return `${m.status ? pill(m.status) : ''}${(m.tags || '').split(',').filter(Boolean).slice(0, 4).map(t => `<span class="tag">${esc(t)}</span>`).join('')}`;
+  return `${m.is_mine ? '<span class="chip sent">보낸 메일</span>' : ''}${m.status ? pill(m.status) : ''}${(m.tags || '').split(',').filter(Boolean).slice(0, 4).map(t => `<span class="tag">${esc(t)}</span>`).join('')}`;
 }
 async function openMail(id, V) {
   mailState.sel = id;
@@ -964,7 +975,8 @@ async function openMail(id, V) {
     <div class="chips" id="rd-chips" style="margin-bottom:8px">${readerChips(m, tags)}</div>
     <h1>${esc(m.subject)}</h1>
     <dl class="meta"><dt>보낸사람</dt><dd>${esc(m.sender_name)} <span class="sub">&lt;${esc(m.sender_email)}&gt;</span></dd>
-      <dt>받은 시각</dt><dd class="num">${esc((m.sent_at || '').replace('T', ' ').slice(0, 16))} · <span class="mono">#${m.id}</span></dd>
+      ${m.is_mine && m.to_addr ? `<dt>받는사람</dt><dd>${esc(m.to_addr)}</dd>` : ''}
+      <dt>${m.is_mine ? '보낸 시각' : '받은 시각'}</dt><dd class="num">${esc((m.sent_at || '').replace('T', ' ').slice(0, 16))} · <span class="mono">#${m.id}</span></dd>
       ${m.part_nos ? `<dt>품번</dt><dd class="mono">${esc(m.part_nos.split(',').slice(0, 8).join(', '))}</dd>` : ''}
       ${m.attachments ? `<dt>첨부</dt><dd>${esc(m.attachments.split(/\n|, /).join(' · '))}</dd>` : ''}</dl>
     <div class="actions">
@@ -1359,7 +1371,7 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-09.1';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-10.1';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');

@@ -100,10 +100,24 @@ class Classifier:
         me = cfg.get("me", {})
         self.my_addrs = {a.lower() for a in me.get("addresses", []) if a and "company.com" not in a}
         self.my_names = [n for n in me.get("names", []) if n]
+        self.my_domains = {a.split("@", 1)[1] for a in self.my_addrs if "@" in a}
         cars = cfg.get("cars", {})
         self.car_known = {k for k, v in (cars.get("aliases") or {}).items()} | \
             {x for v in (cars.get("aliases") or {}).values() for x in v} | set(cars.get("known", []))
         self.car_ignore = set(cars.get("ignore", []))
+
+    def is_my_mail(self, sender_email: str, sender_name: str = "", folder: str = "") -> bool:
+        """내가 보낸 메일인지. 보낸편지함에서 왔거나, 보낸사람 주소가 내 주소이거나,
+        (그룹웨어가 주소를 다르게 붙여도) 보낸사람 이름이 내 이름이고 회사 도메인이 같으면."""
+        email_l = (sender_email or "").strip().lower()
+        if email_l in self.my_addrs or any(f in (folder or "").lower() for f in SENT_FOLDERS):
+            return True
+        name = re.sub(r"\s+", "", sender_name or "")
+        if not name or not self.my_names:
+            return False
+        dom = email_l.split("@", 1)[1] if "@" in email_l else ""
+        same_co = dom in self.my_domains if self.my_domains else True
+        return same_co and any(re.sub(r"\s+", "", n) and name.startswith(re.sub(r"\s+", "", n)) for n in self.my_names)
 
     def _addressed_to_me(self, to_addr: str) -> bool:
         """받는사람(To)에 내가 있는지. 설정이 없으면 판단 불가 → True."""
@@ -155,7 +169,7 @@ class Classifier:
 
         sender = (rec.get("sender_email") or "").lower()
         folder = (rec.get("folder") or "").lower()
-        is_mine = int(sender in self.my_addrs or any(f in folder for f in SENT_FOLDERS))
+        is_mine = int(self.is_my_mail(sender, rec.get("sender_name", ""), folder))
 
         # 조치 필요: 내가 보낸 메일 X, 내가 받는사람(To)에 있음 (참조만이면 X), 공지·알림·단체메일 X,
         #            제목/최신 본문에 요청 키워드

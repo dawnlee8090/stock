@@ -253,3 +253,41 @@ class RestartTest(unittest.TestCase):
                 webapp.serve(None, port=port, open_window=False, log=logs.append)
             self.assertTrue(any("예전 버전 앱 엔진" in x for x in logs), logs)
             self.assertTrue(any("업무 비서 앱: " in x for x in logs), logs)   # 새 엔진으로 시작
+
+
+class SentMailTest(unittest.TestCase):
+    """그룹웨어 보낸편지함 → 받은편지함으로 옮겨 수집한 내 메일을 '보낸 메일'로."""
+
+    def test_moved_sent_mails_become_mine(self):
+        from mailhub.classify import Classifier
+        from mailhub.webapp import mark_my_mails
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t)
+            cfg = load_config(d / "none.toml")
+            cfg["archive"]["db_path"] = str(d / "m.db")
+            cfg["me"] = {"addresses": ["dh.lee@corp.co.kr"], "names": ["이도현"]}
+            clf = Classifier(cfg)
+            self.assertTrue(clf.is_my_mail("DH.Lee@corp.co.kr", "", "받은편지함"))
+            self.assertTrue(clf.is_my_mail("dohyun@corp.co.kr", "이도현 책임", "받은편지함"))   # 그룹웨어 별칭 주소
+            self.assertFalse(clf.is_my_mail("lee@vendor.com", "이도현", "받은편지함"))         # 다른 회사 동명이인
+            self.assertFalse(clf.is_my_mail("x@corp.co.kr", "김철수", "받은편지함"))
+            c = db.connect(cfg["archive"]["db_path"])
+            # 예전 버전으로 '받은 메일'로 저장된 내 메일 + 업체 메일
+            mine = db.insert_mail(c, "k1", {"subject": "RE: 범퍼 검토", "sender_name": "이도현 책임",
+                                           "sender_email": "dohyun@corp.co.kr", "sent_at": "2026-11-09T18:00:00",
+                                           "needs_action": 1, "thread_key": "범퍼 검토"})
+            other = db.insert_mail(c, "k2", {"subject": "범퍼 검토", "sender_name": "업체", "sender_email": "a@v.com",
+                                            "sent_at": "2026-11-09T09:00:00", "needs_action": 1, "thread_key": "범퍼 검토"})
+            c.commit()
+            data = Data(cfg)
+            self.assertEqual(mark_my_mails(data), 1)
+            self.assertEqual(mark_my_mails(data), 0)   # 설정이 그대로면 다시 훑지 않음
+            r = c.execute("SELECT is_mine, needs_action FROM mails WHERE id=?", (mine,)).fetchone()
+            self.assertEqual((r[0], r[1]), (1, 0))
+            rows = data.mails(c, {"special": ["sent"]})
+            self.assertEqual([x["id"] for x in rows], [mine])
+            self.assertEqual(rows[0]["is_mine"], 1)
+            self.assertEqual(data.mailcounts(c)["sent"], 1)
+            from mailhub.search import todo
+            self.assertNotIn(other, [x["id"] for x in todo(c, "2026-01-01", 100)])   # 내가 회신한 건은 회신 필요에서 빠짐
+            c.close()

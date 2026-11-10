@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-09.1"
+APP_VERSION = "2026-11-10.1"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -66,7 +66,7 @@ class Data:
         from .search import snippet
         from .textutil import readable_body
         return {k: r[k] for k in ("id", "sent_at", "sender_name", "sender_email", "subject", "tags", "part_nos",
-                                  "attachments", "needs_action", "status")} | {
+                                  "attachments", "needs_action", "status", "is_mine")} | {"to_addr": (r["to_addr"] or "")[:300]} | {
             "snippet": snippet(readable_body(r["body"]), q, att_text=r["att_text"])}
 
     def img_url(self, path: str) -> str:
@@ -226,7 +226,9 @@ class Data:
         car = (q.get("car") or [""])[0]
         tag = (q.get("tag") or [None])[0]
         auto = self.autoway_senders()
-        if (q.get("special") or [""])[0] == "autoway":   # 오토웨이 접수 (RPABOT)
+        if (q.get("special") or [""])[0] == "sent":      # 보낸 메일 (그룹웨어 보낸편지함 → 받은편지함으로 옮겨 수집한 것 포함)
+            rows = search(c, query, mine=True, limit=limit, sort="date")
+        elif (q.get("special") or [""])[0] == "autoway":   # 오토웨이 접수 (RPABOT)
             rows = search(c, query, senders_any=auto, limit=limit, sort="date")
         elif car:      # 차종 폴더 (+ 분류)
             g = self.car_groups(c).get(car)
@@ -253,7 +255,7 @@ class Data:
 
     def _meta_rows(self, c) -> list:
         """(tags, cars, status, sender_email, sender_name) 전체 - 색인(idx_mails_meta)만 읽어 빠름."""
-        return c.execute("SELECT tags, cars, status, sender_email, sender_name FROM mails").fetchall()
+        return c.execute("SELECT tags, cars, status, is_mine, sender_email, sender_name FROM mails").fetchall()
 
     def _is_auto(self, email: str, name: str) -> bool:
         who = f"{email or ''} {name or ''}".lower()
@@ -316,7 +318,12 @@ class Data:
                 for g in sorted(groups.values(), key=lambda g: -g["count"])]
         return {"all": len(rows), "todo": len(todo(c, _iso(date.today() - timedelta(days=30)), 10 ** 6)),
                 "progress": status["진행중"], "vendor": status["업체검토중"], "done": status["완료"],
-                "autoway": auto, "tags": {t: tags[t] for t in self.TAGS}, "cars": cars}
+                "autoway": auto, "tags": {t: tags[t] for t in self.TAGS}, "cars": cars,
+                "sent": sum(1 for r in rows if r["is_mine"]), "me_set": self.me_set()}
+
+    def me_set(self) -> bool:
+        me = self.cfg.get("me", {})
+        return bool([a for a in me.get("addresses", []) if a and "company.com" not in a] or [n for n in me.get("names", []) if n])
 
     def mail(self, c, mid: int) -> dict:
         r = c.execute("SELECT * FROM mails WHERE id=?", (mid,)).fetchone()
@@ -564,6 +571,7 @@ class Data:
             r = subprocess.run([py, "-m", "mailhub", *cfg_args, *st], capture_output=True, text=True, encoding="utf-8",
                                errors="replace", timeout=1800, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
             out += r.stdout + r.stderr
+        mark_my_mails(self, recent_days=30)   # 받은편지함으로 옮겨 온 내 보낸 메일도 '보낸 메일'로
         m = re.search(r"신규 ([\d,]+)", out)
         added = int(m.group(1).replace(",", "")) if m else 0
         return {"ok": True, "added": added, "message": f"새 메일 {added}건을 받았습니다" if m else "점검을 마쳤습니다"}
@@ -740,6 +748,37 @@ def open_app_window(url: str) -> None:
     webbrowser.open(url)
 
 
+def mark_my_mails(data: "Data", recent_days: int | None = None, log=None) -> int:
+    """보낸사람이 나인데 '받은 메일'로 저장된 메일(그룹웨어 보낸편지함 → 받은편지함으로 옮겨 수집)을 '보낸 메일'로 고친다.
+    내가 보낸 메일은 회신 필요에서 빠지고, 같은 건의 받은 메일은 '회신함'으로 처리된다."""
+    from .classify import Classifier
+    clf = Classifier(data.cfg)
+    if not (clf.my_addrs or clf.my_names):
+        return 0
+    c = data.conn()
+    try:
+        c.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+        sig = repr((sorted(clf.my_addrs), clf.my_names))
+        if recent_days is None:   # 앱을 켤 때: 내 주소·이름 설정이 바뀌었을 때만 전체 확인
+            row = c.execute("SELECT value FROM meta WHERE key='mine_backfilled'").fetchone()
+            if row and row[0] == sig:
+                return 0
+        since = _iso(date.today() - timedelta(days=recent_days)) if recent_days else ""
+        ids = [r["id"] for r in c.execute("SELECT id, sender_email, sender_name, folder FROM mails WHERE is_mine=0 AND sent_at >= ?",
+                                          (since,)) if clf.is_my_mail(r["sender_email"], r["sender_name"], r["folder"])]
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            c.execute(f"UPDATE mails SET is_mine=1, needs_action=0, quotes_me=0 WHERE id IN ({','.join('?' * len(chunk))})", chunk)
+        if recent_days is None:
+            c.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('mine_backfilled', ?)", (sig,))
+        c.commit()
+        if ids and log:
+            log(f"내가 보낸 메일 {len(ids):,}건을 '보낸 메일'로 분류했습니다.")
+        return len(ids)
+    finally:
+        c.close()
+
+
 def backfill_cars(data: "Data", log=print, force: bool = False) -> int:
     """차종 폴더용 차종 정보(mails.cars)를 예전 메일에 한 번 채운다 (retag 를 안 해도 되게)."""
     from .classify import Classifier, latest_part
@@ -823,6 +862,7 @@ def serve(cfg_path: str | None = None, port: int = 8765, open_window: bool = Tru
     from . import sentmove
     sentmove.Scheduler(data.conn, cfg, data.sync, log).start()   # 평일 19~22시 보낸메일 옮기기 알림
     threading.Thread(target=backfill_cars, args=(data, log), daemon=True).start()   # 차종 정보가 없는 예전 메일 채우기
+    threading.Thread(target=mark_my_mails, args=(data,), kwargs={"log": log}, daemon=True).start()   # 받은편지함으로 옮긴 내 메일
     if open_window:
         threading.Timer(0.6, open_app_window, args=(url,)).start()
     try:
