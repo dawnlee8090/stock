@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-11.1"
+APP_VERSION = "2026-11-11.2"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -238,6 +238,8 @@ class Data:
         query = (q.get("q") or [""])[0]
         limit = min(int((q.get("limit") or ["150"])[0]), 500)
         off = max(int((q.get("offset") or ["0"])[0]), 0)   # 목록 '더 보기' (150건씩)
+        d = (q.get("dir") or [""])[0]   # sent = 보낸 메일만, recv = 받은 메일만 (검색 결과·전체 메일 필터)
+        dk = {"mine": True} if d == "sent" else ({"received": True} if d == "recv" else {})
         status = (q.get("status") or [""])[0]
         car = (q.get("car") or [""])[0]
         tag = (q.get("tag") or [None])[0]
@@ -245,19 +247,19 @@ class Data:
         if (q.get("special") or [""])[0] == "sent":      # 보낸 메일 (그룹웨어 보낸편지함 → 받은편지함으로 옮겨 수집한 것 포함)
             rows = search(c, query, mine=True, limit=limit, offset=off, sort="date")
         elif (q.get("special") or [""])[0] == "autoway":   # 오토웨이 접수 (RPABOT)
-            rows = search(c, query, senders_any=auto, limit=limit, offset=off, sort="date")
+            rows = search(c, query, **dk, senders_any=auto, limit=limit, offset=off, sort="date")
         elif car:      # 차종 폴더 (+ 분류)
             g = self.car_groups(c).get(car)
-            rows = search(c, query, cars=(g["variants"] if g else [car]), tag=tag, exclude_senders=auto, limit=limit, offset=off,
+            rows = search(c, query, **dk, cars=(g["variants"] if g else [car]), tag=tag, exclude_senders=auto, limit=limit, offset=off,
                           sort="date")
         elif tag and not query:   # 분류 폴더
-            rows = search(c, query, tag=tag, exclude_senders=auto, limit=limit, offset=off, sort="date")
+            rows = search(c, query, **dk, tag=tag, exclude_senders=auto, limit=limit, offset=off, sort="date")
         elif status:   # 내가 표시한 진행 상태 (진행중 / 업체검토중 / 완료)
-            rows = search(c, query, status=status, limit=limit, offset=off, sort="date")
+            rows = search(c, query, **dk, status=status, limit=limit, offset=off, sort="date")
         elif (q.get("todo") or [""])[0] == "1" and not query:
             rows = todo(c, _iso(date.today() - timedelta(days=30)), limit, offset=off)
         else:
-            rows = search(c, query, tag=(q.get("tag") or [None])[0], limit=limit, offset=off, sort="date")   # 검색도 최근 메일이 맨 위
+            rows = search(c, query, **dk, tag=(q.get("tag") or [None])[0], limit=limit, offset=off, sort="date")   # 검색도 최근 메일이 맨 위
         return [self.mail_row(r, query) for r in rows]
 
     def autoway_senders(self) -> list[str]:
@@ -349,6 +351,35 @@ class Data:
         from .textutil import readable_body
         d.update(body=readable_body(r["body"])[:30000], att_text=(r["att_text"] or "")[:20000])
         return d
+
+    def mail_related(self, c, mid: int) -> dict:
+        """메일을 열 때 참고로 보여줄 관련 메일: 같은 건(RE/FW 스레드) + 같은 품번이 들어간 다른 건."""
+        r = c.execute("SELECT id, thread_key, part_nos FROM mails WHERE id=?", (mid,)).fetchone()
+        if not r:
+            raise KeyError(f"#{mid} 메일이 없습니다")
+        cols = "id, sent_at, sender_name, sender_email, to_addr, subject, is_mine, status, thread_key"
+        pick = lambda x: {k: x[k] for k in ("id", "sent_at", "sender_name", "sender_email", "subject", "is_mine", "status")} | \
+            {"to_addr": (x["to_addr"] or "")[:200]}
+        thread = [pick(x) for x in c.execute(
+            f"SELECT {cols} FROM mails WHERE thread_key=? AND thread_key != '' AND id != ? ORDER BY sent_at DESC LIMIT 40",
+            (r["thread_key"] or "", mid))] if r["thread_key"] else []
+        seen = {mid, *(x["id"] for x in thread)}
+        parts_out, pnos = [], [p for p in (r["part_nos"] or "").split(",") if len(p) >= 5][:3]
+        for pn in pnos:   # 품번은 검색 색인(part_nos 칸)으로 빠르게
+            try:
+                ids = [x[0] for x in c.execute("SELECT rowid FROM mails_fts WHERE mails_fts MATCH ? ORDER BY rowid DESC LIMIT 60",
+                                               ('part_nos : "' + pn.replace('"', '') + '"',))]
+            except Exception:
+                ids = []
+            if not ids:
+                continue
+            for x in c.execute(f"SELECT {cols} FROM mails WHERE id IN ({','.join('?' * len(ids))}) ORDER BY sent_at DESC", ids):
+                if x["id"] in seen or (x["thread_key"] and x["thread_key"] == r["thread_key"]):
+                    continue
+                seen.add(x["id"])
+                parts_out.append(pick(x) | {"part_no": pn})
+        parts_out.sort(key=lambda x: x["sent_at"], reverse=True)
+        return {"thread": thread, "parts": parts_out[:30], "part_nos": pnos}
 
     def original_html(self, c, mid: int) -> str:
         """메일 원본의 HTML(표·서식·본문 이미지 포함). 스크립트·외부 연결은 응답 헤더(CSP)로 막는다."""
@@ -705,6 +736,8 @@ def make_handler(data: Data, port: int):
                         self.end_headers()
                         self.wfile.write(body)
                         return
+                    if parts[0] == "mail" and len(parts) == 3 and parts[2] == "related":
+                        return self._json(data.mail_related(c, int(parts[1])))
                     if parts[0] == "mail" and len(parts) == 2:
                         return self._json(data.mail(c, int(parts[1])))
                     if parts == ["reqs"]:

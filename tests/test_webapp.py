@@ -352,3 +352,34 @@ class HistoryTest(unittest.TestCase):
         from mailhub.ai import history_key, parse_draft
         self.assertEqual(parse_draft("제목: A 요청\n본문:\n안녕하세요\n"), {"subject": "A 요청", "body": "안녕하세요\n"})
         self.assertEqual(history_key("q", [3, 1]), history_key("q", [1, 3]))
+
+
+class RelatedMailTest(unittest.TestCase):
+    """검색 결과 받은/보낸 필터 + 메일을 열 때 관련 메일(같은 건·같은 품번)."""
+
+    def test_dir_filter_and_related(self):
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t)
+            cfg = load_config(d / "none.toml")
+            cfg["archive"]["db_path"] = str(d / "m.db")
+            c = db.connect(cfg["archive"]["db_path"])
+            ins = lambda k, **r: db.insert_mail(c, k, r)
+            a = ins("1", subject="콘솔 문제점 개선 요청", is_mine=1, sent_at="2026-11-01T10:00:00", thread_key="콘솔 문제점 개선 요청",
+                    part_nos="84650-NX100")
+            b = ins("2", subject="RE: 콘솔 문제점 개선 요청", sent_at="2026-11-02T10:00:00", thread_key="콘솔 문제점 개선 요청",
+                    sender_name="업체")
+            p = ins("3", subject="콘솔 UPR 측정 결과", sent_at="2026-11-03T10:00:00", thread_key="콘솔 upr 측정 결과",
+                    part_nos="84650-NX100,12345-AA000")
+            ins("4", subject="범퍼 일정", sent_at="2026-11-04T10:00:00", thread_key="범퍼 일정", part_nos="86511-NX200")
+            c.commit()
+            data = Data(cfg)
+            ids = lambda q: [x["id"] for x in data.mails(c, q)]
+            self.assertEqual(ids({"q": ["콘솔"], "dir": ["sent"]}), [a])
+            self.assertEqual(ids({"q": ["콘솔"], "dir": ["recv"]}), [p, b])
+            self.assertEqual(len(ids({"q": ["콘솔"]})), 3)
+            self.assertEqual(ids({"dir": ["sent"]}), [a])                      # 전체 메일 폴더에서도
+            r = data.mail_related(c, a)
+            self.assertEqual([x["id"] for x in r["thread"]], [b])
+            self.assertEqual([(x["id"], x["part_no"]) for x in r["parts"]], [(p, "84650-NX100")])
+            self.assertEqual(data.mail_related(c, b)["parts"], [])            # 품번 없는 메일
+            c.close()

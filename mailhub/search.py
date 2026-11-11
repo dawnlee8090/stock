@@ -25,7 +25,8 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
            needs_action: bool = False, status: str | None = None, part_no: str | None = None,
            sort: str = "date", limit: int = 50, mine: bool = False,
            to: str | None = None, cars: list[str] | None = None, senders_any: list[str] | None = None,
-           exclude_senders: list[str] | None = None, like_only: bool = False, offset: int = 0) -> list[sqlite3.Row]:
+           exclude_senders: list[str] | None = None, like_only: bool = False, offset: int = 0,
+           received: bool = False) -> list[sqlite3.Row]:
     where, params = [], []
     use_fts = False
     for raw in split_terms(query):
@@ -83,6 +84,8 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
         params += p
     if mine:
         where.append("m.is_mine = 1")
+    if received:   # 받은 메일만 (내가 보낸 메일 제외)
+        where.append("m.is_mine = 0")
     if to:
         where.append("(m.to_addr LIKE ? OR m.cc_addr LIKE ?)")
         params += [f"%{to}%"] * 2
@@ -111,7 +114,8 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
         rows = search(conn, query, sender=sender, since=since, until=until, tag=tag, has_attach=has_attach,
                       attach_name=attach_name, subject_only=subject_only, needs_action=needs_action, status=status,
                       part_no=part_no, sort="date", limit=limit, mine=mine, to=to, cars=cars,
-                      senders_any=senders_any, exclude_senders=exclude_senders, like_only=True, offset=offset)
+                      senders_any=senders_any, exclude_senders=exclude_senders, like_only=True, offset=offset,
+                      received=received)
     return rows
 
 
