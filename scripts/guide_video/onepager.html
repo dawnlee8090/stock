@@ -1,0 +1,48 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+body{width:1600px;height:900px;font-family:"IBM Plex Sans KR",sans-serif;color:#fff;
+ background:radial-gradient(1100px 700px at 75% 15%,#16426a 0%,#0b1a2e 60%,#07111f 100%);padding:44px 52px;display:grid;grid-template-columns:1fr 470px;gap:36px}
+.tag{display:inline-block;background:#2563eb;color:#fff;font-weight:700;font-size:15px;padding:6px 12px;border-radius:6px;margin-right:10px}
+.top{font-size:16px;color:#9fc3e6;font-weight:600;margin-bottom:18px}
+h1{font-size:50px;line-height:1.2;font-weight:700;margin-bottom:12px}
+h2{font-size:24px;color:#7cc4ff;font-weight:600;margin-bottom:12px}
+.lead{font-size:17px;line-height:1.6;color:#c9d7e6;margin-bottom:22px}
+.shot{border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.18);box-shadow:0 20px 50px rgba(0,0,0,.45);position:relative}
+.shot{height:540px}.shot img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.shot .lb{position:absolute;right:12px;bottom:10px;font-size:12px;background:rgba(7,17,31,.8);padding:4px 8px;border-radius:5px;color:#c9d7e6}
+aside{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:24px 26px;display:flex;flex-direction:column}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.meta div{background:rgba(255,255,255,.06);border-radius:10px;padding:10px 14px}
+.meta small{display:block;font-size:13px;color:#9fc3e6}.meta b{font-size:17px}
+h3{font-size:20px;margin-bottom:12px}
+ol{list-style:none;display:grid;gap:14px;counter-reset:n}
+li{display:grid;grid-template-columns:38px 1fr;gap:12px;align-items:start;counter-increment:n}
+li:before{content:counter(n);width:34px;height:34px;border-radius:50%;background:#2563eb;display:grid;place-items:center;font-weight:700;font-size:16px}
+li b{display:block;font-size:17px;margin-bottom:2px}
+li span{font-size:13.5px;color:#c9d7e6;line-height:1.45}
+.fx{margin-top:auto;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fx div{text-align:center}.fx b{display:block;font-size:26px;color:#ffd166}.fx small{font-size:13px;color:#c9d7e6}
+.sec{margin-top:10px;font-size:12.5px;color:#8aa3bd}
+</style></head><body>
+<main>
+ <div class="top"><span class="tag">IDEA 01</span>E-NOVATION · AI 업무 생산성 · 실사용 검증 완료</div>
+ <h1>AI 개발 업무 비서</h1>
+ <h2>놓친 메일은 3초 안에, 회신 초안은 1분 안에</h2>
+ <p class="lead">고객사 · 금형업체 · 검사구업체 · 현지 법인 메일(E.O · T/O · 금형 수정 · 금형 이관)을 내 PC 한 곳에 모아<br>첨부 속 글자까지 검색하고, 회신 근거 정리와 회신 초안을 AI가 만들어 줍니다.</p>
+ <div class="shot"><img src="today.png" alt=""><span class="lb">[오늘] 화면 · 시연용 가상 데이터</span></div>
+</main>
+<aside>
+ <div class="meta"><div><small>분류</small><b>업무 효율화</b></div><div><small>구분</small><b>AI S/W 적용</b></div></div>
+ <h3>주요 기능 및 기대 효과</h3>
+ <ol>
+  <li><div><b>누락 메일 3초 검색</b><span>서버 + PST 백업 통합, 첨부 엑셀 · PPT · PDF 안 품번까지 검색</span></div></li>
+  <li><div><b>회신 근거 · 초안 자동 작성</b><span>요약 · 요청사항 표 · 근거 메일 번호 · 회신 초안 (발송은 본인 확인)</span></div></li>
+  <li><div><b>기한 · 지연 알림</b><span>[오늘] 한 화면: 회신 필요 · 업체 기한 · E.O / T/O 지연 · 이관 서류</span></div></li>
+  <li><div><b>E.O · T/O · 이관 이력 자산화</b><span>E.O 자동 기입, T/O 재발 감지 · 과거 대책 추천, 이관 서류 체크</span></div></li>
+ </ol>
+ <div class="fx"><div><b>약 1시간/일</b><small>1인 업무 시간 절감 (예상)</small></div><div><b>월 약 20시간</b><small>시범 적용 후 실측 확정</small></div></div>
+ <div class="sec">보안: 메일 DB는 담당자 PC에만 저장 · 자동 발송 없음 · 기록 변경은 담당자 확인 후</div>
+</aside>
+</body></html>
