@@ -300,3 +300,55 @@ class SentMailTest(unittest.TestCase):
             from mailhub.search import todo
             self.assertNotIn(other, [x["id"] for x in todo(c, "2026-01-01", 100)])   # 내가 회신한 건은 회신 필요에서 빠짐
             c.close()
+
+
+class HistoryTest(unittest.TestCase):
+    """주제별 이력 정리 (예: CONSOLE 문제점) + 업체 메일 초안."""
+
+    def test_history_threads_and_draft(self):
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t)
+            cfg = load_config(d / "none.toml")
+            cfg["archive"]["db_path"] = str(d / "m.db")
+            cfg["me"] = {"addresses": ["me@corp.co.kr"], "names": ["나"], "intro": "개발팀 나입니다.", "signature": "나 / 개발팀"}
+            c = db.connect(cfg["archive"]["db_path"])
+            ins = lambda k, **r: db.insert_mail(c, k, r)
+            a = ins("1", subject="[NX5] CONSOLE UPR 유격 개선 요청", sender_name="나", sender_email="me@corp.co.kr", is_mine=1,
+                    to_addr="한영수 <ys.han@mold.co.kr>", sent_at="2026-10-20T10:00:00", body="유격 1.2mm 원인 대책 요청",
+                    thread_key="[nx5] console upr 유격 개선 요청")
+            b = ins("2", subject="RE: [NX5] CONSOLE UPR 유격 개선 요청", sender_name="한영수", sender_email="ys.han@mold.co.kr",
+                    to_addr="나 <me@corp.co.kr>", sent_at="2026-10-25T10:00:00", body="리브 보강하겠습니다",
+                    thread_key="[nx5] console upr 유격 개선 요청")
+            other = ins("3", subject="범퍼 일정", sender_name="x", sender_email="x@y.com", sent_at="2026-10-26T10:00:00", body="일정")
+            c.commit()
+            data = Data(cfg)
+            h = data.history(c, {"q": ["CONSOLE 문제점"]})
+            self.assertEqual(h["search"], "CONSOLE")
+            self.assertEqual(h["ignored"], ["문제점"])
+            self.assertEqual([m["id"] for m in h["mails"]], [a, b])          # 날짜순
+            self.assertEqual(len(h["threads"]), 1)
+            self.assertEqual(h["threads"][0]["state"], "진행")                 # 마지막이 업체 회신
+            self.assertEqual(h["vendor"]["to"], "ys.han@mold.co.kr")
+            self.assertNotIn(other, [m["id"] for m in h["mails"]])
+            # RE: 메일은 검색어가 본문에 없어도 같은 건으로 따라옴
+            h2 = data.history(c, {"q": ["유격"]})
+            self.assertEqual({m["id"] for m in h2["mails"]}, {a, b})
+            dr = data.post(c, ["draft", "make", ""], {"q": "CONSOLE 문제점", "ids": [a, b], "due": "2026-11-14",
+                                                     "vendor_name": "한영수", "note": "T3 측정 데이터"})
+            self.assertIn("~11/14", dr["subject"])
+            self.assertIn("한영수님 안녕하세요.", dr["body"])
+            self.assertIn("10/20 [당사 요청]", dr["body"])
+            self.assertIn("4. T3 측정 데이터", dr["body"])
+            self.assertIn("나 / 개발팀", dr["body"])
+            self.assertNotIn(f"#{a}", dr["body"])                              # 업체 메일에는 내부 메일 번호를 쓰지 않음
+            r = data.post(c, ["req", "add", ""], {"to": "ys.han@mold.co.kr", "subject": dr["subject"], "due": "2026-11-14",
+                                                 "mail_id": b, "vendor": "mold.co.kr"})
+            self.assertEqual(c.execute("SELECT due_date, mail_id FROM requests WHERE id=?", (r["id"],)).fetchone()[:], ("2026-11-14", b))
+            with self.assertRaises(ValueError):
+                data.history(c, {"q": [""]})
+            c.close()
+
+    def test_parse_claude_draft(self):
+        from mailhub.ai import history_key, parse_draft
+        self.assertEqual(parse_draft("제목: A 요청\n본문:\n안녕하세요\n"), {"subject": "A 요청", "body": "안녕하세요\n"})
+        self.assertEqual(history_key("q", [3, 1]), history_key("q", [1, 3]))

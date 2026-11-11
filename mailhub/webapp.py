@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-10.2"
+APP_VERSION = "2026-11-11.1"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -150,6 +150,21 @@ class Data:
                             "status": r["status"], "cars": car_of(cars=r["cars"])} for r in todo_rows[:500]],
             "cars": [{"key": k, "name": g["name"]} for k, g in sorted(groups.items(), key=lambda x: -x[1]["count"])],
         }
+
+    def history(self, c, q: dict) -> dict:
+        """주제별 이력 (예: CONSOLE 문제점) - 검색한 메일 + 같은 건의 앞뒤 메일."""
+        from . import history as H
+        query = (q.get("q") or [""])[0].strip()
+        if not query:
+            raise ValueError("정리할 주제(검색어)를 넣어 주세요")
+        car = (q.get("car") or [""])[0]
+        g = self.car_groups(c).get(car) if car else None
+        cars = (g["variants"] if g else [car]) if car else None
+        days = int((q.get("days") or ["0"])[0] or 0)
+        since = _iso(date.today() - timedelta(days=days)) if days else ""
+        out = H.build(c, self.cfg, query, cars=cars, since=since)
+        out["car_name"] = g["name"] if g else car
+        return out
 
     def _car_resolver(self, c):
         """차종 표기(BC4t CUV, BC4 ...)를 차종 폴더 키(BC4)로. 폴더가 있는 차종만."""
@@ -481,6 +496,26 @@ class Data:
     # ---- 쓰기 ----
     def post(self, c, path: list[str], body: dict) -> dict:
         from . import eo as E, followup as F, mold as M, to as T
+        if path[0] == "draft" and path[1] == "make":   # 이력 → 업체 메일 초안 (틀)
+            from . import history as H
+            ids = [int(i) for i in (body.get("ids") or [])][:150]
+            if not ids:
+                raise ValueError("근거 메일을 하나 이상 골라 주세요")
+            rows = c.execute(f"SELECT * FROM mails WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()
+            mails = [H._row(r, str(body.get("q") or "")) for r in rows]
+            return H.draft(mails, self.cfg, str(body.get("q") or "").strip() or "문제점", str(body.get("due") or ""),
+                           str(body.get("vendor_name") or ""), str(body.get("car") or ""), str(body.get("note") or ""))
+        if path[0] == "draft" and path[1] == "open":   # 아웃룩 새 메일 창 (보내기는 사용자가 창에서)
+            to = str(body.get("to") or "")
+            res = F.open_draft(to, str(body.get("cc") or ""), str(body.get("subject") or ""), str(body.get("body") or ""),
+                               send=False, draft_dir=Path(self.cfg["archive"].get("draft_dir", "data/drafts")))
+            return {"ok": True, "message": res}
+        if path[0] == "req" and path[1] == "add":   # 화면에서 업체 요청 등록 (회신 추적)
+            mid = int(body.get("mail_id") or 0) or None
+            rid = F.add(c, str(body.get("to") or ""), str(body.get("subject") or "")[:300], str(body.get("due") or "+3영업일"),
+                        cc=str(body.get("cc") or ""), vendor=str(body.get("vendor") or "")[:60],
+                        req_type=str(body.get("req_type") or "개선대책")[:30], mail_id=mid, note=str(body.get("note") or "")[:300])
+            return {"ok": True, "id": rid}
         if path[0] == "mails" and path[1] == "mark":   # 여러 통 한 번에 (목록에서 선택)
             st = str(body.get("status", ""))[:20]
             ids = [int(i) for i in (body.get("ids") or [])[:500]]
@@ -628,6 +663,14 @@ def make_handler(data: Data, port: int):
                         return self._send(404, b"not found", "text/plain")
                     ctype = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
                     return self._send(200, p.read_bytes(), ctype)
+                if parts[0] == "ai" and len(parts) == 3 and parts[1] in ("history", "draft"):
+                    from . import ai
+                    if not re.fullmatch(r"[0-9a-f]{12}", parts[2]):
+                        raise KeyError("잘못된 번호")
+                    out = {"available": bool(ai.find_claude()), "job": ai.job(f"{parts[1]}:{parts[2]}")}
+                    if parts[1] == "history":
+                        out["saved"] = ai.saved_history(data.cfg, parts[2])
+                    return self._json(out)
                 if parts[0] == "ai" and len(parts) == 3:
                     from . import ai
                     key = f"{'review' if parts[1] == 'review' else 'eo'}:{int(parts[2])}"
@@ -642,6 +685,8 @@ def make_handler(data: Data, port: int):
                         return self._json(sentmove.status(c, data.cfg))
                     if parts == ["mailcounts"]:
                         return self._json(data.mailcounts(c))
+                    if parts == ["history"]:
+                        return self._json(data.history(c, q))
                     if parts[0] == "related" and len(parts) == 3:
                         return self._json(data.related(c, parts[1], int(parts[2])))
                     if parts == ["summary"]:
@@ -704,6 +749,18 @@ def make_handler(data: Data, port: int):
                     return self._json({"ok": True})
                 if parts == ["sync"]:
                     return self._json(data.sync())
+                if parts in (["ai", "history"], ["ai", "draft"]):   # 주제별 이력 요약 · 업체 메일 초안 (Claude)
+                    from . import ai
+                    ids = [int(i) for i in (body.get("ids") or [])][:150]
+                    qq = str(body.get("q") or "")[:200]
+                    if not ids:
+                        raise ValueError("근거 메일을 하나 이상 골라 주세요")
+                    if parts[1] == "history":
+                        key, job = ai.start_history(data.cfg, qq, ids)
+                    else:
+                        key, job = ai.start_draft(data.cfg, qq, ids, str(body.get("to") or "")[:300],
+                                                  str(body.get("due") or "")[:10], str(body.get("note") or "")[:300])
+                    return self._json({"key": key, "job": job})
                 if parts[0] == "ai" and len(parts) == 3:
                     from . import ai
                     mid = int(parts[2])

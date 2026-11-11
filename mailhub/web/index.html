@@ -244,6 +244,39 @@ table.t td.c { text-align: center; }
 .drawer.wide { width: min(1000px, 100%); }
 .drawer.flush .drawer-b { padding: 0; display: block; overflow: hidden; flex: 1; }
 iframe.orig { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
+.drawer.flush .drawer-b { display: flex; flex-direction: column; }
+.drawer.flush iframe.orig { flex: 1; height: auto; }
+.orig-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.orig-text { padding: 16px 20px; overflow: auto; flex: 1; }
+.orig-text h3 { margin: 0 0 10px; font-size: 16px; }
+.orig-text table.mh { border-collapse: collapse; margin-bottom: 12px; font-size: 13px; } .orig-text .mh th { text-align: left; color: var(--fg-2); font-weight: 600; padding: 3px 12px 3px 0; vertical-align: top; white-space: nowrap; }
+.hist-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 14px; margin-bottom: 16px; }
+.hist-form #hist-q { flex: 1 1 320px; height: 34px; font-size: 14px; }
+.hist-form select { height: 34px; }
+.hist-recent { flex-basis: 100%; }
+.hist-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.hist-stats > div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px; display: grid; gap: 2px; }
+.hist-stats b { font-size: 18px; } .hist-stats span { font-size: 12px; color: var(--fg-2); }
+.hist-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.hist-acts label { display: flex; align-items: center; gap: 6px; margin-right: 6px; }
+.hthread { margin-bottom: 12px; } .hthread h2 { font-size: 14px; margin: 0; }
+.hlist { list-style: none; margin: 0; padding: 4px 0; }
+.hrow { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line-2); cursor: pointer; }
+.hrow:last-child { border-bottom: 0; }
+.hrow:hover, .hrow:focus-visible { background: var(--surface-2); }
+.hrow .pick { grid-row: span 3; margin-top: 2px; }
+.hrow .hd { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 12.5px; }
+.hrow .hs { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hrow .hn { font-size: 12px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hrow.ctx .hs, .hrow.ctx .hn { opacity: .72; }
+.dir { font-weight: 700; font-size: 11.5px; } .dir.out { color: var(--accent); } .dir.in { color: var(--fg-2); }
+.hist-md table { font-size: 12.5px; } .mref { color: var(--accent); font-family: var(--mono, monospace); }
+.draft-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.draft-grid label { display: grid; gap: 4px; font-size: 12px; color: var(--fg-2); }
+.draft-grid label.full { grid-column: 1 / -1; }
+.draft-grid input, .draft-grid textarea { font: inherit; font-size: 13px; color: var(--fg); width: 100%; }
+.draft-grid textarea { line-height: 1.6; resize: vertical; }
+@media (max-width: 700px) { .hist-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .draft-grid { grid-template-columns: minmax(0, 1fr); } }
 .drawer-h { display: flex; align-items: flex-start; gap: 10px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
 .drawer-h h2 { font-size: 16px; line-height: 1.4; flex: 1; }
 .drawer-b { overflow-y: auto; padding: 16px 20px 28px; display: grid; gap: 18px; }
@@ -397,6 +430,10 @@ function buildDemo() {
   const T = (n, h = 9, m = 0) => addDays(n) + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':00';
   const mails = [
     { id: 30415, sent_at: T(0, 9, 5), is_mine: 1, sender_name: '나 (개발1팀)', sender_email: 'me@example-corp.com', to_addr: '박성민 과장 <sm.park@hanbit-mold.example>; 김태현 차장 <th.kim@nuri-cf.example>', subject: 'RE: [NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청', tags: 'E.O,금형수정', part_nos: '86511-NX200', attachments: '', needs_action: 0, status: '', snippet: '검토서 확인했습니다. 비용 협의 후 금일 중 착수 회신드리겠습니다.', body: '박성민 과장님 안녕하세요.\n\n검토서 확인했습니다. 수정 기간 7일 OK이며, 비용은 구매팀과 협의 후 금일 중 착수 여부 회신드리겠습니다.\n검사구 체크핀 위치 수정은 누리검사구에 별도 요청하겠습니다.\n\n감사합니다.', att_text: '' },
+    { id: 30290, sent_at: T(-6, 14, 20), sender_name: '오세훈 책임 (고객사 품질)', sender_email: 'sh.oh@oem-example.com', to_addr: '나 (개발1팀) <me@example-corp.com>', subject: '[NX5 HEV] CONSOLE UPR 조립 유격 재발 공유', tags: '품질문제', part_nos: '84650-NX100', attachments: '유격 측정_1106.xlsx', needs_action: 1, status: '진행중', snippet: 'P2 조립에서 CONSOLE UPR 좌측 유격 1.4mm 재발. 대책 적용품인지 확인 부탁드립니다.', body: '안녕하십니까. 고객사 품질 오세훈입니다.\n\nP2 조립 평가에서 CONSOLE UPR 좌측 유격이 1.4mm (규격 0.5±0.3)로 재발하였습니다.\n지난번 회신하신 리브 보강 대책이 적용된 부품인지 확인 부탁드리며, 원인과 추가 대책을 회신 부탁드립니다.\n\n감사합니다.', att_text: '[첨부: 유격 측정_1106.xlsx]\n좌측 1.4 / 우측 0.6 / 전방 0.5' },
+    { id: 30260, sent_at: T(-10, 9, 30), is_mine: 1, sender_name: '나 (개발1팀)', sender_email: 'me@example-corp.com', to_addr: '한영수 과장 <ys.han@daesung-mold.example>', subject: 'RE: RE: [NX5 HEV] CONSOLE UPR 문제점 개선 요청 (단차·유격)', tags: '금형수정,품질문제', part_nos: '84650-NX100', attachments: '', needs_action: 0, status: '', snippet: '리브 보강 대책 진행 바랍니다. 수정 후 T3 샘플 측정 데이터 함께 송부 부탁드립니다.', body: '한영수 과장님 안녕하세요.\n\n회신 감사합니다. 말씀하신 리브 보강(0.8→1.2t) 대책으로 진행 부탁드립니다.\n수정 후 T3 샘플 단차·유격 측정 데이터를 함께 송부 부탁드립니다.\n\n감사합니다.', att_text: '' },
+    { id: 30230, sent_at: T(-17, 16, 5), sender_name: '한영수 과장 (대성금형)', sender_email: 'ys.han@daesung-mold.example', to_addr: '나 (개발1팀) <me@example-corp.com>', subject: 'RE: [NX5 HEV] CONSOLE UPR 문제점 개선 요청 (단차·유격)', tags: '금형수정,품질문제', part_nos: '84650-NX100', attachments: 'CONSOLE UPR 원인분석.pptx', needs_action: 0, status: '', snippet: '원인: 후크부 리브 두께 부족으로 이형 시 변형. 대책: 리브 0.8→1.2t 보강, 수정 5일.', body: '안녕하십니까. 대성금형 한영수입니다.\n\n요청하신 CONSOLE UPR 단차·유격 원인 분석 결과 송부드립니다.\n- 원인: 후크부 리브 두께 부족(0.8t)으로 이형 시 변형 발생\n- 대책: 리브 0.8 → 1.2t 보강 (코어측 가공)\n- 일정: 승인 후 5일\n\n검토 부탁드립니다.', att_text: '[첨부: CONSOLE UPR 원인분석.pptx]\n후크 리브 변형 / 이형 저항' },
+    { id: 30210, sent_at: T(-20, 10, 0), is_mine: 1, sender_name: '나 (개발1팀)', sender_email: 'me@example-corp.com', to_addr: '한영수 과장 <ys.han@daesung-mold.example>', subject: '[NX5 HEV] CONSOLE UPR 문제점 개선 요청 (단차·유격)', tags: '품질문제', part_nos: '84650-NX100', attachments: 'T2 측정결과.xlsx', needs_action: 0, status: '', snippet: 'T2 샘플에서 CONSOLE UPR 좌측 단차 0.9mm, 유격 1.2mm 발생. 원인과 개선대책 회신 부탁드립니다.', body: '한영수 과장님 안녕하세요.\n\nT2 샘플 평가 결과 CONSOLE UPR 좌측 단차 0.9mm, 유격 1.2mm가 발생하였습니다 (규격 0.5±0.3).\n원인 분석과 개선대책, 금형 수정 일정 회신 부탁드립니다.\n\n감사합니다.', att_text: '[첨부: T2 측정결과.xlsx]\n단차 0.9 / 유격 1.2' },
     { id: 30412, sent_at: T(0, 8, 41), sender_name: '이준호 책임 (고객사 품질)', sender_email: 'jh.lee@oem-example.com', subject: '[NX5 CUV] 도어트림 감싸기 주름 개선대책 회신 요청 (~11/12)', tags: 'T/O,품질문제,일정', part_nos: '82305-NX100', attachments: '도어트림 주름 사진.pptx', needs_action: 1, status: '', snippet: 'LP2 이벤트에서 FR 도어트림 암레스트 감싸기 주름이 재발했습니다. 원인과 개선대책을 11/12까지 회신 부탁드립니다.', body: '안녕하십니까. 고객사 품질팀 이준호입니다.\n\nLP2 이벤트에서 FR 도어트림 암레스트 감싸기 주름이 재발했습니다 (발생률 6/40).\n첨부 사진 참고하시어 원인과 개선대책을 11/12(목)까지 회신 부탁드립니다.\n\n1. 발생 부위: 암레스트 앞쪽 코너 R부\n2. 지난 M단계 대책(접착제 도포량 증가) 적용 여부 확인 필요\n\n감사합니다.', att_text: '[첨부: 도어트림 주름 사진.pptx]\n암레스트 코너 R부 주름 / 발생 6EA / 40EA 중' },
     { id: 30398, sent_at: T(-1, 17, 12), sender_name: '박성민 과장 (한빛정밀)', sender_email: 'sm.park@hanbit-mold.example', subject: 'RE: [NX5 CUV] FR BUMPER 보스 높이 금형수정 검토 요청', tags: 'E.O,금형수정', part_nos: '86511-NX200', attachments: '금형수정 검토서_86511.pdf', needs_action: 0, status: '업체검토중', snippet: '검토서 송부드립니다. 육성 후 재가공, 수정 기간 7일, 비용 180만원입니다.', body: '안녕하십니까. 한빛정밀 박성민입니다.\n\n요청하신 보스 높이 2mm 상향 건 검토서 송부드립니다.\n- 수정 방식: 코어측 육성 후 재가공\n- 수정 기간: 착수 후 7일\n- 비용: 180만원 (VAT 별도)\n- 검사구 영향: 보스 체크핀 위치 수정 필요\n\n확인 부탁드립니다.', att_text: '[첨부: 금형수정 검토서_86511.pdf]\n수정 부위 보스 4EA / 육성 2.0mm / 재가공 / 일정 7일' },
     { id: 30377, sent_at: T(-1, 10, 5), sender_name: '최유진 대리 (MSV설계)', sender_email: 'yj.choi@design-example.com', subject: '[NX5 HEV] 콘솔 브라켓 E.O 통보 (EO26-0871)', tags: 'E.O,설계반영', part_nos: '84634-NX100', attachments: 'EO26-0871.pdf, EO LIST.xlsx', needs_action: 1, status: '', snippet: '콘솔 CTR MTG 브라켓 볼트 형상 변경 E.O 통보드립니다. 금형 수정 가능 여부와 일정 회신 부탁드립니다.', body: '안녕하세요. MSV설계 최유진입니다.\n\nEO26-0871 통보드립니다.\n- 품번: 84634-NX100 BRKT ASSY-CONSOLE CTR MTG\n- 변경: IN-LINE 볼트 형상 변경, PAD 32x12 → 40x25x0.5t\n\n금형 수정 가능 여부와 일정을 11/14까지 회신 부탁드립니다.', att_text: '[첨부: EO LIST.xlsx]\nEO26-0871 / 84634-NX100 / BRKT ASSY-CONSOLE CTR MTG / PAD 형상 변경' },
@@ -517,6 +554,43 @@ async function demoApi(path, body) {
   const parts = base.split('/');
   await new Promise(r => setTimeout(r, 60));
   if (base === 'summary') return demoSummary();
+  if (base === 'history') {   // 예시: 주제 단어가 들어간 메일 + 같은 제목(RE:/FW: 뗀) 메일
+    const GEN = ['문제점', '문제', '이력', '관련', '건', '메일', '내용', '정리', '요청'], all = (p.get('q') || '').toLowerCase().split(/\s+/).filter(Boolean);
+    const q = all.some(t => !GEN.includes(t)) ? all.filter(t => !GEN.includes(t)) : all, tk = (x) => x.replace(/^\s*((re|fw|fwd)\s*:\s*)+/i, '').trim();
+    const hit = D.mails.filter(m => q.every(t => (m.subject + ' ' + m.body + ' ' + (m.att_text || '') + ' ' + (m.part_nos || '')).toLowerCase().includes(t)));
+    const keys = new Set(hit.map(m => tk(m.subject)));
+    const ms = D.mails.filter(m => keys.has(tk(m.subject))).sort((a, b) => a.sent_at.localeCompare(b.sent_at))
+      .map(m => ({ ...m, is_mine: m.is_mine || 0, to_addr: m.to_addr || '', thread_key: tk(m.subject), hit: hit.includes(m) }));
+    const th = {}; ms.forEach(m => (th[m.thread_key] = th[m.thread_key] || []).push(m));
+    const threads = Object.entries(th).map(([k, x]) => { const last = x[x.length - 1];
+      const [state, sev] = last.status === '완료' ? ['완료', 'ok'] : last.is_mine ? ['업체 회신 대기', 'warn'] : last.needs_action ? ['회신 필요', 'crit'] : ['진행', 'info'];
+      return { key: k, subject: k, first: x[0].sent_at, last: last.sent_at, count: x.length, mine: x.filter(m => m.is_mine).length, ids: x.map(m => m.id), state, sev, last_from: last.sender_name, last_mine: !!last.is_mine }; })
+      .sort((a, b) => b.last.localeCompare(a.last));
+    const ppl = {}; ms.filter(m => !m.is_mine).forEach(m => { ppl[m.sender_name] = ppl[m.sender_name] || { name: m.sender_name, email: m.sender_email, count: 0 }; ppl[m.sender_name].count++; });
+    const v = ms.find(m => /daesung|hanbit|nuri/.test(m.sender_email + m.to_addr));
+    const vm = v ? (v.is_mine ? (v.to_addr.match(/<([^>]+)>/) || [])[1] : v.sender_email) : '';
+    return { query: p.get('q'), search: q.join(' '), ignored: all.filter(t => !q.includes(t)), mails: ms, threads, hits: hit.length, first: ms.length ? ms[0].sent_at : '', last: ms.length ? ms[ms.length - 1].sent_at : '',
+      received: ms.filter(m => !m.is_mine).length, sent: ms.filter(m => m.is_mine).length, people: Object.values(ppl).sort((a, b) => b.count - a.count),
+      vendor: { to: vm || '', name: vm ? (vm.startsWith('ys.han') ? '한영수 과장' : vm.startsWith('sm.park') ? '박성민 과장' : '') : '', domain: vm ? vm.split('@')[1] : '' }, car_name: '' };
+  }
+  if (base === 'draft/make') {
+    const ms = D.mails.filter(m => body.ids.includes(m.id)).sort((a, b) => a.sent_at.localeCompare(b.sent_at));
+    const due = body.due || addDays(3), [y, mo, dd] = due.split('-').map(Number), w = '일월화수목금토'[new Date(due + 'T00:00:00').getDay()];
+    const lines = ms.map((m, i) => `${i + 1}) ${md(m.sent_at.slice(0, 10))} [${m.is_mine ? '당사 요청' : m.sender_name}] ${m.subject}\n   - ${(m.snippet || '').slice(0, 90)}`);
+    return { due, subject: `${body.q} 이력 정리 및 개선대책 회신 요청 (~${mo}/${dd})`, body: [`${body.vendor_name ? body.vendor_name + '님 ' : ''}안녕하세요.`, '개발1팀 담당자입니다.', '',
+      `${body.q} 관련하여 그동안 메일로 요청드린 내용과 회신 이력을 아래와 같이 정리하여 공유드립니다.`, '', '■ 진행 이력', ...lines, '', '■ 요청 사항',
+      '1. 미결 문제점별 원인 분석 결과', '2. 개선 대책 및 적용 일정 (금형 수정이 필요한 경우 수정 범위와 일정 포함)', '3. 대책 적용 후 검증 결과 (샘플 / 측정 데이터)',
+      ...(body.note ? ['4. ' + body.note] : []), '', `위 내용 ${mo}/${dd}(${w})까지 회신 부탁드립니다.`, '일정 내 회신이 어려운 항목은 가능한 일정을 먼저 회신 부탁드립니다.', '', '감사합니다.'].join('\n') + '\n' };
+  }
+  if (base === 'draft/open') return { ok: true, message: '예시 화면에서는 Outlook 창을 띄우지 않습니다' };
+  if (base === 'req/add') return { ok: true, id: 0 };
+  if (base === 'ai/history' || base === 'ai/draft' || (parts[0] === 'ai' && (parts[1] === 'history' || parts[1] === 'draft') && parts[2])) {
+    const k = parts[1] + ':demo';
+    if (body) { DEMO_JOBS[k] = { state: 'running', t: Date.now() }; return { key: 'demo', job: DEMO_JOBS[k] }; }
+    const j = DEMO_JOBS[k];
+    if (j && j.state === 'running' && Date.now() - j.t > 2500) { j.state = 'done'; j.result = parts[1] === 'history' ? { text: DEMO_HISTORY, at: iso(TODAY) + 'T' + new Date().toTimeString().slice(0, 5) } : DEMO_DRAFT; }
+    return { available: true, job: j || null };
+  }
   if (parts[0] === 'related') {   // 예시: 품번·제목이 겹치는 메일을 관련 메일로
     const src = parts[1], sid = +parts[2], pick = (fn) => D.mails.filter(fn).sort((a, b) => b.sent_at.localeCompare(a.sent_at)).map(m => ({ id: m.id, sent_at: m.sent_at, sender_name: m.sender_name, subject: m.subject }));
     const byPart = (pn, name) => pick(m => (pn && m.part_nos.includes(pn)) || (name && m.subject.toUpperCase().includes(name.toUpperCase())));
@@ -589,6 +663,34 @@ async function demoApi(path, body) {
   return { ok: true, demo: true };
 }
 const DEMO_JOBS = {};
+const DEMO_HISTORY = `### 1) 한눈에 보기
+- NX5 HEV CONSOLE UPR 좌측 **단차·유격** 문제를 T2 샘플에서 확인해 대성금형에 개선 요청 (#30210).
+- 업체 원인: 후크부 리브 두께 부족 → 이형 변형, 대책: 리브 0.8→1.2t 보강 (#30230). 진행 승인 (#30260).
+- 그러나 P2 조립 평가에서 유격 1.4mm **재발** (#30290) → 대책 적용 여부 확인과 추가 대책 필요.
+
+### 2) 이력표
+| 날짜 | 구분 | 보낸사람 → 받는사람 | 내용 요약 | 근거 |
+|---|---|---|---|---|
+| 10/22 | 요청 | 나 → 대성금형 | T2 단차 0.9 / 유격 1.2mm, 원인·대책 요청 | #30210 |
+| 10/25 | 원인·대책 | 대성금형 → 나 | 리브 두께 부족, 0.8→1.2t 보강, 5일 | #30230 |
+| 11/1 | 요청 | 나 → 대성금형 | 리브 보강 진행, T3 측정 데이터 요청 | #30260 |
+| 11/5 | 결과 | 고객사 → 나 | P2 유격 1.4mm 재발 | #30290 |
+
+### 3) 문제점별 현황
+**CONSOLE UPR 좌측 유격** — 상태: **미결(재발)**
+- 현상: 유격 1.2mm (T2) → 1.4mm (P2), 규격 0.5±0.3 (#30210, #30290)
+- 원인: 후크 리브 두께 부족으로 이형 시 변형 (#30230)
+- 대책: 리브 1.2t 보강 (#30230) / 적용 여부: 메일에 없음
+- 검증: T3 측정 데이터 메일에 없음
+
+### 4) 미결 · 확인할 점
+- T3 측정 데이터 미회신 (#30260 요청)
+- P2 부품이 대책 적용품인지 확인 필요 (#30290)
+
+### 5) 다음 조치
+- 대성금형: 대책 적용 여부·T3 측정 데이터·추가 대책 회신 요청 (3영업일)
+- 고객사: 원인·대책 일정 중간 회신`;
+const DEMO_DRAFT = { subject: '[NX5 HEV] CONSOLE UPR 유격 재발 관련 대책 적용 여부 및 추가 대책 회신 요청', body: '한영수 과장님 안녕하세요.\n개발1팀 담당자입니다.\n\nCONSOLE UPR 좌측 단차·유격 건 진행 이력 공유드립니다.\n- 10/22 T2 평가 단차 0.9mm, 유격 1.2mm 개선 요청\n- 10/25 귀사 회신: 후크 리브 0.8→1.2t 보강 대책\n- 11/1 대책 진행 및 T3 측정 데이터 요청\n\n그런데 11/5 고객사 P2 조립 평가에서 유격 1.4mm가 재발하였습니다.\n아래 내용 확인 후 회신 부탁드립니다.\n1. P2 부품의 리브 보강 대책 적용 여부\n2. T3 샘플 단차·유격 측정 데이터\n3. 재발 원인 및 추가 대책, 적용 일정\n\n고객사 중간 보고가 필요하여 11/14(금)까지 회신 부탁드립니다.\n\n감사합니다.\n', at: '' };
 const DEMO_REVIEW = `### 1) 요약
 - 발신: 이준호 책임 (고객사 품질) · 회신 기한 **11/12(목)**
 - LP2 이벤트에서 FR 도어트림 암레스트 코너 R부 감싸기 주름 재발 (6/40)
@@ -642,8 +744,9 @@ const ICONS = {
   eo: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
   to: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
   mold: '<rect x="3" y="7" width="18" height="12" rx="1"/><path d="M7 7V4h10v3M3 12h18"/>',
+  hist: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
 };
-const NAV = [['today', '오늘'], ['mail', '메일함'], ['req', '업체 요청'], ['eo', 'E.O 리스트'], ['to', 'T/O 문제점'], ['mold', '금형 이관']];
+const NAV = [['today', '오늘'], ['mail', '메일함'], ['hist', '이력 정리'], ['req', '업체 요청'], ['eo', 'E.O 리스트'], ['to', 'T/O 문제점'], ['mold', '금형 이관']];
 // 메일함 폴더: [주소, 이름, 필터, 건수 키]
 const FOLDERS = [['mail', '전체 메일', '', 'all'], ['mail-todo', '회신 필요', 'todo', 'todo'], ['mail-progress', '진행중', '@진행중', 'progress'],
   ['mail-vendor', '업체 검토중', '@업체검토중', 'vendor'], ['mail-done', '처리 완료', '@완료', 'done'], null,
@@ -1156,6 +1259,187 @@ function eoForm(m, res) {
 }
 
 // ================= 화면: 업체 요청 =================
+// ================= 화면: 이력 정리 (주제별 근거 메일 이력 + 업체 메일 초안) =================
+let histState = { q: '', car: '', days: 0, tab: 'thread', data: null, pick: new Set() };
+const histRecent = () => { try { return JSON.parse(localStorage.getItem('histRecent') || '[]'); } catch { return []; } };
+function histRemember(q) { try { localStorage.setItem('histRecent', JSON.stringify([q, ...histRecent().filter(x => x !== q)].slice(0, 8))); } catch { /* 무시 */ } }
+const dt16 = (s) => (s || '').replace('T', ' ').slice(0, 16);
+function histMailRow(m) {
+  const tos = (m.to_addr || '').split(/[;,]/).filter(x => x.trim()).length;
+  const who = m.is_mine ? `<span class="dir out" title="내가 보낸 메일">↗ 보냄</span> ${esc(firstTo(m.to_addr) || '')}${tos > 1 ? ` <span class="sub">외 ${tos - 1}명</span>` : ''}`
+    : `<span class="dir in" title="받은 메일">↙ 받음</span> ${esc(m.sender_name || m.sender_email)}`;
+  return `<li class="hrow${m.hit ? '' : ' ctx'}" data-mid="${m.id}" tabindex="0">
+    <input type="checkbox" class="pick" data-hpick="${m.id}" ${histState.pick.has(m.id) ? 'checked' : ''} aria-label="근거 메일로 선택">
+    <div class="hd"><span class="num">${esc(dt16(m.sent_at))}</span>${who}<span class="mono sub">#${m.id}</span>${m.status ? pill(m.status) : ''}${m.attachments ? '<span class="sub" title="첨부 있음">📎</span>' : ''}</div>
+    <div class="hs">${esc(m.subject)}</div><div class="hn">${esc(m.snippet || '')}</div></li>`;
+}
+async function viewHist(V) {
+  V.className = 'view';
+  const cars = ((window.__mailcounts || {}).cars || []);
+  const recent = histRecent();
+  V.innerHTML = `
+    <div class="head"><div><div class="eyebrow">근거 메일로 정리</div><h1>이력 정리</h1></div>
+      <div class="sub">주제(문제점·부품·품번)를 넣으면 관련 메일과 같은 건의 회신까지 모아 건별·날짜순으로 정리합니다. 메일을 누르면 원본이 열립니다.</div></div>
+    <form class="panel hist-form" id="hist-form">
+      <input type="text" id="hist-q" value="${esc(histState.q)}" placeholder="예: CONSOLE 문제점 · 84634-NX100 · 콘솔 브라켓 싱크" aria-label="정리할 주제" autocomplete="off">
+      <select id="hist-car" aria-label="차종"><option value="">전체 차종</option>${cars.map(c => `<option value="${esc(c.key)}" ${histState.car === c.key ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+      <select id="hist-days" aria-label="기간">${[[0, '전체 기간'], [365, '최근 1년'], [180, '최근 6개월'], [90, '최근 3개월']].map(([v, l]) => `<option value="${v}" ${+histState.days === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <button class="btn primary" type="submit">이력 정리</button>
+      ${recent.length ? `<div class="chips hist-recent"><span class="sub">최근:</span>${recent.map(r => `<button class="filter" type="button" data-hq="${esc(r)}">${esc(r)}</button>`).join('')}</div>` : ''}
+    </form>
+    <div id="hist-out">${histState.data ? '' : '<div class="empty">주제를 넣고 [이력 정리]를 누르세요<br><span class="sub">공백 = 모두 포함(AND), "정확한 구문", -제외어. 결과가 적으면 영문/한글 표기나 품번으로 바꿔 보세요 (CONSOLE ↔ 콘솔)</span></div>'}</div>`;
+  const run = async () => {
+    histState.q = $('#hist-q', V).value.trim(); histState.car = $('#hist-car', V).value; histState.days = +$('#hist-days', V).value;
+    if (!histState.q) return toast('정리할 주제를 넣어 주세요');
+    $('#hist-out', V).innerHTML = '<div class="empty"><span class="spin"></span> 메일을 모으는 중…</div>';
+    try {
+      const p = new URLSearchParams({ q: histState.q }); if (histState.car) p.set('car', histState.car); if (histState.days) p.set('days', histState.days);
+      histState.data = await api('history?' + p);
+      histState.pick = new Set(histState.data.mails.map(m => m.id));   // 처음엔 전부 근거로
+      histRemember(histState.q);
+      renderHist(V);
+    } catch (err) { $('#hist-out', V).innerHTML = `<div class="empty">정리하지 못했습니다: ${esc(err.message)}</div>`; }
+  };
+  $('#hist-form', V).addEventListener('submit', (e) => { e.preventDefault(); run(); });
+  V.querySelectorAll('[data-hq]').forEach(b => b.addEventListener('click', () => { $('#hist-q', V).value = b.dataset.hq; run(); }));
+  if (histState.data) renderHist(V);
+}
+function renderHist(V) {
+  const d = histState.data, O = $('#hist-out', V);
+  if (!d.mails.length) { O.innerHTML = '<div class="empty">관련 메일을 찾지 못했습니다. 다른 표기(영문/한글)나 품번으로 찾아 보세요</div>'; return; }
+  const byId = Object.fromEntries(d.mails.map(m => [m.id, m]));
+  const open = d.threads.filter(t => t.state !== '완료');
+  O.innerHTML = `
+    <div class="hist-stats">
+      <div><b class="num">${d.mails.length}</b><span>메일 (검색 ${d.hits} + 같은 건 ${d.mails.length - d.hits})</span></div>
+      <div><b class="num">${d.threads.length}</b><span>건 · 진행 중 ${open.length}</span></div>
+      <div><b class="num">${md(d.first.slice(0, 10))} ~ ${md(d.last.slice(0, 10))}</b><span>기간</span></div>
+      <div><b class="num">${d.received} / ${d.sent}</b><span>받은 / 보낸</span></div>
+    </div>
+    ${d.mails.length >= 400 ? '<div class="note-box">메일이 많아 최근 400통까지만 정리했습니다. 차종·기간을 고르거나 품번·부품명을 더 넣어 좁혀 보세요.</div>' : ''}
+    ${(d.ignored || []).length ? `<div class="sub" style="margin:-4px 0 10px">'${esc(d.ignored.join(', '))}'는 메일에 없을 수 있어 빼고 <b>${esc(d.search)}</b>(으)로 찾았습니다</div>` : ''}
+    ${d.people.length ? `<div class="chips" style="margin:-4px 0 12px"><span class="sub">주고받은 사람:</span>${d.people.slice(0, 6).map(p => `<span class="chip" title="${esc(p.email)}">${esc(p.name)} ${p.count}</span>`).join('')}</div>` : ''}
+    <div class="hist-acts">
+      <label class="sub"><input type="checkbox" class="pick" id="hp-all" ${histState.pick.size === d.mails.length ? 'checked' : ''}> 근거 메일 <b class="num" id="hp-n">${histState.pick.size}</b>통 선택</label>
+      <button class="btn primary sm" id="h-ai" type="button">✦ Claude 이력 요약</button>
+      <button class="btn sm" id="h-draft" type="button">✉ 업체 메일 초안</button>
+    </div>
+    <div id="h-ai-out"></div><div id="h-draft-out"></div>
+    <div class="seg" role="tablist"><button type="button" role="tab" data-ht="thread" aria-selected="${histState.tab === 'thread'}">건별 정리 <b class="num">${d.threads.length}</b></button>
+      <button type="button" role="tab" data-ht="time" aria-selected="${histState.tab === 'time'}">날짜순 전체 <b class="num">${d.mails.length}</b></button>
+      <span class="sub seg-link">흐린 줄 = 검색어는 없지만 같은 건(회신·전달)인 메일</span></div>
+    <div id="h-list">${histState.tab === 'thread' ? d.threads.map(t => `
+      <section class="panel hthread"><div class="panel-h"><div style="min-width:0"><h2 class="clip">${esc(t.subject)}</h2>
+          <div class="sub">${md(t.first.slice(0, 10))} ~ ${md(t.last.slice(0, 10))} · ${t.count}통 (보냄 ${t.mine}) · 마지막: ${t.last_mine ? '나' : esc(t.last_from)}</div></div>
+        <div class="chips"><span class="chip ${t.sev}">${esc(t.state)}</span><button class="btn sm" type="button" data-tpick="${esc(t.key)}">이 건만 근거로</button></div></div>
+        <ol class="hlist">${t.ids.map(i => histMailRow(byId[i])).join('')}</ol></section>`).join('')
+      : `<section class="panel"><ol class="hlist">${d.mails.map(histMailRow).join('')}</ol></section>`}</div>`;
+  const syncPick = () => { $('#hp-n', O).textContent = histState.pick.size; $('#hp-all', O).checked = histState.pick.size === d.mails.length;
+    O.querySelectorAll('[data-hpick]').forEach(b => { b.checked = histState.pick.has(+b.dataset.hpick); }); };
+  $('#hp-all', O).addEventListener('change', (e) => { histState.pick = new Set(e.target.checked ? d.mails.map(m => m.id) : []); syncPick(); });
+  O.querySelectorAll('[data-tpick]').forEach(b => b.addEventListener('click', () => { const t = d.threads.find(x => x.key === b.dataset.tpick); histState.pick = new Set(t.ids); syncPick(); toast(`이 건의 메일 ${t.ids.length}통을 근거로 골랐습니다`); }));
+  O.querySelectorAll('[data-ht]').forEach(b => b.addEventListener('click', () => { histState.tab = b.dataset.ht; renderHist(V); }));
+  const order = d.mails.map(m => m.id);
+  $('#h-list', O).addEventListener('click', (e) => {
+    const box = e.target.closest('[data-hpick]');
+    if (box) { const id = +box.dataset.hpick; box.checked ? histState.pick.add(id) : histState.pick.delete(id); syncPick(); return; }
+    const row = e.target.closest('.hrow'); if (row) origPopup(+row.dataset.mid, order);
+  });
+  $('#h-list', O).addEventListener('keydown', (e) => { const row = e.target.closest('.hrow'); if (row && e.key === 'Enter') origPopup(+row.dataset.mid, order); });
+  $('#h-ai', O).addEventListener('click', () => histSummary(O));
+  $('#h-draft', O).addEventListener('click', () => histDraft(O));
+}
+// 근거 메일 원본 팝업 (이전/다음으로 이력 따라 넘기기)
+async function origPopup(id, order) {
+  const i = order.indexOf(id), m = (histState.data && histState.data.mails.find(x => x.id === id)) || {};
+  const nav = `<div class="orig-bar"><button class="btn sm" type="button" data-on="-1" ${i <= 0 ? 'disabled' : ''}>◀ 이전</button>
+    <span class="sub num">${i + 1} / ${order.length} · ${esc(dt16(m.sent_at))} · #${id}</span>
+    <button class="btn sm" type="button" data-on="1" ${i < 0 || i >= order.length - 1 ? 'disabled' : ''}>다음 ▶</button>
+    <span style="flex:1"></span><button class="btn sm" type="button" id="o-mail">메일함에서 열기</button>${LIVE ? '<button class="btn sm" type="button" id="o-ol">Outlook에서 열기</button>' : ''}</div>`;
+  const ready = (L) => {
+    L.querySelectorAll('[data-on]').forEach(b => b.addEventListener('click', () => origPopup(order[i + +b.dataset.on], order)));
+    $('#o-mail', L).addEventListener('click', () => { L.innerHTML = ''; PENDING = { view: 'mail', id }; mailState.filter = ''; mailState.q = ''; location.hash = '#mail'; if (location.hash === '#mail') route(); });
+    const ol = $('#o-ol', L); if (ol) ol.addEventListener('click', async () => { try { await api(`mail/${id}/open`, {}); toast('Outlook으로 열었습니다'); } catch (err) { toast(err.message); } });
+  };
+  if (LIVE) return drawer(esc(m.subject || '메일 원본'), nav + `<iframe class="orig" sandbox title="메일 원본" src="/api/mail/${id}/original"></iframe>`, ready, 'flush');
+  drawer(esc(m.subject || '메일 원본'), nav + '<div class="orig-text"><div class="empty">불러오는 중…</div></div>', ready, 'flush');   // 예시 화면: 원본 대신 본문
+  try {
+    const x = await api('mail/' + id);
+    const box = $('#layer .orig-text'); if (!box) return;
+    box.innerHTML = `<h3>${esc(x.subject)}</h3><table class="mh"><tr><th>보낸사람</th><td>${esc(x.sender_name)} &lt;${esc(x.sender_email)}&gt;</td></tr>
+      ${x.to_addr ? `<tr><th>받는사람</th><td>${esc(x.to_addr)}</td></tr>` : ''}<tr><th>날짜</th><td>${esc(dt16(x.sent_at))}</td></tr>
+      ${x.attachments ? `<tr><th>첨부</th><td>${esc(x.attachments)}</td></tr>` : ''}</table><div class="body-text">${esc(x.body || '')}</div>`;
+  } catch (err) { const box = $('#layer .orig-text'); if (box) box.innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+}
+async function histSummary(O) {
+  const ids = [...histState.pick]; if (!ids.length) return toast('근거 메일을 하나 이상 골라 주세요');
+  const out = $('#h-ai-out', O), btn = $('#h-ai', O);
+  btn.disabled = true;
+  out.innerHTML = `<section class="ai-panel"><div class="ai-body"><span class="spin"></span> Claude가 근거 메일 ${ids.length}통을 읽고 이력을 정리하는 중입니다 (보통 2~5분). <span class="sub" id="h-ai-t"></span></div></section>`;
+  try {
+    const st = await api('ai/history', { q: histState.q, ids });
+    if (st.job.state === 'error') throw new Error(st.job.error);
+    const r = st.job.state === 'done' ? st : await waitJob('ai/history/' + st.key, (k) => { const t = $('#h-ai-t', O); if (t) t.textContent = `${(k + 1) * 3}초 경과`; });
+    if (r.job.state === 'error') throw new Error(r.job.error);
+    const res = r.job.result, text = res.text;
+    out.innerHTML = `<section class="ai-panel"><div class="panel-h"><h2>✦ ${esc(histState.q)} 이력 요약</h2><div class="chips"><span class="sub">${esc((res.at || '').replace('T', ' '))} · 근거 ${ids.length}통</span>
+      <button class="btn sm" id="h-ai-copy" type="button">복사</button></div></div><div class="ai-body hist-md">${mdToHtml(text).replace(/#(\d{2,})/g, '<a href="#" class="mref" data-mref="$1">#$1</a>')}</div></section>`;
+    $('#h-ai-copy', out).addEventListener('click', async () => { try { await navigator.clipboard.writeText(text); toast('복사했습니다'); } catch { toast('복사가 막혀 있습니다. 직접 선택해 복사하세요'); } });
+    out.querySelectorAll('[data-mref]').forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); origPopup(+a.dataset.mref, histState.data.mails.map(m => m.id)); }));
+  } catch (err) {
+    out.innerHTML = `<section class="ai-panel"><div class="ai-body">요약을 만들지 못했습니다: ${esc(err.message)}<div style="height:8px"></div>${claudeBox('/mail-history ' + histState.q, '명령 복사')}</div></section>`;
+  } finally { btn.disabled = false; }
+}
+async function histDraft(O) {
+  const ids = [...histState.pick]; if (!ids.length) return toast('근거 메일을 하나 이상 골라 주세요');
+  const d = histState.data, out = $('#h-draft-out', O);
+  const due = (() => { let x = new Date(TODAY), n = 3; while (n) { x.setDate(x.getDate() + 1); if (x.getDay() % 6) n--; } return iso(x); })();
+  out.innerHTML = '<div class="empty">초안을 만드는 중…</div>';
+  let r;
+  try { r = await api('draft/make', { q: histState.q, ids, due, vendor_name: d.vendor.name, car: d.car_name || '' }); }
+  catch (err) { out.innerHTML = `<div class="empty">초안을 만들지 못했습니다: ${esc(err.message)}</div>`; return; }
+  const latest = d.mails.filter(m => histState.pick.has(m.id)).slice(-1)[0];
+  out.innerHTML = `<section class="ai-panel draft"><div class="panel-h"><h2>✉ 업체 메일 초안</h2><span class="sub">보내지 않습니다 · 확인 후 Outlook 창에서 직접 보내세요</span></div>
+    <div class="ai-body"><div class="draft-grid">
+      <label>받는사람<input type="text" id="d-to" value="${esc(d.vendor.to)}" placeholder="업체 담당자 메일 주소 (여러 명은 ; 로)"></label>
+      <label>참조<input type="text" id="d-cc" value="" placeholder="참조 (선택)"></label>
+      <label>회신 기한<input type="text" id="d-due" value="${esc(r.due)}" placeholder="YYYY-MM-DD"></label>
+      <label>제목<input type="text" id="d-subj" value="${esc(r.subject)}"></label>
+      <label class="full">추가 요청 (선택)<input type="text" id="d-note" placeholder="예: 금형 수정 전 수정 범위 도면 송부 요청"></label>
+      <label class="full">본문<textarea id="d-body" rows="18">${esc(r.body)}</textarea></label></div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn sm" id="d-remake" type="button">기한·추가요청 반영해 다시 만들기</button>
+        <button class="btn primary sm" id="d-ai" type="button">✦ Claude로 내 말투로 다듬기</button>
+        <button class="btn sm" id="d-copy" type="button">본문 복사</button>
+        ${LIVE ? '<button class="btn sm" id="d-ol" type="button">Outlook 새 메일 창으로</button>' : ''}
+        <button class="btn sm" id="d-req" type="button">업체 요청으로 등록 (회신 추적)</button>
+        <span class="sub" id="d-note-t"></span></div></div></section>`;
+  const v = (k) => $('#' + k, out).value.trim();
+  $('#d-remake', out).addEventListener('click', async () => {
+    try { const x = await api('draft/make', { q: histState.q, ids: [...histState.pick], due: v('d-due'), vendor_name: d.vendor.name, car: d.car_name || '', note: v('d-note') });
+      $('#d-subj', out).value = x.subject; $('#d-body', out).value = x.body; $('#d-due', out).value = x.due; toast('다시 만들었습니다'); } catch (err) { toast(err.message); } });
+  $('#d-copy', out).addEventListener('click', async () => { try { await navigator.clipboard.writeText(v('d-body')); toast('본문을 복사했습니다. 그룹웨어 메일에 붙여 넣으세요'); } catch { toast('복사가 막혀 있습니다. 직접 선택해 복사하세요'); } });
+  const ol = $('#d-ol', out); if (ol) ol.addEventListener('click', async () => {
+    try { const x = await api('draft/open', { to: v('d-to'), cc: v('d-cc'), subject: v('d-subj'), body: $('#d-body', out).value }); toast(x.message || 'Outlook 창을 띄웠습니다'); } catch (err) { toast(err.message); } });
+  $('#d-req', out).addEventListener('click', async () => {
+    if (!v('d-to')) return toast('받는사람(업체 주소)을 넣어 주세요');
+    if (!confirm(`업체 요청으로 등록할까요?\n\n받는사람: ${v('d-to')}\n제목: ${v('d-subj')}\n회신 기한: ${v('d-due')}\n\n같은 제목으로 업체 회신이 오면 자동으로 '회신받음'이 됩니다. 메일은 보내지 않습니다.`)) return;
+    try { const x = await api('req/add', { to: v('d-to'), cc: v('d-cc'), subject: v('d-subj'), due: v('d-due'), vendor: d.vendor.domain || '', mail_id: latest ? latest.id : null, note: histState.q + ' 이력 정리 후 요청', req_type: '개선대책' });
+      toast(LIVE ? `업체 요청 R${x.id}로 등록했습니다 · [업체 요청] 화면에서 기한을 관리합니다` : '예시 화면이라 저장되지 않습니다'); refreshSummary(); } catch (err) { toast('등록 실패: ' + err.message); } });
+  $('#d-ai', out).addEventListener('click', async () => {
+    const b = $('#d-ai', out), t = $('#d-note-t', out); b.disabled = true; t.innerHTML = '<span class="spin"></span> Claude가 근거 메일과 내 말투를 보고 다듬는 중 (1~3분)';
+    try {
+      const st = await api('ai/draft', { q: histState.q, ids: [...histState.pick], to: v('d-to'), due: v('d-due'), note: v('d-note') });
+      if (st.job.state === 'error') throw new Error(st.job.error);
+      const x = st.job.state === 'done' ? st : await waitJob('ai/draft/' + st.key, (k) => { t.innerHTML = `<span class="spin"></span> ${(k + 1) * 3}초 경과`; });
+      if (x.job.state === 'error') throw new Error(x.job.error);
+      if (x.job.result.subject) $('#d-subj', out).value = x.job.result.subject;
+      $('#d-body', out).value = x.job.result.body; t.textContent = '다듬었습니다. 내용 확인 후 보내세요';
+    } catch (err) { t.textContent = '다듬지 못했습니다: ' + err.message; } finally { b.disabled = false; }
+  });
+  out.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
 async function viewReq(V) {
   const rows = await api('reqs');
   V.className = 'view';
@@ -1353,7 +1637,7 @@ async function openMold(id) {
 }
 
 // ================= 라우팅·시작 =================
-const VIEWS = { today: viewToday, mail: viewMail, req: viewReq, eo: viewEO, to: viewTO, mold: viewMold };
+const VIEWS = { today: viewToday, mail: viewMail, hist: viewHist, req: viewReq, eo: viewEO, to: viewTO, mold: viewMold };
 async function route() {
   const k = (location.hash || '#today').slice(1);
   let fn = VIEWS[k] || viewToday;
@@ -1408,7 +1692,7 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-10.2';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-11.1';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');
