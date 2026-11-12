@@ -4,14 +4,15 @@ import json
 import tempfile
 import threading
 import unittest
+import urllib.parse
 import urllib.request
 from datetime import date
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from mailhub import db, local as L
-from mailhub.config import load_config
-from mailhub.webapp import Data, make_handler
+from localmold import core as L
+from localmold.config import load_config
+from localmold.webapp import Data, make_handler
 
 TODAY = date(2026, 11, 12)
 
@@ -48,7 +49,7 @@ def png(color=(200, 60, 60), size=(640, 480)) -> bytes:
 
 def mkcfg(d: Path):
     cfg = load_config(d / "none.toml")
-    cfg["archive"].update(db_path=str(d / "data" / "m.db"), eo_image_dir=str(d / "data" / "img"))
+    cfg.update(db_path=str(d / "data" / "lm.db"), photo_dir=str(d / "data" / "photos"), export_dir=str(d / "data" / "export"))
     return cfg
 
 
@@ -94,7 +95,7 @@ class ImportTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.d = Path(self.tmp.name)
         self.cfg = mkcfg(self.d)
-        self.c = db.connect(self.cfg["archive"]["db_path"])
+        self.c = L.connect(self.cfg["db_path"])
         L.ensure(self.c)
 
     def tearDown(self):
@@ -178,7 +179,7 @@ class ImportTest(unittest.TestCase):
         self.assertIsNone(L.save_photo(self.c, self.cfg, iid, png(), "before"))
         marks = [{"t": "ellipse", "a": {"x": .2, "y": .2}, "b": {"x": .4, "y": .4}, "c": "r"}, {"t": "bogus"}]
         L.set_marks(self.c, self.cfg, p1, marks, png((255, 255, 0)))
-        r = self.c.execute("SELECT * FROM eo_images WHERE id=?", (p1,)).fetchone()
+        r = self.c.execute("SELECT * FROM lm_photos WHERE id=?", (p1,)).fetchone()
         self.assertEqual(len(json.loads(r["marks"])), 1)
         self.assertTrue(Path(r["marked_path"]).is_file())
         L.move_photo(self.c, p2, -1)
@@ -218,7 +219,7 @@ class PhoneTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.d = Path(self.tmp.name)
         self.cfg = mkcfg(self.d)
-        self.c = db.connect(self.cfg["archive"]["db_path"])
+        self.c = L.connect(self.cfg["db_path"])
         L.import_issues(self.c, "CUV", V4_ROWS, today=TODAY)
 
     def tearDown(self):
@@ -285,12 +286,70 @@ class PhoneTest(unittest.TestCase):
         self.assertTrue(all(keys))
 
 
+class PriorityAndMoveTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.d = Path(self.tmp.name)
+        self.cfg = mkcfg(self.d)
+        self.c = L.connect(self.cfg["db_path"])
+
+    def tearDown(self):
+        self.c.close()
+        self.tmp.cleanup()
+
+    def test_priority_order_and_reasons(self):
+        mid, _ = L.upsert_mold(self.c, "CUV", "ASHA-9", "86511-BN000")
+        a = L.add_issue(self.c, mid, problem="게이트 웰드", importance="하", occ_date="2026-11-01", today=TODAY)
+        b = L.add_issue(self.c, mid, problem="보스 싱크", importance="상", occ_date="2026-11-01", today=TODAY)
+        c = L.add_issue(self.c, mid, problem="취출 긁힘", importance="중", due="2026-11-02", occ_date="2026-10-20", today=TODAY)
+        d = L.add_issue(self.c, mid, problem="리브 BURR", importance="중", status="대책적용", occ_date="2026-11-01", today=TODAY)
+        L.add_issue(self.c, mid, problem="끝난 건", importance="상", status="종결", to_result="OK", today=TODAY)
+        top = L.priority(self.c, "CUV", today=TODAY)
+        self.assertEqual([r["id"] for r in top], [c, b, d, a])       # 지연 > 중요도 상 > 검증 T/O > 나머지, 종결 제외
+        self.assertEqual(top[0]["why"][0], "수정 10일 지연")
+        self.assertIn("검증 T/O 필요", top[2]["why"])
+
+    def test_vendor_names_are_matched(self):
+        for v, pn in (("SAFE DEMO", "86511-BN001"), ("TEKNIKAPLAST", "86511-BN002"), ("ASHA-1", "86511-BN003"), ("ASHA-12", "86511-BN004")):
+            L.upsert_mold(self.c, "CUV", v, pn)
+        got = [L.match_vendor(self.c, "CUV", v) for v in ("SAFEDEMO", "TEKNIKA", "ASHA1", "ASHA-2", "NEW")]
+        self.assertEqual(got, ["SAFE DEMO", "TEKNIKAPLAST", "ASHA-1", "ASHA-2", "NEW"])
+
+    def test_move_from_mailhub_keeps_numbers_and_photos(self):
+        import sqlite3
+        old = self.d / "mailhub.db"
+        src = sqlite3.connect(old)
+        src.executescript(L.SCHEMA.split("CREATE TABLE IF NOT EXISTS lm_photos")[0])
+        src.execute("CREATE TABLE eo_images (id INTEGER PRIMARY KEY, eo_id INTEGER, kind TEXT, path TEXT, source TEXT, caption TEXT, "
+                    "sha1 TEXT, sort INTEGER, grp TEXT, marks TEXT, marked_path TEXT, w INTEGER, h INTEGER, created_at TEXT)")
+        src.execute("INSERT INTO lm_molds (id, car, vendor, part_no, part_name) VALUES (7, 'CUV', 'ASHA-9', '86511-BN000', 'COVER')")
+        src.execute("INSERT INTO lm_issues (id, mold_id, car, vendor, part_no, problem, status, src_key) "
+                    "VALUES (41, 7, 'CUV', 'ASHA-9', '86511-BN000', '측면 BURR', '대책수립', 'k1')")
+        src.execute("INSERT INTO lm_log (issue_id, at, from_status, to_status, note) VALUES (41, '2026-11-01T09:00:00', '', '발생', '등록')")
+        jpg = self.d / "old" / "01_before.jpg"
+        jpg.parent.mkdir()
+        jpg.write_bytes(png())
+        src.execute("INSERT INTO eo_images (id, eo_id, kind, path, source, grp, marks, marked_path, w, h) "
+                    "VALUES (3, 41, 'lm', ?, 'phone', 'before', '[]', '', 640, 480)", (str(jpg),))
+        src.execute("INSERT INTO eo_images (id, eo_id, kind, path) VALUES (4, 41, 'eo', 'x.jpg')")   # E.O 그림은 옮기지 않음
+        src.commit()
+        src.close()
+        res = L.from_mailhub(self.c, self.cfg, old)
+        self.assertEqual((res["금형"], res["문제점"], res["이력"], res["사진"]), (1, 1, 1, 1))
+        r = L.get_issue(self.c, 41)
+        self.assertEqual((r["problem"], r["mold_id"]), ("측면 BURR", 7))
+        p = L.photos(self.c, 41)[0]
+        self.assertEqual((p["source"], p["grp"]), ("phone", "before"))
+        self.assertTrue(Path(p["path"]).is_file() and Path(self.cfg["photo_dir"]) in Path(p["path"]).parents)
+        self.assertRaises(ValueError, L.from_mailhub, self.c, self.cfg, old)    # 두 번은 안 옮김
+
+
 class LocalApiTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.cfg = mkcfg(Path(cls.tmp.name))
-        c = db.connect(cls.cfg["archive"]["db_path"])
+        c = L.connect(cls.cfg["db_path"])
         c.close()
         cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), None)
         port = cls.srv.server_address[1]
@@ -312,33 +371,38 @@ class LocalApiTest(unittest.TestCase):
         return json.load(urllib.request.urlopen(req))
 
     def test_flow(self):
-        self.assertEqual(self.get("local")["cars"], [])
+        self.assertEqual(self.get("board")["cars"], [])
         csv_text = "\n".join(",".join(f'"{x}"' for x in r) for r in V4_ROWS)
-        r = self.post("local/import", {"car": "CUV", "name": "list.csv", "data": base64.b64encode(csv_text.encode()).decode()})
+        r = self.post("import", {"car": "CUV", "name": "list.csv", "data": base64.b64encode(csv_text.encode()).decode()})
         self.assertEqual((r["kind"], r["new"]), ("문제점 리스트", 5))
-        d = self.get("local?car=CUV")
+        d = self.get("board?car=CUV")
         self.assertEqual((d["car"], len(d["molds"]), len(d["issues"])), ("CUV", 3, 5))
         mid = next(m["id"] for m in d["molds"] if m["part_no"] == "86511-BN000")
-        iid = self.post("local/issue/add", {"mold_id": mid, "problem": "취출 긁힘", "category": "취출", "importance": "상"})["id"]
+        iid = self.post("issue/add", {"mold_id": mid, "problem": "취출 긁힘", "category": "취출", "importance": "상"})["id"]
         url = "data:image/png;base64," + base64.b64encode(png()).decode()
-        ph = self.post(f"local/issue/{iid}/photo", {"grp": "before", "data": url,
+        ph = self.post(f"issue/{iid}/photo", {"grp": "before", "data": url,
                                                     "marks": [{"t": "rect", "a": {"x": .1, "y": .1}, "b": {"x": .3, "y": .3}, "c": "b"}],
                                                     "flat": url})["photo"]
         self.assertTrue(ph["marked"] and ph["marks"][0]["c"] == "b")
         img = urllib.request.urlopen(self.base + ph["url"]).read()
         self.assertTrue(img.startswith(b"\xff\xd8"))                    # JPEG 로 저장
-        self.post(f"local/photo/{ph['id']}", {"marks": []})
-        self.assertEqual(self.get(f"local/issue/{iid}")["photos"][0]["marks"], [])
-        r = self.post(f"local/issue/{iid}", {"status": "대책적용", "note": "랩핑 완료"})
+        self.post(f"photo/{ph['id']}", {"marks": []})
+        self.assertEqual(self.get(f"issue/{iid}")["photos"][0]["marks"], [])
+        r = self.post(f"issue/{iid}", {"status": "대책적용", "note": "랩핑 완료"})
         self.assertEqual((r["issue"]["status"], r["issue"]["wait"]), ("대책적용", "검증 T/O 필요"))
-        m = self.get(f"local/mold/{mid}")
+        m = self.get(f"mold/{mid}")
         self.assertEqual(len(m["issues"]), 3)
         self.assertEqual(len(next(x for x in m["issues"] if x["id"] == iid)["photo_list"]), 1)
-        out = self.post("export/local", {"car": "CUV", "vendor": "ASHA-9"})
+        out = self.post("export", {"car": "CUV", "vendor": "ASHA-9"})
         self.assertTrue(out["path"].endswith(".xlsx"))
-        self.post(f"local/issue/{iid}/del", {})
-        self.assertEqual(len(self.get(f"local/mold/{mid}")["issues"]), 2)
-        self.assertIn("lm_late", self.get("summary")["counts"])
+        self.post(f"issue/{iid}/del", {})
+        self.assertEqual(len(self.get(f"mold/{mid}")["issues"]), 2)
+        s = self.get("summary")
+        self.assertEqual((s["total"]["issues"], s["cars"][0]["car"]), (5, "CUV"))
+        self.assertTrue(s["top"] and s["top"][0]["why"])
+        self.assertEqual(self.get("top?car=CUV&limit=3")["issues"][0]["id"], s["top"][0]["id"])
+        self.assertEqual(self.get("find?q=" + urllib.parse.quote("싱크"))["issues"][0]["problem"], "리브 싱크")
+        self.assertIn("localmold", self.get("ping")["app"])
 
 
 if __name__ == "__main__":

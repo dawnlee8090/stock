@@ -6,6 +6,9 @@
 진행 단계는 T/O 문제점 대장과 같다: 발생 → 원인분석 → 대책수립 → 대책적용 → 효과확인 → 종결 (보류)
 갑지 STATUS = 그 금형 문제점 중 가장 앞 단계 (양식의 'STATUS 자동 산정 기준'과 같은 방식, 문제점 없으면 '-')
 사진은 원본을 그대로 두고 표시(수정부위 빨강 · 리워크부위 파랑)를 비율 좌표로 겹쳐 저장한다.
+
+데이터는 이 앱 전용 DB(data/localmold/localmold.db)와 사진 폴더(data/localmold/photos)에만 둔다.
+불량 유형 지식(원인·대책 가이드)은 업무 비서의 T/O 대장과 같은 것을 쓴다 (mailhub/to_knowledge.py).
 """
 from __future__ import annotations
 
@@ -19,8 +22,10 @@ import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from .to import STATUSES
-from .to_knowledge import DEFECTS, normalize_defect
+from mailhub.to_knowledge import DEFECTS, GUIDE, guide_text, normalize_defect  # noqa: F401  (T/O 대장과 같은 지식)
+
+# 진행 단계 = T/O 문제점 대장과 같음
+STATUSES = ["발생", "원인분석", "대책수립", "대책적용", "효과확인", "종결", "보류"]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS lm_molds (
@@ -79,6 +84,22 @@ CREATE TABLE IF NOT EXISTS lm_log (
 CREATE TABLE IF NOT EXISTS lm_mails (
     issue_id INTEGER, mail_id INTEGER, how TEXT, linked_at TEXT, PRIMARY KEY (issue_id, mail_id)
 );
+CREATE TABLE IF NOT EXISTS lm_photos (
+    id          INTEGER PRIMARY KEY,
+    issue_id    INTEGER,
+    grp         TEXT DEFAULT 'before',  -- before 수정 전 / after 수정 후
+    path        TEXT,
+    marked_path TEXT DEFAULT '',        -- 표시를 그려 넣은 사본 (엑셀용)
+    marks       TEXT DEFAULT '',        -- 표시 (비율 좌표 JSON)
+    w           INTEGER DEFAULT 0,
+    h           INTEGER DEFAULT 0,
+    source      TEXT DEFAULT '',        -- upload / import / phone
+    caption     TEXT DEFAULT '',
+    sha1        TEXT DEFAULT '',
+    sort        INTEGER DEFAULT 0,
+    created_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_lm_photos_issue ON lm_photos(issue_id);
 """
 
 CATS = ["습합", "취출", "WELD LINE", "SINK", "미성형", "GAS", "기타"]
@@ -93,10 +114,18 @@ _CAT_FROM_DEFECT = {"버": "습합", "단차·갭": "습합", "취출·이젝터
                     "미성형": "미성형", "가스·탄화": "GAS"}
 
 
+def connect(db_path) -> sqlite3.Connection:
+    p = Path(db_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(p)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    ensure(conn)
+    return conn
+
+
 def ensure(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
-    from . import eo_images
-    eo_images.ensure(conn)
 
 
 def _now() -> str:
@@ -140,7 +169,11 @@ def match_vendor(conn, car: str, vendor: str) -> str:
         if sorted(key(h)) == sorted(key(v)) or (re.sub(r"\D", "", h) == re.sub(r"\D", "", v) and
                                                 difflib.SequenceMatcher(None, key(h), key(v)).ratio() >= 0.8):
             return h
-    return v
+    # 줄여 쓴 이름 (TEKNIKA ↔ TEKNIKAPLAST): 5글자 이상 앞부분이 같고 숫자가 같으며 하나뿐일 때만
+    kv = key(v)
+    pre = [h for h in have if len(min(key(h), kv, key=len)) >= 5 and re.sub(r"\D", "", h) == re.sub(r"\D", "", v)
+           and (key(h).startswith(kv) or kv.startswith(key(h)))]
+    return pre[0] if len(pre) == 1 else v
 
 
 def norm_category(cat: str, problem: str = "") -> str:
@@ -479,8 +512,7 @@ def log(conn, iid: int) -> list:
 
 # ---------------- 사진 (수정 전/후 + 표시) ----------------
 def _img_dir(cfg: dict, iid: int) -> Path:
-    from .eo_images import img_dir
-    return img_dir(cfg, iid, "lm")
+    return Path(cfg["photo_dir"]) / f"L{iid}"
 
 
 def _to_jpeg(data: bytes, max_side: int = 1800) -> tuple[bytes, int, int]:
@@ -510,17 +542,17 @@ def save_photo(conn, cfg: dict, iid: int, data: bytes, grp: str = "before", mark
     if not get_issue(conn, iid):
         raise ValueError(f"L{iid} 문제점이 없습니다")
     sha = hashlib.sha1(data).hexdigest()
-    if conn.execute("SELECT 1 FROM eo_images WHERE eo_id=? AND kind='lm' AND sha1=?", (iid, sha)).fetchone():
+    if conn.execute("SELECT 1 FROM lm_photos WHERE issue_id=? AND sha1=?", (iid, sha)).fetchone():
         return None
     jpg, w, h = _to_jpeg(data)
     d = _img_dir(cfg, iid)
     d.mkdir(parents=True, exist_ok=True)
-    n = (conn.execute("SELECT COALESCE(MAX(ABS(sort)), 0) FROM eo_images WHERE eo_id=? AND kind='lm'", (iid,)).fetchone()[0] or 0) + 1
+    n = (conn.execute("SELECT COALESCE(MAX(ABS(sort)), 0) FROM lm_photos WHERE issue_id=?", (iid,)).fetchone()[0] or 0) + 1
     p = d / f"{n:02d}_{grp}.jpg"
     p.write_bytes(jpg)
-    cur = conn.execute("INSERT INTO eo_images (eo_id, kind, path, source, caption, sha1, sort, grp, marks, w, h, created_at) "
-                       "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                       (iid, "lm", str(p.resolve()), source, caption or PHOTO_GROUPS[grp], sha, n, grp, "", w, h, _now()))
+    cur = conn.execute("INSERT INTO lm_photos (issue_id, path, source, caption, sha1, sort, grp, marks, w, h, created_at) "
+                       "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                       (iid, str(p.resolve()), source, caption or PHOTO_GROUPS[grp], sha, n, grp, "", w, h, _now()))
     pid = cur.lastrowid
     if marks:
         set_marks(conn, cfg, pid, marks, flat, commit=False)
@@ -531,7 +563,7 @@ def save_photo(conn, cfg: dict, iid: int, data: bytes, grp: str = "before", mark
 
 def set_marks(conn, cfg: dict, pid: int, marks: list, flat: bytes | None = None, commit: bool = True) -> None:
     """표시 저장. flat = 표시를 그려 넣은 그림 (엑셀·메일용). 표시를 모두 지우면 사본도 지운다."""
-    r = conn.execute("SELECT * FROM eo_images WHERE id=? AND kind='lm'", (pid,)).fetchone()
+    r = conn.execute("SELECT * FROM lm_photos WHERE id=?", (pid,)).fetchone()
     if not r:
         raise ValueError("사진이 없습니다")
     marks = [m for m in (marks or []) if isinstance(m, dict) and m.get("t") in ("ellipse", "rect", "arrow", "pen")][:60]
@@ -546,42 +578,42 @@ def set_marks(conn, cfg: dict, pid: int, marks: list, flat: bytes | None = None,
         path = old
     if old and old != path:
         Path(old).unlink(missing_ok=True)
-    conn.execute("UPDATE eo_images SET marks=?, marked_path=? WHERE id=?",
+    conn.execute("UPDATE lm_photos SET marks=?, marked_path=? WHERE id=?",
                  (json.dumps(marks, ensure_ascii=False) if marks else "", path, pid))
     if commit:
         conn.commit()
 
 
 def move_photo(conn, pid: int, step: int) -> None:
-    r = conn.execute("SELECT * FROM eo_images WHERE id=? AND kind='lm'", (pid,)).fetchone()
+    r = conn.execute("SELECT * FROM lm_photos WHERE id=?", (pid,)).fetchone()
     if not r:
         raise ValueError("사진이 없습니다")
-    sibs = conn.execute("SELECT id, sort FROM eo_images WHERE eo_id=? AND kind='lm' AND grp=? ORDER BY sort, id",
-                        (r["eo_id"], r["grp"])).fetchall()
+    sibs = conn.execute("SELECT id, sort FROM lm_photos WHERE issue_id=? AND grp=? ORDER BY sort, id",
+                        (r["issue_id"], r["grp"])).fetchall()
     ids = [s["id"] for s in sibs]
     i = ids.index(pid)
     j = i + (1 if step > 0 else -1)
     if 0 <= j < len(ids):
         a, b = sibs[i], sibs[j]
-        conn.execute("UPDATE eo_images SET sort=? WHERE id=?", (b["sort"], a["id"]))
-        conn.execute("UPDATE eo_images SET sort=? WHERE id=?", (a["sort"], b["id"]))
+        conn.execute("UPDATE lm_photos SET sort=? WHERE id=?", (b["sort"], a["id"]))
+        conn.execute("UPDATE lm_photos SET sort=? WHERE id=?", (a["sort"], b["id"]))
         conn.commit()
 
 
 def remove_photo(conn, pid: int) -> None:
-    r = conn.execute("SELECT * FROM eo_images WHERE id=? AND kind='lm'", (pid,)).fetchone()
+    r = conn.execute("SELECT * FROM lm_photos WHERE id=?", (pid,)).fetchone()
     if not r:
         return
     for p in (r["path"], r["marked_path"]):
         if p:
             Path(p).unlink(missing_ok=True)
-    conn.execute("DELETE FROM eo_images WHERE id=?", (pid,))
+    conn.execute("DELETE FROM lm_photos WHERE id=?", (pid,))
     conn.commit()
 
 
 def photos(conn, iid: int, grp: str | None = None) -> list:
     ensure(conn)
-    sql, a = "SELECT * FROM eo_images WHERE eo_id=? AND kind='lm'", [iid]
+    sql, a = "SELECT * FROM lm_photos WHERE issue_id=?", [iid]
     if grp:
         sql += " AND grp=?"
         a.append(grp)
@@ -595,14 +627,14 @@ def first_photos(conn, ids: list[int]) -> dict[int, sqlite3.Row]:
         return out
     for i in range(0, len(ids), 500):
         chunk = ids[i:i + 500]
-        for r in conn.execute(f"SELECT * FROM eo_images WHERE kind='lm' AND eo_id IN ({','.join('?' * len(chunk))}) "
+        for r in conn.execute(f"SELECT * FROM lm_photos WHERE issue_id IN ({','.join('?' * len(chunk))}) "
                               "ORDER BY CASE grp WHEN 'before' THEN 0 ELSE 1 END, sort, id", chunk):
-            out.setdefault(r["eo_id"], r)
+            out.setdefault(r["issue_id"], r)
     return out
 
 
 def photo_counts(conn) -> dict[int, int]:
-    return {r[0]: r[1] for r in conn.execute("SELECT eo_id, COUNT(*) FROM eo_images WHERE kind='lm' GROUP BY eo_id")}
+    return {r[0]: r[1] for r in conn.execute("SELECT issue_id, COUNT(*) FROM lm_photos GROUP BY issue_id")}
 
 
 # ---------------- 표 읽기 (엑셀 · CSV) ----------------
@@ -709,7 +741,8 @@ def import_molds(conn, car: str, rows: list[list], vendor: str | None = None, sr
     """금형 리스트(엑셀) 또는 외주처 갑지(MASTER) → 금형 등록·갱신. 바뀐 칸만 고친다."""
     ensure(conn)
     hi, cols = _find_header(rows, MOLD_HEADERS, "part_no")
-    vendor_default = (vendor or "").upper() or match_vendor(conn, car, _title_vendor(rows))
+    # 직접 적은 외주처도 이미 있는 이름에 맞춘다 (SAFEDEMO ↔ SAFE DEMO, ASAH-5 ↔ ASHA-5)
+    vendor_default = match_vendor(conn, car, vendor or _title_vendor(rows))
     if "vendor" not in cols and not vendor_default:
         raise ValueError("외주처 열이 없습니다. --vendor 로 외주처를 지정해 주세요")
     alt_pn = [i for i, h in enumerate(rows[hi]) if _hkey(h).startswith("partno") and i != cols["part_no"]]
@@ -800,7 +833,7 @@ def import_workbook(conn, cfg: dict, car: str, data: bytes, vendor: str | None =
     wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
     stats = {"molds_new": 0, "molds_updated": 0, "new": 0, "updated": 0, "same": 0, "kept": 0, "photos": 0, "sheets": 0}
     master = next((ws for ws in wb.worksheets if ws.title.strip().upper() in ("MASTER", "갑지")), None)
-    v = (vendor or "").upper()
+    v = match_vendor(conn, car, vendor) if vendor else ""
     if master is not None:
         rows = [list(r) for r in master.iter_rows(values_only=True)]
         v = v or match_vendor(conn, car, _title_vendor(rows))
@@ -1135,7 +1168,7 @@ def export_list(conn, car: str, path: Path) -> Path:
 
 
 def export_dir(cfg: dict, car: str) -> Path:
-    base = Path(cfg["archive"].get("local_dir") or Path(cfg["archive"]["db_path"]).parent / "local")
+    base = Path(cfg["export_dir"])
     return base / re.sub(r"[^\w가-힣.-]+", "_", car).strip("_")
 
 
@@ -1149,3 +1182,101 @@ def export(conn, cfg: dict, car: str, vendor: str | None = None, out_dir: Path |
     for v in sorted({m["vendor"] for m in molds(conn, car)}):
         out.append(export_vendor(conn, cfg, car, v, d / f"{car}_{v}_문제점_{stamp}.xlsx"))
     return out
+
+
+# ---------------- 작업 우선순위 (출장 · 현지 점검용) ----------------
+def priority(conn, car: str | None = None, vendor: str | None = None, limit: int = 30, today: date | None = None) -> list[dict]:
+    """진행 중 문제점을 먼저 챙길 순서로. 점수와 이유를 같이 돌려준다 (왜 위에 있는지 설명 가능하게).
+    수정 지연(오래될수록) > 중요도 상 > 검증 T/O 필요 · T/O NG > 재발 > 수정 목표 임박 > 오래된 건."""
+    today = today or date.today()
+    out = []
+    for r in issues(conn, car, vendor, status="open"):
+        why, score = [], 0
+        d = delay_of(r, today)
+        if d:
+            score += 100 + min(int(re.search(r"\d+", d).group()), 60) * 2
+            why.append(d)
+        elif r["due"] and r["status"] in ("발생", "원인분석", "대책수립"):
+            left = (date.fromisoformat(r["due"]) - today).days
+            if 0 <= left <= 3:
+                score += 20
+                why.append(f"수정 목표 D-{left}")
+        if r["importance"] == "상":
+            score += 80
+            why.append("중요도 상")
+        elif r["importance"] == "중":
+            score += 30
+        w = wait_check(r)
+        if w:
+            score += 50
+            why.append(w)
+        if r["to_result"] == "NG":
+            score += 40
+            why.append("수정 후 T/O NG")
+        if r["recur_of"]:
+            score += 30
+            why.append(f"재발 ← L{r['recur_of']}")
+        if r["mold_fix"] == "O":
+            score += 10
+        if r["occ_date"]:
+            score += min(max((today - date.fromisoformat(r["occ_date"])).days, 0), 60) // 6
+        out.append(dict(r) | {"score": score, "why": why, "delay": d, "wait": w})
+    out.sort(key=lambda x: (-x["score"], x["occ_date"] or "9999", x["id"]))
+    return out[:limit] if limit else out
+
+
+# ---------------- 예전 업무 비서(mailhub)에서 옮기기 ----------------
+def from_mailhub(conn, cfg: dict, src_db) -> dict:
+    """업무 비서 안의 [현지 금형]에 넣었던 차종 · 금형 · 문제점 · 이력 · 사진을 이 앱으로 옮긴다 (처음 한 번, L번호 유지).
+    업무 비서 DB 는 읽기만 한다."""
+    import shutil
+    ensure(conn)
+    if conn.execute("SELECT (SELECT COUNT(*) FROM lm_molds) + (SELECT COUNT(*) FROM lm_issues)").fetchone()[0]:
+        raise ValueError("이 앱에 이미 데이터가 있어 옮기지 않았습니다 (처음 한 번만 옮길 수 있습니다)")
+    p = Path(src_db)
+    if not p.is_file():
+        raise ValueError(f"업무 비서 DB 가 없습니다: {p}")
+    src = sqlite3.connect(f"file:{p.resolve().as_posix()}?mode=ro", uri=True)
+    src.row_factory = sqlite3.Row
+    try:
+        have = {r[0] for r in src.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "lm_molds" not in have:
+            raise ValueError("업무 비서에 현지 금형 데이터가 없습니다")
+        out = {}
+        for t in ("lm_molds", "lm_issues", "lm_log", "lm_mails"):
+            if t not in have:
+                continue
+            mine = [r[1] for r in conn.execute(f"PRAGMA table_info({t})")]
+            cols = [c for c in (r[1] for r in src.execute(f"PRAGMA table_info({t})")) if c in mine]
+            rows = src.execute(f"SELECT {', '.join(cols)} FROM {t}").fetchall()
+            conn.executemany(f"INSERT INTO {t} ({', '.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+                             [tuple(r) for r in rows])
+            out[t] = len(rows)
+        n_ph = miss = 0
+        if "eo_images" in have:
+            for r in src.execute("SELECT * FROM eo_images WHERE kind='lm' ORDER BY id"):
+                old = Path(r["path"] or "")
+                if not old.is_file():
+                    miss += 1
+                    continue
+                d = _img_dir(cfg, r["eo_id"])
+                d.mkdir(parents=True, exist_ok=True)
+                new = d / old.name
+                shutil.copy2(old, new)
+                marked = ""
+                keys = r.keys()
+                if "marked_path" in keys and r["marked_path"] and Path(r["marked_path"]).is_file():
+                    mp = d / Path(r["marked_path"]).name
+                    shutil.copy2(r["marked_path"], mp)
+                    marked = str(mp.resolve())
+                g = lambda k, dflt="": r[k] if k in keys and r[k] is not None else dflt
+                conn.execute("INSERT INTO lm_photos (id, issue_id, grp, path, marked_path, marks, w, h, source, caption, sha1, sort, "
+                             "created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                             (r["id"], r["eo_id"], g("grp", "before"), str(new.resolve()), marked, g("marks"), g("w", 0), g("h", 0),
+                              g("source"), g("caption"), g("sha1"), g("sort", 0), g("created_at")))
+                n_ph += 1
+        conn.commit()
+        return {"금형": out.get("lm_molds", 0), "문제점": out.get("lm_issues", 0), "이력": out.get("lm_log", 0),
+                "사진": n_ph, "사진 파일 없음": miss}
+    finally:
+        src.close()
