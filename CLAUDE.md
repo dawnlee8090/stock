@@ -31,6 +31,12 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   `mold add --mold-no .. --part-name .. --dest ..`, `mold doc <M번호> <금형사양서|성형조건표|부품리스트|선적일정|KD리스트|원소재리스트|기타> --mail N --attach "파일명 일부" [--status 확정]`,
   `mold items <M번호> --type KD|원소재|부품 --mail N --attach ..`(첨부 엑셀 불러오기), `mold ship <M번호> --etd .. --eta .. --atd .. --ata .. --bl ..`,
   `mold set <M번호> --status ..`, `mold export data/MOLD_TRANSFER.xlsx`. 메일 반영 절차는 `/mold-update`
+- 현지 금형 문제점은 **별도 앱** `python -m localmold <명령>` (업무 비서와 따로 실행, 데이터 `data/localmold/`, 설명 `localmold/README.md`).
+  차종 → 외주처 갑지 → 을지, T/O 대장 단계, L번호: `cars`, `top [--car ..] [--json]`(작업 우선순위 + 이유), `molds --car .. [--vendor ..]`,
+  `list --car .. [--vendor --status open|all|wait|단계 --importance --category --q] [--json]`, `show <L번호> [--json]`,
+  `import <엑셀/CSV> --car .. [--vendor ..]`(외주처 엑셀=갑지+을지+사진 / 통합 문제점 리스트 / 금형 리스트 자동 구분),
+  `set <L번호> --status .. --to-result OK|NG --note ..`, `export --car .. [--vendor ..] [--open]`, `from-mailhub`(예전 업무 비서 [현지 금형] 데이터 옮기기, 처음 한 번), `shortcut`(바탕화면 · 시작 메뉴 앱 아이콘, Windows).
+  드라이브에서 받기는 `/local-sync`. 휴대폰 사진 접수(claude.ai 비공개 페이지) ↔ PC: `snapshot --car .. --out ..`(폰에서 고를 목록), `phone-import <받은 폴더>`(사진 들여오기). 절차는 `/local-sync` 4-1
 - 주제별 이력 정리: `/mail-history <주제>` (예: CONSOLE 문제점, 품번) - 이력표·문제점별 현황·미결·다음 조치, 근거 #id.
   앱 [이력 정리] 화면: 검색 + 같은 건(스레드) 메일을 건별·날짜순으로, 메일 클릭 = 원본 팝업, 업체 메일 초안(틀 / Claude 다듬기) → Outlook 창·업체 요청 등록
 - 결과가 적으면 동의어/영문 표기(E.O ↔ EO ↔ 설계변경, T/O ↔ TRY OUT ↔ 트라이)와 품번으로 다시 검색한다.
@@ -38,10 +44,11 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
 - 앱 화면: `python -m mailhub app` (mailhub/web/index.html + mailhub/webapp.py, 127.0.0.1 전용). 화면이나 API 를 바꾸면 두 파일의
   APP_VERSION 을 같이 올린다 (예전 엔진이 켜져 있으면 새 실행이 자동으로 교체). 화면을 바꾸면 같은 파일이
   아티팩트 예시(가상 데이터)로도 쓰이므로 예시 데이터(buildDemo)와 API 응답 형태를 함께 맞춘다.
+  현지 금형 앱도 같다: `python -m localmold app` (localmold/web/index.html + localmold/webapp.py, 127.0.0.1:8766), 예시 데이터는 buildLocalDemo/addDemoCar2/demoApi.
 
 ## 원칙
 - 메일 내용은 회사 기밀이다. 외부 서비스로 보내거나 저장소에 커밋하지 않는다 (`data/` 는 gitignore).
 - 메일 발송/전달은 하지 않는다. 회신·전달은 **초안만** 작성하고 사용자가 직접 보낸다.
   자동 발송 기능은 없다. 재요청은 `req remind <R번호>`(아웃룩 창) 또는 `--ask`(확인 창)로만 하고, 발송은 사용자가 창에서 결정한다.
-- `req add`, `mark`, `req update`, `eo add/set/link/import`, `to add/set/link/import`, `mold add/set/doc/ship/items/link` 처럼 기록을 바꾸는 명령은 사용자 확인 후 실행한다.
+- `req add`, `mark`, `req update`, `eo add/set/link/import`, `to add/set/link/import`, `mold add/set/doc/ship/items/link`, `localmold import/set/phone-import/from-mailhub` 처럼 기록을 바꾸는 명령은 사용자 확인 후 실행한다.
 - 답변에는 근거 메일 번호(#id)와 날짜를 함께 적는다.
