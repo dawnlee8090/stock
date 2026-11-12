@@ -428,6 +428,7 @@ table.lm-master th.c { text-align: center; }
 .lm-tim { position: relative; width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #11161c; }
 .lm-tim svg { width: 100%; height: 100%; display: block; }
 .lm-tim .no { position: absolute; left: 4px; top: 4px; background: rgba(20, 30, 40, .75); color: #fff; font-size: 11px; font-weight: 700; border-radius: 3px; padding: 0 5px; }
+.lm-tim .src { position: absolute; right: 4px; top: 4px; background: var(--accent); color: var(--accent-fg); font-size: 10.5px; font-weight: 700; border-radius: 3px; padding: 0 5px; }
 .lm-tact { display: flex; gap: 3px; }
 .lm-tact button { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 5px; font: inherit; font-size: 12px; padding: 3px 0; cursor: pointer; }
 .lm-tact button.mk { flex: 2; color: #e8261c; font-weight: 600; }
@@ -2081,7 +2082,7 @@ function renderLmGroups(L) {
     const list = lmCur.photos.filter(p => p.grp === g);
     return `<div class="lm-group${lmCur.activeGrp === g ? ' active' : ''}" data-grp="${g}">
       <div class="lm-glab"><b>${label}</b><span>${lmCur.activeGrp === g ? 'Ctrl+V 붙여넣기 대상 · ' : ''}${list.length ? list.length + '장' : ''}</span></div>
-      <div class="lm-tiles">${list.map((p, i) => `<div class="lm-tile"><div class="lm-tim">${photoSVG(p)}${list.length > 1 ? `<span class="no">${i + 1}</span>` : ''}</div>
+      <div class="lm-tiles">${list.map((p, i) => `<div class="lm-tile"><div class="lm-tim">${photoSVG(p)}${list.length > 1 ? `<span class="no">${i + 1}</span>` : ''}${p.source === 'phone' ? '<span class="src">폰</span>' : ''}</div>
         <div class="lm-tact"><button type="button" class="mk" data-act="mark" data-pid="${p.id}">○ 표시</button><button type="button" data-act="left" data-pid="${p.id}" ${i === 0 ? 'disabled' : ''} aria-label="앞으로">◀</button>
         <button type="button" data-act="right" data-pid="${p.id}" ${i === list.length - 1 ? 'disabled' : ''} aria-label="뒤로">▶</button><button type="button" data-act="del" data-pid="${p.id}" aria-label="삭제">✕</button></div></div>`).join('')}
         <div class="lm-tile"><div class="lm-add"><label class="btn sm">사진 촬영<input type="file" accept="image/*" capture="environment" data-up="${g}"></label>
@@ -2259,7 +2260,7 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-12.1';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-12.2';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');

@@ -31,6 +31,25 @@ description: 현지 금형 문제점 - 구글 드라이브의 외주처 문제�
   - 앱에서 고친 문제점(edited)은 덮어쓰지 않는다는 점을 알려준다.
 - 실행 후 결과 숫자(신규 · 갱신 · 변경 없음 · 앱 수정 유지 · 사진)를 그대로 보고한다.
 
+## 4-1. 휴대폰 사진 접수 → PC (페이지: https://claude.ai/artifact/N24XX6Sp2iByKyNKNR44G5)
+폰에서 '현지 금형 사진 접수' 페이지로 올린 사진을 문제점 사진 칸에 넣는다. 받은 파일은 `data/local/phone/<오늘 날짜>/` 에만 둔다.
+1. 반영 대기 목록: ArtifactData `query` (url 위 주소, collection `uploads`, where `[["synced","==",false]]`, limit 1000,
+   `out_dir` = `data/local/phone/<날짜>`) → `uploads/<문서>.json` 로 저장된다 (문서 id 의 `~` 는 파일 이름에서 `@`).
+   결과에 나온 각 문서의 version 을 적어 둔다 (5번에서 씀).
+2. 사진 받기: 문서마다 `asset`(원본)과 `flat`(표시를 그려 넣은 사본, 있을 때만)을
+   Artifact `read` (url, `path` = 사진 id, `out_dir` = `data/local/phone/<날짜>/assets`) 로 받는다 → `assets/<id>.jpg`.
+3. 사용자에게 표로 보여주고 확인받는다: | 올린 시각 | 차종 · 외주처 · 품번 | 문제점(L번호 또는 새 문제점) | 수정 전/후 | 메모 |
+4. `python -m mailhub local phone-import data/local/phone/<날짜> --json`
+   - 문제점은 키(`key`) → L번호(같은 품번일 때) 순서로 찾고, 없으면 금형을 찾아(없으면 등록) 새 문제점을 만든다 (같은 접수 묶음은 1건).
+   - 같은 사진은 다시 들어가지 않으므로 다시 실행해도 된다. `error` 인 건은 이유를 그대로 보고한다.
+5. 반영 표시: `added` / `duplicate` 인 문서마다 ArtifactData `batch` 로
+   `{op: "update", collection: "uploads", doc_id, data: {synced: true, synced_l: <L번호>, synced_at: <지금 ISO>}, if_version: <1번 version>}`
+   (50건씩). 폰 페이지의 [올린 사진]에서 'PC 반영 · L번호'로 바뀐다.
+6. 목록 새로 보내기: `python -m mailhub local snapshot --car "<차종>" --out data/local/phone/catalog.json` →
+   외주처마다 ArtifactData `set` collection `catalog`, doc_id `<차종>~<외주처>`(허용 문자 외에는 `_`), 내용은 그 외주처 항목
+   (이미 있으면 `get` 으로 version 을 읽어 `if_version`). 폰에서 고르는 금형 · 진행 중 문제점 · L번호가 PC 와 같아진다.
+- 페이지는 비공개다. 현지 직원·출장자가 올리게 하려면 사용자가 페이지 Share 메뉴에서 편집 권한을 준다 (Claude 는 공유 설정을 바꾸지 않는다).
+
 ## 5. 정리
 - `python -m mailhub local cars` 로 반영 후 현황을 다시 보여주고, 바뀐 점(새 문제점, 단계가 바뀐 건, 새 사진)을 요약한다.
 - 바로 챙길 것: 수정 지연, 중요도 상 진행, **검증 T/O 필요**(금형 수정은 끝났는데 T/O 결과 없음) 상위 10건 —

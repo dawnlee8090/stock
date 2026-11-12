@@ -974,6 +974,28 @@ def cmd_local(args, cfg, conn):
         r = LM.update_issue(conn, args.id, note=args.note, **kw)
         _out(f"L{r['id']} → {r['status']} · {r['problem'][:50]}")
         return
+    if a == "snapshot":
+        rows = LM.snapshot(conn, args.car)
+        text = json.dumps(rows, ensure_ascii=False)
+        if args.out:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(text, encoding="utf-8")
+            _out(f"{args.out}: {len(rows)}개 (외주처별) · 금형 {sum(len(r['molds']) for r in rows)} · 진행 중 문제점 {sum(len(r['issues']) for r in rows)}")
+        else:
+            _out(text)
+        return
+    if a == "phone-import":
+        ups, base = LM.phone_uploads(Path(args.source))
+        if not ups:
+            _out("들여올 폰 사진이 없습니다")
+            return
+        res = LM.phone_import(conn, cfg, ups, base)
+        if args.json:
+            _out(json.dumps(res, ensure_ascii=False, indent=1))
+            return
+        for r in res:
+            _out(f"{r['id']}: {r['status']}{' (새 문제점)' if r.get('new') else ''} → L{r['l']}" + (f"  {r['error']}" if r.get("error") else ""))
+        return
     if a == "export":
         paths = LM.export(conn, cfg, args.car, args.vendor, Path(args.dir) if args.dir else None)
         for p in paths:
@@ -1420,6 +1442,12 @@ def build_parser() -> argparse.ArgumentParser:
                  ("to_after", "수정 후 T/O O/X"), ("to_result", "T/O 결과 OK/NG"), ("progress", "진행 메모")):
         x.add_argument("--" + f.replace("_", "-"), dest=f, help=h)
     x.add_argument("--note", help="메모 (이력에 남음)")
+    x = ls.add_parser("snapshot", help="폰 사진 접수 페이지에 보낼 목록 (외주처별 금형 · 진행 중 문제점, JSON)")
+    x.add_argument("--car")
+    x.add_argument("--out", help="저장할 파일 (없으면 화면에 출력)")
+    x = ls.add_parser("phone-import", help="폰에서 올린 사진 들여오기 (내려받은 폴더: uploads/*.json + assets/사진, 또는 manifest JSON)")
+    x.add_argument("source")
+    x.add_argument("--json", action="store_true")
     x = ls.add_parser("export", help="엑셀: --vendor 면 외주처 양식(갑지+을지+사진), 없으면 통합 리스트 + 외주처별 전부")
     x.add_argument("--car", required=True)
     x.add_argument("--vendor")

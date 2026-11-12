@@ -35,6 +35,7 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   `local list --car .. [--vendor --status open|all|wait|단계 --importance --category --q] [--json]`, `local show <L번호> [--json]`,
   `local import <엑셀/CSV> --car .. [--vendor ..]`(외주처 엑셀=갑지+을지+사진 / 통합 문제점 리스트 / 금형 리스트 자동 구분),
   `local set <L번호> --status .. --to-result OK|NG --note ..`, `local export --car .. [--vendor ..] [--open]`. 드라이브에서 받기는 `/local-sync`
+  휴대폰 사진 접수(claude.ai 비공개 페이지) ↔ PC: `local snapshot --car .. --out ..`(폰에서 고를 목록), `local phone-import <받은 폴더>`(사진 들여오기). 절차는 `/local-sync` 4-1
 - 주제별 이력 정리: `/mail-history <주제>` (예: CONSOLE 문제점, 품번) - 이력표·문제점별 현황·미결·다음 조치, 근거 #id.
   앱 [이력 정리] 화면: 검색 + 같은 건(스레드) 메일을 건별·날짜순으로, 메일 클릭 = 원본 팝업, 업체 메일 초안(틀 / Claude 다듬기) → Outlook 창·업체 요청 등록
 - 결과가 적으면 동의어/영문 표기(E.O ↔ EO ↔ 설계변경, T/O ↔ TRY OUT ↔ 트라이)와 품번으로 다시 검색한다.
@@ -47,5 +48,5 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
 - 메일 내용은 회사 기밀이다. 외부 서비스로 보내거나 저장소에 커밋하지 않는다 (`data/` 는 gitignore).
 - 메일 발송/전달은 하지 않는다. 회신·전달은 **초안만** 작성하고 사용자가 직접 보낸다.
   자동 발송 기능은 없다. 재요청은 `req remind <R번호>`(아웃룩 창) 또는 `--ask`(확인 창)로만 하고, 발송은 사용자가 창에서 결정한다.
-- `req add`, `mark`, `req update`, `eo add/set/link/import`, `to add/set/link/import`, `mold add/set/doc/ship/items/link`, `local import/set` 처럼 기록을 바꾸는 명령은 사용자 확인 후 실행한다.
+- `req add`, `mark`, `req update`, `eo add/set/link/import`, `to add/set/link/import`, `mold add/set/doc/ship/items/link`, `local import/set/phone-import` 처럼 기록을 바꾸는 명령은 사용자 확인 후 실행한다.
 - 답변에는 근거 메일 번호(#id)와 날짜를 함께 적는다.

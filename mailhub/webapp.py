@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-12.1"
+APP_VERSION = "2026-11-12.2"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -524,7 +524,7 @@ class Data:
     def _photo(self, p) -> dict:
         return {"id": p["id"], "grp": p["grp"], "url": self.img_url(p["path"]),
                 "marked": self.img_url(p["marked_path"]) if p["marked_path"] else "",
-                "marks": json.loads(p["marks"]) if p["marks"] else [], "w": p["w"], "h": p["h"]}
+                "marks": json.loads(p["marks"]) if p["marks"] else [], "w": p["w"], "h": p["h"], "source": p["source"]}
 
     def _lm_row(self, r, thumb=None, n_photo: int = 0) -> dict:
         from . import local as LM

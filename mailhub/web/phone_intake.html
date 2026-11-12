@@ -1,0 +1,540 @@
+<title>현지 금형 사진 접수</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* 현장 폰 우선 한 줄 배치(금형 → 문제점 → 사진 → 올리기), PC 에서는 올린 사진을 카드 격자로. 개발 업무 비서와 같은 청록 계열 */
+:root {
+  --bg: #eef1f5; --panel: #ffffff; --panel-2: #f5f7fa; --line: #d6dce5; --line-2: #e6eaf0;
+  --fg: #17202b; --fg-2: #566275; --fg-3: #8a94a5;
+  --accent: #0e6a86; --accent-weak: #e0f0f5; --accent-fg: #ffffff;
+  --crit: #c4362b; --crit-weak: #fbe9e7; --warn: #b9700c; --warn-weak: #fdf1df; --ok: #2b7d50; --ok-weak: #e3f3ea;
+  --mark-r: #e8261c; --mark-b: #1565d8;
+  --font: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141a; --panel: #161d26; --panel-2: #1b232e; --line: #2a3443; --line-2: #212a36;
+  --fg: #e5eaf0; --fg-2: #a2adbd; --fg-3: #6f7b8c;
+  --accent: #4fb2cf; --accent-weak: #15303b; --accent-fg: #06222b;
+  --crit: #f07468; --crit-weak: #3a1d1b; --warn: #e3a54a; --warn-weak: #36280f; --ok: #5cc28a; --ok-weak: #15301f;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f141a; --panel: #161d26; --panel-2: #1b232e; --line: #2a3443; --line-2: #212a36;
+  --fg: #e5eaf0; --fg-2: #a2adbd; --fg-3: #6f7b8c;
+  --accent: #4fb2cf; --accent-weak: #15303b; --accent-fg: #06222b;
+  --crit: #f07468; --crit-weak: #3a1d1b; --warn: #e3a54a; --warn-weak: #36280f; --ok: #5cc28a; --ok-weak: #15301f;
+  color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 96px; }
+.wrap { max-width: 1100px; margin: 0 auto; }
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; padding-block: 18px 12px; border-bottom: 2px solid var(--fg); margin-bottom: 14px; }
+header.top .sub { font-family: var(--mono); font-size: 11.5px; color: var(--fg-2); letter-spacing: .05em; text-transform: uppercase; }
+header.top h1 { margin: 2px 0 0; font-size: 21px; font-weight: 700; text-wrap: balance; }
+.tabs { display: flex; gap: 4px; }
+.tab { border: 1px solid var(--line); background: var(--panel); color: var(--fg); padding: 8px 14px; font: inherit; font-size: 14px; border-radius: 6px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  padding: 9px 14px; border-radius: 7px; font-size: 14px; font-weight: 500; cursor: pointer; position: relative; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.sm { padding: 5px 10px; font-size: 13px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.notice { border: 1px solid var(--warn); color: var(--warn); background: var(--warn-weak); padding: 9px 12px; border-radius: 7px; font-size: 13.5px; margin-bottom: 12px; }
+.up { display: flex; flex-direction: column; gap: 12px; max-width: 760px; }
+.step { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.step h2 { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 8px; }
+.step h2 .n { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.step h2 .hint { font-size: 12px; color: var(--fg-3); font-weight: 400; }
+label.f { display: grid; gap: 4px; font-size: 12px; color: var(--fg-2); font-weight: 500; min-width: 0; }
+.f input, .f select, .f textarea, .search { width: 100%; font: inherit; font-size: 15px; color: var(--fg); background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 9px 10px; min-width: 0; }
+.f textarea { min-height: 72px; resize: vertical; }
+.row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: var(--panel-2); color: var(--fg-2); white-space: nowrap; }
+.chip.crit { background: var(--crit-weak); color: var(--crit); } .chip.warn { background: var(--warn-weak); color: var(--warn); }
+.chip.ok { background: var(--ok-weak); color: var(--ok); } .chip.acc { background: var(--accent-weak); color: var(--accent); }
+.vbtn { border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 999px; padding: 5px 12px; font-size: 13.5px; }
+.vbtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.vbtn .c { font-family: var(--mono); font-size: 11.5px; opacity: .8; margin-left: 4px; }
+.plist { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 7px; max-height: 280px; overflow-y: auto; }
+.plist li { padding: 9px 12px; border-bottom: 1px solid var(--line-2); cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; }
+.plist li:last-child { border-bottom: 0; }
+.plist li:hover, .plist li:focus-visible { background: var(--accent-weak); outline: none; }
+.pn { font-family: var(--mono); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.pname { font-size: 13px; color: var(--fg-2); min-width: 0; overflow-wrap: anywhere; }
+.cnt { font-size: 11.5px; color: var(--fg-3); white-space: nowrap; }
+.sel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--accent-weak); border-radius: 7px; padding: 9px 12px; }
+.sel .pn { color: var(--accent); }
+.issues { display: grid; gap: 6px; }
+.iss { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; border: 1px solid var(--line); border-radius: 7px; padding: 9px 10px; cursor: pointer; background: var(--panel); }
+.iss input { margin: 3px 0 0; accent-color: var(--accent); width: 18px; height: 18px; }
+.iss b { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.iss .meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.iss:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; align-self: flex-start; }
+.seg button { border: 0; background: var(--panel); color: var(--fg); padding: 7px 14px; font-size: 14px; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: 600; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.tile { display: grid; gap: 4px; min-width: 0; }
+.tim { position: relative; width: 100%; max-width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #11161c; }
+.tim svg { width: 100%; height: 100%; display: block; }
+.tim .g { position: absolute; left: 4px; top: 4px; font-size: 11px; font-weight: 700; color: #fff; background: rgba(20, 30, 40, .75); border-radius: 3px; padding: 0 5px; }
+.tact { display: flex; gap: 3px; }
+.tact button { flex: 1; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 5px; font-size: 12.5px; padding: 4px 0; }
+.tact button.mk { flex: 2; color: var(--mark-r); font-weight: 600; }
+.adds { display: flex; flex-wrap: wrap; gap: 8px; }
+.savebar { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; box-shadow: 0 6px 20px rgba(10, 20, 30, .12); }
+.savebar .msg { font-size: 13px; color: var(--fg-2); flex: 1 1 180px; min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.toolbar select, .toolbar input { font: inherit; font-size: 14px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; min-width: 0; }
+.toolbar input { flex: 1 1 200px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; padding: 10px; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.card:hover { border-color: var(--accent); }
+.card .th { width: 120px; max-width: 100%; aspect-ratio: 4 / 3; border-radius: 6px; overflow: hidden; background: #11161c; border: 1px solid var(--line); }
+.card .th svg { width: 100%; height: 100%; display: block; }
+.card .m { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.card .p { font-size: 13.5px; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.when { font-family: var(--mono); font-size: 11.5px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 26px 16px; text-align: center; color: var(--fg-2); font-size: 14px; display: grid; gap: 6px; justify-items: center; }
+.empty b { color: var(--fg); }
+.ov { position: fixed; inset: 0; z-index: 30; background: rgba(8, 12, 16, .88); display: flex; flex-direction: column; gap: 8px;
+  padding: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); --mc: var(--mark-r); }
+.ov .bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--panel); border-radius: 8px; padding: 8px; }
+.ov .bar .t { font-weight: 700; margin-right: auto; font-size: 14px; }
+.ov .hint { background: var(--panel); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--fg-2); }
+.ov .hint b { color: var(--mc); }
+.ov .stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.ov canvas, .ov .big { max-width: 100%; max-height: 100%; border-radius: 6px; background: #000; }
+.ov canvas { touch-action: none; cursor: crosshair; }
+.ov .big { width: 100%; height: 100%; }
+.ov .tool[aria-pressed="true"] { background: var(--mc); color: #fff; border-color: var(--mc); }
+.ov .cols { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.ov .cols .col { border: 0; border-radius: 0; }
+.ov .cols .col i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.ov .cols .col[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: 700; }
+.ov .lbl { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ov .lbl input { width: 8em; font: inherit; font-size: 14px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--fg); }
+.ov .info { background: var(--panel); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; display: grid; gap: 4px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 40; background: var(--fg); color: var(--bg);
+  padding: 10px 16px; border-radius: 8px; font-size: 14px; max-width: calc(100% - 32px); }
+@media (max-width: 560px) { .row2 { grid-template-columns: minmax(0, 1fr); } .cards { grid-template-columns: minmax(0, 1fr); } .card { grid-template-columns: 96px minmax(0, 1fr); } .card .th { width: 96px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div><div class="sub" id="subline">현장 촬영 → PC 업무 비서</div><h1>현지 금형 사진 접수</h1></div>
+    <nav class="tabs" role="tablist" aria-label="보기">
+      <button class="tab" role="tab" id="tabUp" type="button" aria-selected="true">사진 올리기</button>
+      <button class="tab" role="tab" id="tabList" type="button" aria-selected="false">올린 사진</button>
+    </nav>
+  </header>
+  <div id="notice" class="notice" hidden></div>
+
+  <section id="vUp" class="up">
+    <div class="step">
+      <h2><span class="n">1</span>금형 고르기<span class="hint" id="catHint"></span></h2>
+      <div class="row2">
+        <label class="f">차종<select id="car"></select></label>
+        <label class="f">품번 · 품명 검색<input class="search" id="pq" type="search" placeholder="예: 84611, CONSOLE" autocomplete="off" autocapitalize="characters"></label>
+      </div>
+      <div class="chips" id="vendors" role="group" aria-label="외주처"></div>
+      <ul class="plist" id="plist" hidden></ul>
+      <div class="sel" id="selMold" hidden></div>
+      <details id="manual"><summary class="pname">목록에 없는 금형 직접 입력</summary>
+        <div class="row2" style="margin-top:8px">
+          <label class="f">차종<input id="mCar" placeholder="예: BC4t CUV"></label>
+          <label class="f">외주처<input id="mVendor" placeholder="예: ASHA-2" autocapitalize="characters"></label>
+          <label class="f">품번<input id="mPn" placeholder="예: 86511-BNGA0" autocapitalize="characters"></label>
+          <label class="f">품명<input id="mName" placeholder="예: COVER ASSY-FR BUMPER UPR"></label>
+        </div>
+        <button class="btn sm" id="mUse" type="button" style="margin-top:8px">이 금형으로</button>
+      </details>
+    </div>
+
+    <div class="step" id="stepIssue">
+      <h2><span class="n">2</span>문제점<span class="hint">진행 중인 문제점을 고르거나 새로 적으세요</span></h2>
+      <div class="issues" id="issues"><div class="empty">먼저 금형을 고르세요</div></div>
+      <div id="newBox" hidden class="row2">
+        <label class="f" style="grid-column:1/-1">새 문제점<textarea id="nProb" placeholder="발생 현상 · 부위 · 수치 (예: 측면 S/D 코아 단차 0.3mm, BURR)"></textarea></label>
+        <label class="f">유형<select id="nCat"><option>습합</option><option>취출</option><option>WELD LINE</option><option>SINK</option><option>미성형</option><option>GAS</option><option selected>기타</option></select></label>
+        <label class="f">중요도<select id="nImp"><option value="">-</option><option>상</option><option>중</option><option>하</option></select></label>
+      </div>
+    </div>
+
+    <div class="step">
+      <h2><span class="n">3</span>사진<span class="hint">한 장씩 찍으면 바로 수정부위 표시 화면이 열립니다</span></h2>
+      <div class="seg" role="group" aria-label="사진 칸"><button type="button" id="gBefore" aria-pressed="true">수정 전 (문제)</button><button type="button" id="gAfter" aria-pressed="false">수정 후 (개선 · 리워크)</button></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="adds">
+        <label class="btn primary">사진 촬영<input type="file" id="cam" accept="image/*" capture="environment"></label>
+        <label class="btn">앨범 · 파일<input type="file" id="alb" accept="image/*" multiple></label>
+        <span class="pname" style="align-self:center">PC: 끌어놓기 · Ctrl+V</span>
+      </div>
+      <label class="f">메모 (선택)<input id="memo" placeholder="예: T2 사출품, 7번 캐비티"></label>
+    </div>
+
+    <div class="savebar"><button class="btn primary" id="send" type="button" disabled>올리기</button><span class="msg" id="sendMsg">금형 · 문제점 · 사진을 고르면 올릴 수 있습니다</span></div>
+  </section>
+
+  <section id="vList" hidden>
+    <div class="toolbar">
+      <select id="fSync" aria-label="반영 상태"><option value="wait">PC 반영 대기</option><option value="done">PC 반영됨</option><option value="all">전체</option></select>
+      <select id="fCar" aria-label="차종"><option value="">차종 전체</option></select>
+      <input type="search" id="fq" placeholder="품번 · 품명 · 문제점 · 외주처 검색">
+      <span class="pname" id="fCount"></span>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(() => {
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const IMP = { '상': 'crit', '중': 'warn', '하': '' };
+const ST = { '발생': 'crit', '원인분석': 'warn', '대책수립': 'warn', '대책적용': 'acc', '효과확인': 'ok' };
+let db = null, assets = null, user = null, me = null, editor = false;
+let catalog = [], uploads = [], profiles = {}, loaded = false;
+const sel = { car: '', vendor: '', mold: null, issue: '' };   // issue: 문제점 키 또는 'new'
+let queue = [], grp = 'before', sending = false;
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => el.hidden = true, 3200); }
+function notice(t) { $('notice').hidden = !t; $('notice').textContent = t || ''; }
+const lsGet = (k) => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } };
+
+/* ---------- 표시 (업무 비서 · 검토서와 같은 방식: 원본 위 0~1 비율 좌표) ---------- */
+const MCOL = { r: '#e8261c', b: '#1565d8' }, MLAB = { r: '수정부위', b: '리워크부위' };
+const r4 = n => Math.round(n * 10000) / 10000;
+const markLW = (W, H) => Math.max(3, Math.max(W, H) / 140);
+function labelBox(t, fs) { let w = 0; for (const ch of t) w += ch.charCodeAt(0) > 0x2000 ? fs : fs * 0.62; return { w: w + fs * 1.1, h: fs * 1.7 }; }
+function parsePts(p) { return typeof p === 'string' ? p.split(';').filter(Boolean).map(s => { const [x, y] = s.split(','); return { x: +x, y: +y }; }) : (p || []); }
+function svgMarks(marks, W, H) {
+  const lw = markLW(W, H); let out = '', labels = '';
+  for (const m of (marks || [])) {
+    const R = MCOL[m.c] || MCOL.r, ax = m.a?.x * W, ay = m.a?.y * H, bx = m.b?.x * W, by = m.b?.y * H;
+    if (m.t === 'ellipse') out += `<ellipse cx="${(ax + bx) / 2}" cy="${(ay + by) / 2}" rx="${Math.abs(bx - ax) / 2}" ry="${Math.abs(by - ay) / 2}" fill="none" stroke="${R}" stroke-width="${lw}"/>`;
+    else if (m.t === 'rect') out += `<rect x="${Math.min(ax, bx)}" y="${Math.min(ay, by)}" width="${Math.abs(bx - ax)}" height="${Math.abs(by - ay)}" fill="none" stroke="${R}" stroke-width="${lw}" stroke-dasharray="${lw * 2.5} ${lw * 1.5}"/>`;
+    else if (m.t === 'pen') out += `<polyline points="${parsePts(m.p).map(p => `${p.x * W},${p.y * H}`).join(' ')}" fill="none" stroke="${R}" stroke-width="${lw}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    else if (m.t === 'arrow') {
+      const ang = Math.atan2(by - ay, bx - ax), h = lw * 4.2, hx = bx - h * 0.8 * Math.cos(ang), hy = by - h * 0.8 * Math.sin(ang);
+      out += `<line x1="${ax}" y1="${ay}" x2="${hx}" y2="${hy}" stroke="${R}" stroke-width="${lw * 1.15}" stroke-linecap="round"/><polygon points="${bx},${by} ${bx - h * Math.cos(ang - 0.42)},${by - h * Math.sin(ang - 0.42)} ${bx - h * Math.cos(ang + 0.42)},${by - h * Math.sin(ang + 0.42)}" fill="${R}"/>`;
+      if (m.label) { const fs = lw * 5.2, b = labelBox(m.label, fs);
+        labels += `<rect x="${ax - b.w / 2}" y="${ay - b.h / 2}" width="${b.w}" height="${b.h}" rx="${fs * 0.25}" fill="${R}" stroke="#fff" stroke-width="${lw * 0.5}"/><text x="${ax}" y="${ay}" fill="#fff" font-size="${fs}" font-weight="700" text-anchor="middle" dominant-baseline="central" font-family="Malgun Gothic,Apple SD Gothic Neo,sans-serif">${esc(m.label)}</text>`; }
+    }
+  }
+  return out + labels;
+}
+function drawMarks(ctx, marks, W, H) {
+  const lw = markLW(W, H), later = [];
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const m of (marks || [])) {
+    const ax = m.a?.x * W, ay = m.a?.y * H, bx = m.b?.x * W, by = m.b?.y * H, R = MCOL[m.c] || MCOL.r;
+    ctx.strokeStyle = R; ctx.fillStyle = R; ctx.lineWidth = lw; ctx.setLineDash([]); ctx.beginPath();
+    if (m.t === 'ellipse') { ctx.ellipse((ax + bx) / 2, (ay + by) / 2, Math.abs(bx - ax) / 2 || 1, Math.abs(by - ay) / 2 || 1, 0, 0, Math.PI * 2); ctx.stroke(); }
+    else if (m.t === 'rect') { ctx.setLineDash([lw * 2.5, lw * 1.5]); ctx.strokeRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay)); }
+    else if (m.t === 'pen') { parsePts(m.p).forEach((p, i) => i ? ctx.lineTo(p.x * W, p.y * H) : ctx.moveTo(p.x * W, p.y * H)); ctx.stroke(); }
+    else if (m.t === 'arrow') {
+      const ang = Math.atan2(by - ay, bx - ax), h = lw * 4.2;
+      ctx.lineWidth = lw * 1.15; ctx.moveTo(ax, ay); ctx.lineTo(bx - h * 0.8 * Math.cos(ang), by - h * 0.8 * Math.sin(ang)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx - h * Math.cos(ang - 0.42), by - h * Math.sin(ang - 0.42)); ctx.lineTo(bx - h * Math.cos(ang + 0.42), by - h * Math.sin(ang + 0.42)); ctx.closePath(); ctx.fill();
+      if (m.label) later.push({ x: ax, y: ay, t: m.label, R });
+    }
+  }
+  for (const l of later) {
+    const fs = lw * 5.2; ctx.font = `700 ${fs}px "Malgun Gothic","Apple SD Gothic Neo",sans-serif`;
+    const w = ctx.measureText(l.t).width + fs * 1.1, h = fs * 1.7;
+    ctx.fillStyle = l.R; ctx.strokeStyle = '#fff'; ctx.lineWidth = lw * 0.5; ctx.setLineDash([]); ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(l.x - w / 2, l.y - h / 2, w, h, fs * 0.25); else ctx.rect(l.x - w / 2, l.y - h / 2, w, h);
+    ctx.fill(); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(l.t, l.x, l.y + fs * 0.04);
+  }
+  ctx.restore();
+}
+const photoSVG = (src, W, H, marks, slice) => `<svg viewBox="0 0 ${W || 1600} ${H || 1200}" preserveAspectRatio="xMidYMid ${slice ? 'slice' : 'meet'}"><image href="${esc(src)}" x="0" y="0" width="${W || 1600}" height="${H || 1200}"/>${svgMarks(marks, W || 1600, H || 1200)}</svg>`;
+
+function annotate(base, initial, g) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div'); ov.className = 'ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', '수정 부위 표시');
+    ov.innerHTML = `<div class="bar"><span class="t">수정 부위 표시</span>
+      ${[['circleL', '◎ 동그라미+라벨'], ['circle', '○ 동그라미'], ['arrow', '➜ 화살표+라벨'], ['rect', '□ 사각'], ['pen', '펜']].map(([k, l]) => `<button class="btn sm tool" type="button" data-tool="${k}">${l}</button>`).join('')}
+      <span class="cols"><button class="btn sm col" type="button" data-col="r"><i style="background:${MCOL.r}"></i>수정부위</button><button class="btn sm col" type="button" data-col="b"><i style="background:${MCOL.b}"></i>리워크부위</button></span>
+      <label class="lbl">라벨<input id="mkLabel"></label></div>
+      <div class="hint" id="mkHint"></div><div class="stage"><canvas></canvas></div>
+      <div class="bar"><button class="btn sm" type="button" id="mkUndo">되돌리기</button><button class="btn sm" type="button" id="mkClear">모두 지우기</button><span style="flex:1"></span>
+        <button class="btn sm" type="button" id="mkCancel">취소</button><button class="btn sm primary" type="button" id="mkDone">적용</button></div>`;
+    document.body.appendChild(ov);
+    const q = (s) => ov.querySelector(s), cv = q('canvas'), ctx = cv.getContext('2d'); cv.width = base.width; cv.height = base.height;
+    const W = cv.width, H = cv.height, minWH = Math.min(W, H), DEF_R = minWH * 0.08;
+    let tool = 'circleL', marks = JSON.parse(JSON.stringify(initial || [])), drawing = null, col = g === 'after' ? 'b' : 'r';
+    const HINTS = { circleL: '표시할 부위를 <b>톡 누르면</b> 동그라미와 라벨 화살표가 함께 그려집니다. 누른 채 끌면 크기를 조절합니다.', circle: '표시할 부위를 <b>톡 누르거나</b> 끌어서 동그라미를 그립니다.',
+      arrow: '라벨을 둘 자리에서 <b>수정 부위 쪽으로 끌어</b> 화살표를 그립니다.', rect: '끌어서 점선 사각형을 그립니다.', pen: '손가락 · 마우스로 자유롭게 그립니다.' };
+    const setTool = (t) => { tool = t; ov.querySelectorAll('.tool').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === t)); q('#mkHint').innerHTML = HINTS[t] + ' 원본 사진은 그대로 두고 표시만 겹쳐 저장합니다.'; };
+    const setCol = (c) => { const lb = q('#mkLabel'); if (!lb.value.trim() || lb.value.trim() === MLAB[col]) lb.value = MLAB[c]; col = c; ov.style.setProperty('--mc', MCOL[c]); ov.querySelectorAll('.col').forEach(b => b.setAttribute('aria-pressed', b.dataset.col === c)); };
+    q('#mkLabel').value = MLAB[col]; setCol(col); setTool('circleL');
+    ov.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+    ov.querySelectorAll('.col').forEach(b => b.addEventListener('click', () => setCol(b.dataset.col)));
+    const draw = () => { ctx.drawImage(base, 0, 0); drawMarks(ctx, drawing ? [...marks, drawing] : marks, W, H); };
+    const pos = (e) => { const r = cv.getBoundingClientRect(); return { x: r4(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))), y: r4(Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))) }; };
+    const circleAt = (c, rpx) => ({ t: 'ellipse', a: { x: r4(c.x - rpx / W), y: r4(c.y - rpx / H) }, b: { x: r4(c.x + rpx / W), y: r4(c.y + rpx / H) } });
+    const autoArrow = (cx, cy, pw, ph) => { const dx = cx < 0.5 ? 1 : -1, dy = cy < 0.5 ? 1 : -1, dd = 0.17 + Math.max(pw, ph) / 2;
+      const tail = { x: r4(Math.min(0.88, Math.max(0.12, cx + dx * dd))), y: r4(Math.min(0.9, Math.max(0.1, cy + dy * dd * 0.75))) }, ang = Math.atan2(cy - tail.y, cx - tail.x);
+      return { t: 'arrow', a: tail, b: { x: r4(cx - Math.cos(ang) * pw / 2 * 1.04), y: r4(cy - Math.sin(ang) * ph / 2 * 1.04) } }; };
+    cv.onpointerdown = (e) => { cv.setPointerCapture(e.pointerId); const p = pos(e);
+      if (tool === 'circle' || tool === 'circleL') { drawing = { ...circleAt(p, DEF_R), c: col, _c: p }; draw(); return; }
+      drawing = tool === 'pen' ? { t: 'pen', p: [p], c: col } : { t: tool, a: p, b: p, c: col, ...(tool === 'arrow' ? { label: q('#mkLabel').value.trim() } : {}) }; draw(); };
+    cv.onpointermove = (e) => { if (!drawing) return; const p = pos(e);
+      if (drawing._c) { const r = Math.hypot((p.x - drawing._c.x) * W, (p.y - drawing._c.y) * H); Object.assign(drawing, circleAt(drawing._c, Math.max(r, minWH * 0.02))); draw(); return; }
+      if (drawing.t === 'pen') drawing.p.push(p); else drawing.b = p; draw(); };
+    cv.onpointerup = cv.onpointercancel = () => { if (!drawing) return; const d = drawing; drawing = null;
+      if (d.t === 'pen') { if (d.p.length > 1) marks.push({ t: 'pen', c: d.c, p: d.p.map(p => `${p.x},${p.y}`).join(';') }); }
+      else if (d._c) { marks.push({ t: 'ellipse', a: d.a, b: d.b, c: d.c });
+        if (tool === 'circleL') marks.push({ ...autoArrow(d._c.x, d._c.y, Math.abs(d.b.x - d.a.x), Math.abs(d.b.y - d.a.y)), c: d.c, label: q('#mkLabel').value.trim() }); }
+      else if (Math.hypot((d.b.x - d.a.x) * W, (d.b.y - d.a.y) * H) > minWH * 0.02) { const { _c, ...m } = d; marks.push(m); }
+      draw(); };
+    const close = (v) => { ov.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
+    document.addEventListener('keydown', onKey, true);
+    q('#mkUndo').onclick = () => { marks.pop(); draw(); };
+    q('#mkClear').onclick = () => { marks = []; draw(); };
+    q('#mkCancel').onclick = () => close(null);
+    q('#mkDone').onclick = () => close(marks);
+    draw();
+  });
+}
+
+/* ---------- 탭 ---------- */
+function show(v) {
+  $('vUp').hidden = v !== 'up'; $('vList').hidden = v !== 'list';
+  $('tabUp').setAttribute('aria-selected', v === 'up'); $('tabList').setAttribute('aria-selected', v === 'list');
+  if (location.hash !== '#' + (v === 'list' ? 'list' : 'up')) history.replaceState(null, '', '#' + (v === 'list' ? 'list' : 'up'));
+}
+$('tabUp').onclick = () => show('up');
+$('tabList').onclick = () => show('list');
+window.addEventListener('hashchange', () => show(location.hash === '#list' ? 'list' : 'up'));
+
+/* ---------- 1. 금형 고르기 ---------- */
+const cars = () => [...new Set(catalog.map(c => c.car))].sort();
+const docsOf = (car, vendor) => catalog.filter(c => c.car === car && (!vendor || c.vendor === vendor));
+function renderPicker() {
+  const cs = cars();
+  $('catHint').textContent = catalog.length ? `${cs.length}개 차종 · 금형 ${catalog.reduce((a, c) => a + (c.molds || []).length, 0)}벌` : '';
+  if (!sel.car || !cs.includes(sel.car)) sel.car = cs.includes(lsGet('car')) ? lsGet('car') : (cs[0] || '');
+  $('car').innerHTML = cs.length ? cs.map(c => `<option ${c === sel.car ? 'selected' : ''}>${esc(c)}</option>`).join('') : '<option value="">목록 없음</option>';
+  const vs = docsOf(sel.car);
+  $('vendors').innerHTML = vs.length ? [['', '전체', vs.reduce((a, c) => a + (c.molds || []).length, 0)], ...vs.map(v => [v.vendor, v.vendor, (v.molds || []).length])]
+    .map(([k, l, n]) => `<button class="vbtn" type="button" data-v="${esc(k)}" aria-pressed="${sel.vendor === k}">${esc(l)}<span class="c">${n}</span></button>`).join('') : '';
+  if (loaded && !catalog.length) $('manual').open = true;
+  renderPartList();
+}
+function renderPartList() {
+  const q = $('pq').value.trim().toUpperCase().replace(/\s+/g, ' ');
+  const show = q.length >= 2 || (sel.vendor && !sel.mold);
+  if (!show) { $('plist').hidden = true; return; }
+  const rows = [];
+  for (const d of docsOf(sel.car, sel.vendor)) for (const m of (d.molds || [])) {
+    if (q && !(m[0] + ' ' + (m[1] || '')).toUpperCase().includes(q)) continue;
+    rows.push({ vendor: d.vendor, pn: m[0], name: m[1] || '', item: m[2] || '', open: (d.issues || []).filter(i => i[2] === m[0]).length });
+  }
+  $('plist').hidden = false;
+  $('plist').innerHTML = rows.length ? rows.slice(0, 80).map((r, i) => `<li tabindex="0" data-i="${i}"><span class="pn">${esc(r.pn)}</span><span class="pname">${esc(r.name)}</span><span class="cnt">${esc(r.vendor)}${r.open ? ` · 진행 ${r.open}` : ''}</span></li>`).join('')
+    : `<li style="cursor:default"><span class="pname" style="grid-column:1/-1">맞는 금형이 없습니다. 아래 '직접 입력'을 쓰세요</span></li>`;
+  $('plist').onclick = $('plist').onkeydown = (e) => { if (e.type === 'keydown' && e.key !== 'Enter') return; const li = e.target.closest('li[data-i]'); if (li) pickMold(rows[+li.dataset.i]); };
+}
+function pickMold(m) {
+  sel.mold = { car: sel.car || m.car, vendor: m.vendor, pn: m.pn, name: m.name, item: m.item || '' };
+  sel.issue = ''; $('plist').hidden = true; $('pq').value = '';
+  renderMold(); renderIssues(); updateSend();
+}
+function renderMold() {
+  const m = sel.mold;
+  $('selMold').hidden = !m;
+  if (m) $('selMold').innerHTML = `<span class="pn">${esc(m.pn)}</span><span class="pname">${esc(m.name)}</span><span class="chip">${esc(m.vendor)}</span><span class="chip">${esc(m.car)}</span><button class="btn sm" type="button" id="unpick" style="margin-left:auto">다른 금형</button>`;
+  $('unpick')?.addEventListener('click', () => { sel.mold = null; sel.issue = ''; renderMold(); renderIssues(); renderPartList(); updateSend(); $('pq').focus(); });
+}
+$('car').onchange = () => { sel.car = $('car').value; sel.vendor = ''; lsSet('car', sel.car); renderPicker(); };
+$('vendors').onclick = (e) => { const b = e.target.closest('[data-v]'); if (!b) return; sel.vendor = b.dataset.v; renderPicker(); };
+$('pq').oninput = renderPartList;
+$('mUse').onclick = () => {
+  const car = $('mCar').value.trim(), v = $('mVendor').value.trim().toUpperCase(), pn = $('mPn').value.trim().toUpperCase();
+  if (!car || !v || !pn) return toast('차종 · 외주처 · 품번을 모두 입력하세요');
+  sel.car = car; pickMold({ car, vendor: v, pn, name: $('mName').value.trim() }); $('manual').open = false;
+};
+
+/* ---------- 2. 문제점 ---------- */
+function moldIssues() {
+  const m = sel.mold; if (!m) return [];
+  const d = catalog.find(c => c.car === m.car && c.vendor === m.vendor);
+  return (d?.issues || []).filter(i => i[2] === m.pn);
+}
+function renderIssues() {
+  const list = moldIssues();
+  if (!sel.mold) { $('issues').innerHTML = '<div class="empty">먼저 금형을 고르세요</div>'; $('newBox').hidden = true; return; }
+  if (!sel.issue) sel.issue = list.length ? '' : 'new';
+  $('issues').innerHTML = list.map(i => `<label class="iss"><input type="radio" name="iss" value="${esc(i[0])}" ${sel.issue === i[0] ? 'checked' : ''}>
+      <span><b>${esc(i[6])}</b><span class="meta">${i[1] ? `<span class="chip">L${esc(i[1])}</span>` : ''}<span class="chip">${esc(i[3])}</span>${i[4] ? `<span class="chip ${IMP[i[4]] || ''}">중요도 ${esc(i[4])}</span>` : ''}<span class="chip ${ST[i[5]] || ''}">${esc(i[5])}</span></span></span></label>`).join('')
+    + `<label class="iss"><input type="radio" name="iss" value="new" ${sel.issue === 'new' ? 'checked' : ''}><span><b>새 문제점</b><span class="meta"><span class="pname">목록에 없는 문제를 새로 적습니다</span></span></span></label>`;
+  $('newBox').hidden = sel.issue !== 'new';
+}
+$('issues').onchange = (e) => { if (e.target.name === 'iss') { sel.issue = e.target.value; $('newBox').hidden = sel.issue !== 'new'; updateSend(); } };
+$('nProb').oninput = updateSend;
+
+/* ---------- 3. 사진 ---------- */
+function setGrp(g) { grp = g; $('gBefore').setAttribute('aria-pressed', g === 'before'); $('gAfter').setAttribute('aria-pressed', g === 'after'); }
+$('gBefore').onclick = () => setGrp('before');
+$('gAfter').onclick = () => setGrp('after');
+function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+async function shrink(file, max) {
+  const url = URL.createObjectURL(file);
+  try { const img = await loadImg(url); const r = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * r); c.height = Math.round(img.naturalHeight * r); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c; }
+  finally { URL.revokeObjectURL(url); }
+}
+async function addFiles(files) {
+  const imgs = [...files].filter(f => /^image\//.test(f.type));
+  if (!imgs.length) { if (files.length) toast('사진 파일만 넣을 수 있습니다'); return; }
+  for (const f of imgs) {
+    try {
+      const base = await shrink(f, 1800);
+      let marks = [];
+      if (imgs.length === 1) { const m = await annotate(base, [], grp); if (m === null) return; marks = m; }
+      queue.push({ base, marks, grp, url: base.toDataURL('image/jpeg', 0.8) });
+    } catch (e) { toast('사진을 읽지 못했습니다. 다른 사진으로 해 보세요'); }
+  }
+  renderTiles(); updateSend();
+}
+function renderTiles() {
+  $('tiles').innerHTML = queue.map((p, i) => `<div class="tile"><div class="tim">${photoSVG(p.url, p.base.width, p.base.height, p.marks)}<span class="g">${p.grp === 'after' ? '수정 후' : '수정 전'}</span></div>
+    <div class="tact"><button class="mk" type="button" data-a="mark" data-i="${i}">○ 표시</button><button type="button" data-a="flip" data-i="${i}" aria-label="수정 전 · 후 바꾸기">전↔후</button><button type="button" data-a="del" data-i="${i}" aria-label="빼기">✕</button></div></div>`).join('');
+}
+$('tiles').onclick = async (e) => {
+  const b = e.target.closest('[data-a]'); if (!b) return; const p = queue[+b.dataset.i];
+  if (b.dataset.a === 'del') queue.splice(+b.dataset.i, 1);
+  else if (b.dataset.a === 'flip') p.grp = p.grp === 'after' ? 'before' : 'after';
+  else { const m = await annotate(p.base, p.marks, p.grp); if (m) p.marks = m; }
+  renderTiles(); updateSend();
+};
+$('cam').onchange = (e) => { const f = [...e.target.files]; e.target.value = ''; addFiles(f); };
+$('alb').onchange = (e) => { const f = [...e.target.files]; e.target.value = ''; addFiles(f); };
+document.addEventListener('paste', (e) => {
+  if ($('vUp').hidden || document.querySelector('.ov')) return;
+  const f = [...(e.clipboardData?.items || [])].filter(i => i.kind === 'file' && i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
+  if (f.length) { e.preventDefault(); addFiles(f); }
+});
+document.addEventListener('dragover', (e) => { if (!$('vUp').hidden) e.preventDefault(); });
+document.addEventListener('drop', (e) => { if ($('vUp').hidden) return; e.preventDefault(); addFiles([...(e.dataTransfer?.files || [])]); });
+
+/* ---------- 올리기 ---------- */
+function ready() {
+  if (!sel.mold) return '금형을 고르세요';
+  if (!sel.issue) return '문제점을 고르세요';
+  if (sel.issue === 'new' && !$('nProb').value.trim()) return '새 문제점 내용을 적으세요';
+  if (!queue.length) return '사진을 찍거나 고르세요';
+  if (!db) return '이 화면에서는 저장할 수 없습니다';
+  if (!assets) return '사진 올리기는 이 페이지를 편집할 수 있는 사람만 할 수 있습니다';
+  return '';
+}
+function updateSend() {
+  const why = ready();
+  $('send').disabled = !!why || sending;
+  $('send').textContent = queue.length ? `올리기 (${queue.length}장)` : '올리기';
+  const it = moldIssues().find(i => i[0] === sel.issue);
+  if (!sending) $('sendMsg').textContent = why || `${sel.mold.pn} · ${sel.issue === 'new' ? '새 문제점' : (it && it[1] ? 'L' + it[1] + ' ' : '') + (it ? it[6] : '')}`;
+}
+const blobOf = (canvas) => new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.86));
+function flatten(base, marks) { const c = document.createElement('canvas'); c.width = base.width; c.height = base.height; const x = c.getContext('2d'); x.drawImage(base, 0, 0); drawMarks(x, marks, c.width, c.height); return c; }
+$('send').onclick = async () => {
+  if (ready() || sending) return;
+  sending = true; updateSend();
+  const m = sel.mold, iss = moldIssues().find(i => i[0] === sel.issue), batch = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const base = { batch, car: m.car, vendor: m.vendor, part_no: m.pn, part_name: m.name, key: iss ? iss[0] : '', l: iss ? iss[1] : 0,
+    problem: iss ? iss[6] : $('nProb').value.trim(), category: iss ? iss[3] : $('nCat').value, importance: iss ? iss[4] : $('nImp').value,
+    memo: $('memo').value.trim(), by: me || '', synced: false, synced_l: 0 };
+  let done = 0;
+  try {
+    while (queue.length) {
+      const p = queue[0];
+      $('sendMsg').textContent = `올리는 중… ${done + 1} / ${done + queue.length}`;
+      const a = await assets.upload(await blobOf(p.base), { type: 'image/jpeg' });
+      const f = p.marks.length ? await assets.upload(await blobOf(flatten(p.base, p.marks)), { type: 'image/jpeg' }) : null;
+      await db.collection('uploads').add({ ...base, grp: p.grp, asset: a.id, flat: f ? f.id : '', w: p.base.width, h: p.base.height, marks: p.marks, at: new Date().toISOString() });
+      queue.shift(); done++; renderTiles();
+    }
+    $('memo').value = ''; if (sel.issue === 'new') { $('nProb').value = ''; }
+    toast(`${done}장을 올렸습니다. PC 업무 비서에서 /local-sync 로 들여옵니다`);
+  } catch (err) {
+    const code = err?.code || '';
+    toast(code === 'too_large' ? '사진이 너무 큽니다' : code === 'quota_or_state' || code === 'quota_exceeded' ? '저장 공간이 찼습니다. 반영된 사진을 정리해 주세요'
+      : code === 'rate_limited' || code === 'resource_exhausted' ? '잠시 후 다시 올려 주세요' : `올리지 못했습니다 (${done}장 완료). 남은 사진으로 다시 올리기를 누르세요`);
+  } finally { sending = false; updateSend(); }
+};
+
+/* ---------- 올린 사진 (PC · 폰 공통) ---------- */
+function renderList() {
+  const f = $('fSync').value, car = $('fCar').value, q = $('fq').value.trim().toLowerCase();
+  const cs = [...new Set(uploads.map(u => u.car))].sort();
+  $('fCar').innerHTML = `<option value="">차종 전체</option>` + cs.map(c => `<option ${c === car ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  const rows = uploads.filter(u => (f === 'all' || (f === 'done') === !!u.synced) && (!car || u.car === car) &&
+    (!q || [u.part_no, u.part_name, u.problem, u.vendor, u.memo].join(' ').toLowerCase().includes(q)));
+  const wait = uploads.filter(u => !u.synced).length;
+  $('tabList').textContent = wait ? `올린 사진 (${wait})` : '올린 사진';
+  $('fCount').textContent = `${rows.length}장`;
+  $('cards').innerHTML = rows.length ? rows.map((u, i) => `<button class="card" type="button" data-i="${i}">
+      <div class="th">${u.asset ? photoSVG('/_blob/' + u.asset, u.w, u.h, u.marks, true) : ''}</div>
+      <div class="m"><span class="pn">${esc(u.part_no)}</span><span class="pname">${esc(u.part_name)} · ${esc(u.vendor)}</span>
+        <span class="p">${u.l ? `L${esc(u.l)} · ` : '새 문제점 · '}${esc(u.problem)}</span>
+        <span class="chips"><span class="chip">${u.grp === 'after' ? '수정 후' : '수정 전'}</span>${u.synced ? `<span class="chip ok">PC 반영 · L${esc(u.synced_l)}</span>` : '<span class="chip warn">PC 반영 대기</span>'}</span>
+        <span class="when">${esc((u.at || '').slice(0, 16).replace('T', ' '))}${u.by && profiles[u.by]?.name ? ' · ' + esc(profiles[u.by].name) : ''}</span></div></button>`).join('')
+    : `<div class="empty"><b>${f === 'wait' ? 'PC 반영을 기다리는 사진이 없습니다' : '올린 사진이 없습니다'}</b><span>[사진 올리기]에서 금형과 문제점을 고르고 촬영하면 여기에 쌓입니다.</span></div>`;
+  $('cards').onclick = (e) => { const c = e.target.closest('[data-i]'); if (c) openPhoto(rows[+c.dataset.i]); };
+}
+['fSync', 'fCar'].forEach(id => $(id).onchange = renderList);
+$('fq').oninput = renderList;
+async function openPhoto(u) {
+  const ov = document.createElement('div'); ov.className = 'ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', '사진 보기');
+  const canDel = !u.synced && assets && (u.by === me || editor);
+  ov.innerHTML = `<div class="bar"><span class="t">${esc(u.part_no)} · ${u.grp === 'after' ? '수정 후' : '수정 전'}</span>${canDel ? '<button class="btn sm" type="button" id="pvDel">지우기</button>' : ''}<button class="btn sm primary" type="button" id="pvClose">닫기</button></div>
+    <div class="stage"><div class="big">${photoSVG('/_blob/' + u.asset, u.w, u.h, u.marks)}</div></div>
+    <div class="info"><span><b>${esc(u.part_name)}</b> · ${esc(u.vendor)} · ${esc(u.car)}</span><span>${u.l ? `L${esc(u.l)} ` : '새 문제점 '}${esc(u.problem)}${u.category ? ` · ${esc(u.category)}` : ''}${u.importance ? ` · 중요도 ${esc(u.importance)}` : ''}</span>
+      ${u.memo ? `<span>메모: ${esc(u.memo)}</span>` : ''}<span class="when">${esc((u.at || '').slice(0, 16).replace('T', ' '))} · ${u.synced ? `PC 반영됨 (L${esc(u.synced_l)})` : 'PC 반영 대기'}</span></div>`;
+  document.body.appendChild(ov);
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  document.addEventListener('keydown', onKey, true);
+  ov.querySelector('#pvClose').onclick = close;
+  const del = ov.querySelector('#pvDel');
+  if (del) del.onclick = async () => {
+    if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = '정말 지울까요? 한 번 더'; return; }
+    try { await db.doc('uploads/' + u._id).delete(); for (const id of [u.asset, u.flat].filter(Boolean)) await assets.delete(id).catch(() => {}); close(); toast('지웠습니다'); }
+    catch (e) { toast('지우지 못했습니다'); }
+  };
+}
+
+/* ---------- 시작 ---------- */
+show(location.hash === '#list' ? 'list' : 'up');
+renderPicker(); renderTiles(); renderList(); updateSend();
+(async () => {
+  const C = window.claude;
+  [db, assets, user] = C && C.use ? await Promise.all([C.use('db'), C.use('assets'), C.use('user')]) : [null, null, null];
+  if (user) { try { me = await user.id(); editor = await user.canEdit(); } catch (e) { me = me || null; } }
+  if (!db) { notice('저장소에 연결되지 않았습니다. claude.ai 에 로그인한 상태로 이 페이지를 여세요.'); updateSend(); return; }
+  if (!assets) notice('이 계정은 사진을 볼 수만 있습니다. 올리려면 페이지 소유자에게 편집 권한을 요청하세요.');
+  db.collection('catalog').onSnapshot((s) => { catalog = s.docs.map(d => d.data()); loaded = true; renderPicker(); if (sel.mold) renderIssues(); updateSend(); },
+    () => notice('금형 목록을 불러오지 못했습니다. 새로 고침해 주세요.'));
+  db.collection('uploads').orderBy('at', 'desc').limit(500).onSnapshot(async (s) => {
+    uploads = s.docs.map(d => ({ ...d.data(), _id: d.id }));
+    const ids = [...new Set(uploads.map(u => u.by).filter(Boolean))].filter(id => !profiles[id]);
+    if (user && ids.length) { try { Object.assign(profiles, await user.profiles(ids)); } catch (e) { /* 이름 없이 표시 */ } }
+    renderList();
+  }, () => notice('올린 사진 목록을 불러오지 못했습니다. 새로 고침해 주세요.'));
+  updateSend();
+})();
+})();
+</script>

@@ -213,6 +213,78 @@ class ImportTest(unittest.TestCase):
         self.assertEqual([x["to_status"] for x in L.log(self.c, iid)], ["발생", "대책적용", "종결"])
 
 
+class PhoneTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.d = Path(self.tmp.name)
+        self.cfg = mkcfg(self.d)
+        self.c = db.connect(self.cfg["archive"]["db_path"])
+        L.import_issues(self.c, "CUV", V4_ROWS, today=TODAY)
+
+    def tearDown(self):
+        self.c.close()
+        self.tmp.cleanup()
+
+    def _download(self, docs: dict) -> Path:
+        """ArtifactData out_dir 모양 (uploads/<id>.json, '~' 는 '@') + Artifact read 로 받은 사진 (assets/<id>.jpg)."""
+        src = self.d / "phone"
+        (src / "uploads").mkdir(parents=True)
+        (src / "assets").mkdir()
+        for i, (doc_id, d) in enumerate(docs.items()):
+            (src / "uploads" / f"{doc_id.replace('~', '@')}.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+            for k in ("asset", "flat"):
+                if d.get(k):
+                    (src / "assets" / f"{d[k]}.jpg").write_bytes(png((i * 40 % 255, 90, 30 + i)))
+        return src
+
+    def test_snapshot_keys_and_phone_import(self):
+        snap = L.snapshot(self.c, "CUV")
+        self.assertEqual(len(snap), 1)
+        x = snap[0]
+        self.assertEqual(len(x["molds"]), 3)
+        self.assertEqual(len(x["issues"]), 3)                        # 진행 중만 (종결·보류 제외)
+        key, lno = next((i[0], i[1]) for i in x["issues"] if i[6] == "측면 BURR")
+        mark = [{"t": "ellipse", "a": {"x": .1, "y": .1}, "b": {"x": .2, "y": .2}, "c": "r"}]
+        docs = {
+            "u1": {"batch": "b1", "car": "CUV", "vendor": "ASHA-9", "part_no": "86511-BN000", "key": key, "l": 0, "grp": "after",
+                   "asset": "a" * 32, "flat": "f" * 32, "marks": mark, "memo": "T3 사출품", "at": "2026-11-12T10:00:00Z", "synced": False},
+            "u2": {"batch": "b2", "car": "CUV", "vendor": "ASHA-9", "part_no": "86599-BN000", "part_name": "BRKT-FR BUMPER", "key": "", "l": 0,
+                   "problem": "보스 크랙", "category": "기타", "importance": "상", "grp": "before", "asset": "b" * 32,
+                   "at": "2026-11-12T10:05:00Z", "synced": False},
+            "u3": {"batch": "b2", "car": "CUV", "vendor": "ASHA-9", "part_no": "86599-BN000", "key": "", "l": 0, "problem": "보스 크랙",
+                   "grp": "before", "asset": "c" * 32, "at": "2026-11-12T10:05:30Z", "synced": False},
+            "old": {"car": "CUV", "part_no": "86511-BN000", "asset": "d" * 32, "synced": True},
+        }
+        ups, base = L.phone_uploads(self._download(docs))
+        self.assertEqual([u["id"] for u in ups], ["u1", "u2", "u3"])   # 반영된 건은 빼고 시간순
+        res = L.phone_import(self.c, self.cfg, ups, base, today=TODAY)
+        self.assertEqual([r["status"] for r in res], ["added", "added", "added"])
+        self.assertEqual(res[0]["l"], lno)
+        self.assertEqual(res[1]["l"], res[2]["l"])                     # 같은 접수 묶음 = 문제점 1건
+        self.assertTrue(res[1].get("new"))
+        ph = L.photos(self.c, lno)
+        self.assertEqual((ph[0]["grp"], ph[0]["source"], bool(ph[0]["marked_path"])), ("after", "phone", True))
+        self.assertIn("폰] T3 사출품", L.get_issue(self.c, lno)["note"])
+        n = L.get_issue(self.c, res[1]["l"])
+        self.assertEqual((n["problem"], n["importance"], n["status"], n["occ_date"]), ("보스 크랙", "상", "발생", "2026-11-12"))
+        self.assertEqual(len(L.photos(self.c, n["id"])), 2)
+        self.assertEqual(len(L.molds(self.c, "CUV", "ASHA-9")), 4)      # 목록에 없던 금형은 등록
+        again = L.phone_import(self.c, self.cfg, ups, base, today=TODAY)  # 다시 해도 중복 없음
+        self.assertEqual([r["status"] for r in again], ["duplicate"] * 3)
+        bad = L.phone_import(self.c, self.cfg, [{"id": "x", "car": "CUV", "part_no": "86511-BN000", "key": "", "l": 0, "file": "none.jpg"}],
+                             base, today=TODAY)
+        self.assertEqual(bad[0]["status"], "error")
+
+    def test_app_issue_gets_portable_key(self):
+        mid = L.molds(self.c, "CUV")[0]["id"]
+        iid = L.add_issue(self.c, mid, problem="앱에서 등록", today=TODAY)
+        self.assertTrue(L.get_issue(self.c, iid)["src_key"].startswith("app-"))
+        self.c.execute("UPDATE lm_issues SET src_key=NULL WHERE id=?", (iid,))
+        self.c.commit()
+        keys = [i[0] for x in L.snapshot(self.c) for i in x["issues"]]
+        self.assertTrue(all(keys))
+
+
 class LocalApiTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

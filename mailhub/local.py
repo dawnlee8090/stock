@@ -15,6 +15,7 @@ import io
 import json
 import re
 import sqlite3
+import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -392,8 +393,9 @@ def add_issue(conn, mold_id: int, today: date | None = None, src_key: str | None
     prev = _find_recur(conn, mold_id, v["category"], v["defect_type"], v["occ_date"])
     cols = ["mold_id", "car", "vendor", "part_no", "part_name", *v.keys(), "src_status", "recur_of", "src_key",
             "closed_at", "created_at", "updated_at"]
+    # src_key: 어느 PC 에서든 같은 문제점을 가리키는 키 (가져온 건은 양식 기준, 앱에서 만든 건은 app-…)
     vals = [mold_id, m["car"], m["vendor"], m["part_no"], m["part_name"], *v.values(), src_status,
-            prev["id"] if prev else None, src_key, (today or date.today()).isoformat() if v["status"] == "종결" else "",
+            prev["id"] if prev else None, src_key or "app-" + uuid.uuid4().hex[:16], (today or date.today()).isoformat() if v["status"] == "종결" else "",
             _now(), _now()]
     cur = conn.execute(f"INSERT INTO lm_issues ({', '.join(cols)}) VALUES ({','.join('?' * len(cols))})", vals)
     iid = cur.lastrowid
@@ -854,6 +856,99 @@ def import_workbook(conn, cfg: dict, car: str, data: bytes, vendor: str | None =
                 continue
     conn.commit()
     return stats
+
+
+# ---------------- 휴대폰 사진 접수 (claude.ai '현지 금형 사진 접수' 페이지 ↔ 이 PC) ----------------
+def snapshot(conn, car: str | None = None) -> list[dict]:
+    """폰 페이지에서 고를 목록: 외주처마다 금형 [품번, 품명, ITEM] 과 진행 중 문제점
+    [키, L번호, 품번, 유형, 중요도, 단계, 문제점]. 키(src_key)는 PC 가 달라도 같은 문제점을 가리킨다."""
+    ensure(conn)
+    for r in conn.execute("SELECT id FROM lm_issues WHERE src_key IS NULL OR src_key=''").fetchall():
+        conn.execute("UPDATE lm_issues SET src_key=? WHERE id=?", ("app-" + uuid.uuid4().hex[:16], r["id"]))
+    conn.commit()
+    out: dict[tuple, dict] = {}
+    q, a = "SELECT * FROM lm_molds", []
+    if car:
+        q += " WHERE car=?"
+        a.append(car)
+    for m in conn.execute(q + " ORDER BY car, vendor, part_no", a):
+        d = out.setdefault((m["car"], m["vendor"]), {"car": m["car"], "vendor": m["vendor"], "molds": [], "issues": []})
+        d["molds"].append([m["part_no"], m["part_name"], m["item"]])
+    q = "SELECT * FROM lm_issues WHERE status NOT IN ('종결', '보류')" + (" AND car=?" if car else "")
+    for r in conn.execute(q + " ORDER BY vendor, part_no, occ_date, id", a):
+        d = out.setdefault((r["car"], r["vendor"]), {"car": r["car"], "vendor": r["vendor"], "molds": [], "issues": []})
+        d["issues"].append([r["src_key"], r["id"], r["part_no"], r["category"], r["importance"], r["status"],
+                            re.sub(r"\s+", " ", r["problem"])[:140]])
+    return list(out.values())
+
+
+def phone_uploads(src: Path) -> tuple[list[dict], Path]:
+    """폰 접수 내려받은 폴더(uploads/<문서>.json + assets/<사진 id>.jpg) 또는 manifest JSON → (uploads, 기준 폴더)."""
+    src = Path(src)
+    if src.is_file():
+        data = json.loads(src.read_text(encoding="utf-8"))
+        return (data.get("uploads", []) if isinstance(data, dict) else data), src.parent
+    ups = []
+    adir = src / "assets"
+    find = lambda aid: next((str(f.relative_to(src)) for f in sorted(adir.glob(f"{aid}.*"))), "") if aid and adir.is_dir() else ""
+    for f in sorted((src / "uploads").glob("*.json")):
+        d = json.loads(f.read_text(encoding="utf-8"))
+        if d.get("synced"):
+            continue
+        d["id"] = f.stem.replace("@", "~")
+        d["file"], d["flat"] = find(d.get("asset")), find(d.get("flat"))
+        ups.append(d)
+    ups.sort(key=lambda d: str(d.get("at") or ""))
+    return ups, src
+
+
+def phone_import(conn, cfg: dict, uploads: list[dict], base: Path, today: date | None = None) -> list[dict]:
+    """폰에서 올린 사진 → 문제점 사진 칸. 문제점은 키(src_key) → L번호(같은 품번일 때) 순서로 찾고,
+    없으면 금형을 찾아(없으면 등록) 새 문제점을 만든다 (같은 접수 묶음 batch 는 문제점 1건).
+    같은 사진은 다시 넣지 않으므로 여러 번 실행해도 된다."""
+    ensure(conn)
+    res = []
+    for u in uploads:
+        out = {"id": u.get("id", ""), "status": "", "l": None, "photo": None}
+        try:
+            car, vendor, pn = str(u.get("car") or ""), str(u.get("vendor") or "").upper(), fmt_part_no(u.get("part_no"))
+            row = None
+            if u.get("key"):
+                row = conn.execute("SELECT * FROM lm_issues WHERE src_key=?", (u["key"],)).fetchone()
+            if not row and u.get("l"):
+                r = get_issue(conn, int(u["l"]))
+                row = r if r and r["part_no"] == pn and r["car"] == car else None
+            batch = str(u.get("batch") or u.get("id") or "")
+            if not row and batch:
+                row = conn.execute("SELECT * FROM lm_issues WHERE src_key=?", ("phone-" + batch,)).fetchone()
+            if not row:
+                if not (car and pn and str(u.get("problem") or "").strip()):
+                    raise ValueError("문제점을 찾을 수 없고 새 문제점 내용도 없습니다")
+                mid, _ = upsert_mold(conn, car, vendor, pn, src="휴대폰", overwrite=False, part_name=u.get("part_name") or "")
+                iid = add_issue(conn, mid, today=today, src_key="phone-" + batch, commit=False, problem=u["problem"],
+                                category=u.get("category") or "", importance=u.get("importance") or "",
+                                occ_date=str(u.get("at") or "")[:10] or None)
+                row = get_issue(conn, iid)
+                out["new"] = True
+            out["l"] = row["id"]
+            f = Path(base) / str(u.get("file") or "")
+            if not f.is_file():
+                raise ValueError(f"사진 파일이 없습니다: {u.get('file')}")
+            flat = Path(base) / str(u["flat"]) if u.get("flat") else None
+            pid = save_photo(conn, cfg, row["id"], f.read_bytes(), str(u.get("grp") or "before"), marks=u.get("marks") or None,
+                             flat=flat.read_bytes() if flat and flat.is_file() else None, source="phone", commit=False)
+            out["photo"], out["status"] = pid, ("added" if pid else "duplicate")
+            memo = str(u.get("memo") or "").strip()
+            if pid and memo:
+                t = today or date.today()
+                conn.execute("UPDATE lm_issues SET note=?, updated_at=? WHERE id=?",
+                             ((row["note"] + "\n" if row["note"] else "") + f"[{t.month}/{t.day} 폰] {memo}", _now(), row["id"]))
+            conn.commit()
+        except Exception as e:  # 한 장이 실패해도 나머지는 계속
+            conn.rollback()
+            out["status"], out["error"] = "error", str(e)
+        res.append(out)
+    return res
 
 
 def import_any(conn, cfg: dict, car: str, name: str, data: bytes, vendor: str | None = None,
