@@ -381,12 +381,88 @@ table.matrix td.doc { text-align: center; font-weight: 600; font-size: 12.5px; w
   .back { display: inline-flex; margin-bottom: 10px; }
   .hide-sm { display: none; }
 }
+/* 현지 금형 문제점 */
+.lm-cars { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+table.lm-master td.mono { white-space: nowrap; }
+table.lm-master td.n { text-align: center; font-variant-numeric: tabular-nums; }
+table.lm-master td.n.z { color: var(--fg-3); }
+table.lm-master th.c { text-align: center; }
+.lm-filter { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.lm-filter select, .lm-filter input { font: inherit; font-size: 13px; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; height: 32px; padding: 0 8px; }
+.lm-filter input { flex: 1 1 220px; min-width: 0; }
+.lm-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.lm-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px;
+  padding: 10px; cursor: pointer; text-align: left; font: inherit; color: inherit; align-items: start; }
+.lm-card:hover { border-color: var(--accent); }
+.lm-thumb { position: relative; width: 112px; aspect-ratio: 4 / 3; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--fg-3); flex: none; }
+.lm-thumb.sm { width: 64px; }
+.lm-thumb svg { width: 100%; height: 100%; display: block; }
+.lm-cnt { position: absolute; right: 4px; bottom: 4px; background: rgba(20, 30, 40, .75); color: #fff; font-size: 10.5px; font-weight: 700; border-radius: 3px; padding: 0 5px; }
+.lm-meta { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lm-pn { font-family: var(--mono); font-weight: 600; font-size: 13.5px; }
+.lm-pname { font-size: 12px; color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lm-prob { font-size: 13.5px; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.lm-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-top: 3px; }
+.lm-sheet { display: grid; grid-template-columns: 30px minmax(0, 1.4fr) 140px minmax(0, 1fr) 140px 120px; gap: 10px; align-items: start; padding: 10px 4px;
+  border-bottom: 1px solid var(--line-2); cursor: pointer; font-size: 13px; }
+.lm-sheet:hover { background: var(--surface-2); }
+.lm-sheet.head { cursor: default; font-size: 11.5px; color: var(--fg-3); font-weight: 600; padding-bottom: 6px; }
+.lm-sheet.head:hover { background: none; }
+.lm-sheet > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.lm-mini { display: flex; gap: 4px; align-items: flex-end; flex-wrap: wrap; }
+.lm-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.lm-form .full { grid-column: 1 / -1; }
+.lm-form label { display: grid; gap: 4px; font-size: 12px; color: var(--fg-2); font-weight: 500; }
+.lm-form input, .lm-form select, .lm-form textarea { font: inherit; font-size: 14px; color: var(--fg); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 7px; padding: 7px 9px; width: 100%; min-width: 0; }
+.lm-form textarea { min-height: 64px; resize: vertical; }
+.lm-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.lm-group { border: 2px dashed transparent; border-radius: 8px; padding: 6px; display: grid; gap: 6px; align-content: start; }
+.lm-group.active { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.lm-group.drag { border-color: var(--accent); background: var(--accent-weak); }
+.lm-glab { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--fg-2); }
+.lm-glab b { color: var(--fg); }
+.lm-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.lm-tile { display: grid; gap: 4px; min-width: 0; }
+.lm-tim { position: relative; width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #11161c; }
+.lm-tim svg { width: 100%; height: 100%; display: block; }
+.lm-tim .no { position: absolute; left: 4px; top: 4px; background: rgba(20, 30, 40, .75); color: #fff; font-size: 11px; font-weight: 700; border-radius: 3px; padding: 0 5px; }
+.lm-tact { display: flex; gap: 3px; }
+.lm-tact button { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 5px; font: inherit; font-size: 12px; padding: 3px 0; cursor: pointer; }
+.lm-tact button.mk { flex: 2; color: #e8261c; font-weight: 600; }
+.lm-tact button[disabled] { opacity: .4; cursor: default; }
+.lm-add { width: 100%; height: 100%; min-height: 150px; border: 1.5px dashed var(--line); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 6px; text-align: center; font-size: 11.5px; color: var(--fg-3); }
+.lm-add .btn { width: 100%; justify-content: center; position: relative; }
+.lm-add input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.lm-save { position: sticky; bottom: -28px; background: var(--surface); padding: 10px 0; border-top: 1px solid var(--line-2); }
+.lm-mk { position: fixed; inset: 0; z-index: 70; background: rgba(10, 14, 16, .86); display: flex; flex-direction: column; gap: 8px;
+  padding: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); --mc: #e8261c; }
+.lm-mk .bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; background: var(--surface); padding: 8px; border-radius: 8px; }
+.lm-mk .bar .t { font-weight: 700; font-size: 14px; margin-right: auto; }
+.lm-mk .tool[aria-pressed="true"] { background: var(--mc); color: #fff; border-color: var(--mc); }
+.lm-mk .cols { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.lm-mk .cols .col { border: 0; border-radius: 0; }
+.lm-mk .cols .col i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.lm-mk .cols .col[aria-pressed="true"] { background: var(--fg); color: var(--surface); font-weight: 700; }
+.lm-mk .lbl { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.lm-mk .lbl input { width: 8em; font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--fg); }
+.lm-mk .hint { background: var(--surface); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--fg-2); }
+.lm-mk .hint b { color: var(--mc); }
+.lm-mk .stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.lm-mk canvas { max-width: 100%; max-height: 100%; touch-action: none; background: #000; border-radius: 6px; cursor: crosshair; }
+@media (max-width: 820px) {
+  .lm-form, .lm-groups { grid-template-columns: minmax(0, 1fr); }
+  .lm-sheet { grid-template-columns: 26px minmax(0, 1fr) 96px; }
+  .lm-cards { grid-template-columns: minmax(0, 1fr); }
+}
 @media (prefers-reduced-motion: no-preference) { .drawer { animation: slide .18s ease-out; } @keyframes slide { from { transform: translateX(24px); opacity: .6; } } }
 </style>
 
 <div class="app">
   <nav class="side" aria-label="메뉴">
-    <div class="brand"><div class="brand-mark">업무</div><div><b>개발 업무 비서</b><span>메일 · E.O · T/O · 금형 이관</span></div></div>
+    <div class="brand"><div class="brand-mark">업무</div><div><b>개발 업무 비서</b><span>메일 · E.O · T/O · 금형</span></div></div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
       <span class="mode"><i class="dot" id="mode-dot"></i><span id="mode-text">연결 확인 중</span></span>
@@ -480,8 +556,94 @@ function buildDemo() {
       docs: { '금형사양서': ['접수', addDays(-4)], '성형조건표': ['미접수', ''], '부품리스트': ['미접수', ''], '선적일정': ['미접수', ''], 'KD리스트': ['미접수', ''], '원소재리스트': ['해당없음', ''] },
       ship: { etd: '', eta: '', atd: '', ata: '', bl_no: '', port_from: '', port_to: '' } },
   ];
-  return { mails, reqs, eos, tos, molds, last_sync: T(0, 8, 0) };
+  return { mails, reqs, eos, tos, molds, local: buildLocalDemo(), last_sync: T(0, 8, 0) };
 }
+// ---------- 예시: 현지 금형 문제점 (가상 차종 · 가상 외주처) ----------
+function demoPhoto(kind) {
+  const bg = kind === 'after' ? '#3d4a43' : '#3a4048', part = kind === 'after' ? '#a9b4ab' : '#9aa3ad';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200"><rect width="1600" height="1200" fill="${bg}"/>
+    <rect x="240" y="280" width="1120" height="640" rx="70" fill="${part}"/><rect x="420" y="430" width="300" height="340" rx="24" fill="#828b96"/>
+    <rect x="860" y="430" width="300" height="340" rx="24" fill="#828b96"/><rect x="240" y="880" width="1120" height="26" fill="#6c7480"/>
+    <text x="800" y="1110" fill="#c9d1d9" font-size="56" font-family="sans-serif" text-anchor="middle">예시 사진 (${kind === 'after' ? '수정 후' : '수정 전'})</text></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+function buildLocalDemo() {
+  const car = 'NX5 CUV';
+  const M = (id, vendor, part_no, part_name, item, mold_maker, to_round, weight) => ({ id, car, vendor, part_no, part_name, item, mold_type: 'INJECTION', mold_maker, to_round, weight, owner: '', note: '' });
+  const molds = [M(1, '가람사출', '86511-NX200', 'COVER ASSY-FR BUMPER UPR', 'BUMPER', '한빛정밀', '2nd', '2480g'), M(2, '가람사출', '86612-NX000', 'COVER-RR BUMPER LWR', 'BUMPER', '한빛정밀', '1st', '1650g'),
+    M(3, '가람사출', '86525-NX000', 'BRKT-FR BUMPER SIDE,LH/RH', 'BUMPER', '대성금형', '1st', '95g'), M(4, 'DELTA PLAST', '84611-NX000', 'CONSOLE-FLOOR (EPB AT)', 'CONSOLE', '대성금형', '2nd', '1383g'),
+    M(5, 'DELTA PLAST', '84612-NX000', 'BEZEL-CONSOLE INDICATOR', 'CONSOLE', '대성금형', '1st', ''), M(6, 'DELTA PLAST', '86151-NX000', 'COVER-COWL TOP UPR', 'EXT', '한빛정밀', '1st', '845g'),
+    M(7, 'ORION MOLD', '84761-NX000', 'PNL-C/PAD CTR', 'COCKPIT', '한빛정밀', '1st', '1190g'), M(8, 'ORION MOLD', '97010-NX000', 'DUCT ASSY-RR AIR VENT', 'DUCT', '대성금형', '1st', '')];
+  const I = (id, mold_id, category, problem, countermeasure, importance, status, occ, due, extra = {}) => ({ id, mold_id, category, problem, countermeasure, importance, status, occ_date: addDays(occ), due: due === null ? '' : addDays(due),
+    owner: '', mold_fix: 'O', to_after: '', to_result: '', progress: '', src_status: '', recur_of: null, note: '', defect_type: '', ...extra });
+  const issues = [
+    I(1, 1, '습합', '측면 GATE 사출 시 측면 BURR 과다', '측면 코어 재습합 + 파팅 라이너 보강', '상', '대책수립', -40, -6, { to_after: 'O', to_result: 'NG', progress: '2차 T/O 후 BURR 잔존', src_status: '개선 중' }),
+    I(2, 1, '취출', '취출 시 경사코어 리브부 긁힘', '경사코어 리브 구배 0.5° 추가 + 랩핑', '상', '대책적용', -33, -2, { progress: '금형 수정 완료, T/O 요청 필요' }),
+    I(3, 1, '습합', '상단 플랜지부 BURR 재발', '파팅 보호편 재가공', '중', '원인분석', -8, 6, { recur_of: 1 }),
+    I(4, 2, '취출', '취출 시 도그하우스 파손 (금형 내부 박힘)', '도그하우스 구배 확대, 취출 블록 추가', '상', '효과확인', -30, -12, { to_after: 'O', progress: 'T/O 결과 대기' }),
+    I(5, 2, '기타', '언더컷 부식면 외관 노출', '언더컷 부식부 래핑', '중', '대책수립', -24, 4),
+    I(6, 3, 'SINK', '보스 뒷면 싱크 0.12mm', '보스 살빼기 + 보압 조정', '하', '종결', -45, -20, { to_after: 'O', to_result: 'OK', mold_fix: 'X' }),
+    I(7, 4, '습합', '측면 S/D 코아 단차 & BURR', '재습합 및 단차 개선, 라이너 작업', '상', '대책적용', -28, -5, { progress: '금형 수정 완료 (T/O 시 재확인)' }),
+    I(8, 4, 'WELD LINE', '컵홀더 부 웰드라인 과다', '경사코아 가스벤트 추가, 웰드부 두께 증대', '중', '대책수립', -20, -1),
+    I(9, 4, '기타', '리어커버 · 하단부 두께 편차 이색', '두께 변경 가능 여부 검토', '상', '원인분석', -26, 3),
+    I(10, 6, '취출', '사출 시 하단부 형상 물림', '하단 인서트 코어 유동 개선 + 랩핑', '상', '대책수립', -21, -3, { to_after: 'O', to_result: 'NG' }),
+    I(11, 6, '기타', '핫러너 밸브 커넥터 · 컨트롤 박스 조립 불가', '컨트롤 박스 교체 (현지 설비 사양 확인)', '하', '보류', -21, null, { mold_fix: 'X', src_status: '관망' }),
+    I(12, 7, 'GAS', '차체 터치부 가스 몰림', '가스빼기 추가', '중', '발생', -3, 10),
+  ];
+  for (const r of issues) { const m = molds.find(x => x.id === r.mold_id); Object.assign(r, { car, vendor: m.vendor, part_no: m.part_no, part_name: m.part_name }); }
+  const P = (id, issue, grp, marks) => ({ id, issue, grp, url: demoPhoto(grp), marked: '', marks: marks || [], w: 1600, h: 1200 });
+  const ring = (x, y, c = 'r', label = '수정부위') => [{ t: 'ellipse', a: { x: x - 0.06, y: y - 0.08 }, b: { x: x + 0.06, y: y + 0.08 }, c }, { t: 'arrow', a: { x: Math.min(0.85, x + 0.22), y: Math.min(0.88, y + 0.2) }, b: { x: x + 0.045, y: y + 0.06 }, c, label }];
+  const photos = [P(1, 1, 'before', ring(0.3, 0.42)), P(2, 1, 'before', ring(0.62, 0.5)), P(3, 2, 'before', ring(0.45, 0.6)), P(4, 4, 'before', ring(0.7, 0.4)),
+    P(5, 6, 'before', ring(0.36, 0.52)), P(6, 6, 'after', ring(0.36, 0.52, 'b', '리워크부위')), P(7, 7, 'before', ring(0.55, 0.45)), P(8, 10, 'before', ring(0.5, 0.7))];
+  return { molds, issues, photos, seq: { issue: 100, photo: 100 } };
+}
+const lmDemoDelay = (r) => ['발생', '원인분석', '대책수립'].includes(r.status) && r.due && r.due < iso(TODAY) ? `수정 ${-days(r.due)}일 지연` : '';
+const lmDemoWait = (r) => ['대책적용', '효과확인'].includes(r.status) && !r.to_result ? '검증 T/O 필요' : '';
+function lmDemoRow(r) { const D = DEMO.local, ph = D.photos.filter(p => p.issue === r.id); return { ...r, delay: lmDemoDelay(r), wait: lmDemoWait(r), photos: ph.length, thumb: ph.find(p => p.grp === 'before') || ph[0] || null }; }
+function lmDemoMolds(car, vendor) {
+  const D = DEMO.local, order = ['발생', '원인분석', '대책수립', '대책적용', '효과확인', '보류', '종결'];
+  return D.molds.filter(m => m.car === car && (!vendor || m.vendor === vendor)).map(m => {
+    const li = D.issues.filter(r => r.mold_id === m.id), op = li.filter(r => r.status !== '종결' && r.status !== '보류'), counts = {};
+    LM_CATS.forEach(c => counts[c] = li.filter(r => r.category === c).length);
+    const st = li.map(r => r.status).sort((a, b) => order.indexOf(a) - order.indexOf(b))[0] || '-';
+    return { ...m, counts, total: li.length, open: op.length, hi_open: op.filter(r => r.importance === '상').length, fix_open: op.filter(r => r.mold_fix === 'O').length,
+      late: li.filter(lmDemoDelay).length, wait: li.filter(lmDemoWait).length, status: st, last: li.map(r => r.occ_date).sort().pop() || '' };
+  });
+}
+function lmDemoCars() {
+  const D = DEMO.local;
+  return [...new Set(D.molds.map(m => m.car))].map(car => {
+    const ms = lmDemoMolds(car), li = D.issues.filter(r => r.car === car), vs = {};
+    for (const m of ms) { const v = vs[m.vendor] = vs[m.vendor] || { vendor: m.vendor, molds: 0, issues: 0, open: 0, hi_open: 0 }; v.molds++; v.issues += m.total; v.open += m.open; v.hi_open += m.hi_open; }
+    const closed = li.filter(r => r.status === '종결').length;
+    return { car, molds: ms.length, molds_with_issue: ms.filter(m => m.total).length, issues: li.length, open: ms.reduce((a, m) => a + m.open, 0), hi_open: ms.reduce((a, m) => a + m.hi_open, 0),
+      late: ms.reduce((a, m) => a + m.late, 0), wait: ms.reduce((a, m) => a + m.wait, 0), closed, close_rate: li.length ? Math.round(closed / li.length * 100) : 0, vendors: Object.values(vs) };
+  });
+}
+function lmDemoApi(base, parts, p, body) {
+  const D = DEMO.local;
+  if (base === 'local') { const cars = lmDemoCars(), car = p.get('car') || (cars[0] || {}).car || '', vendor = p.get('vendor') || '';
+    return { cars, car, vendor, molds: lmDemoMolds(car, vendor), cats: LM_CATS, stages: STAGE_TO,
+      issues: D.issues.filter(r => r.car === car && (!vendor || r.vendor === vendor)).map(lmDemoRow).sort((a, b) => ('상중하'.indexOf(a.importance) + 9) % 9 - ('상중하'.indexOf(b.importance) + 9) % 9 || b.occ_date.localeCompare(a.occ_date)) }; }
+  if (parts[1] === 'mold' && !body) { const id = +parts[2], m = lmDemoMolds(D.molds.find(x => x.id === id).car).find(x => x.id === id);
+    return { mold: m, issues: D.issues.filter(r => r.mold_id === id).map(r => ({ ...lmDemoRow(r), photo_list: D.photos.filter(x => x.issue === r.id) })) }; }
+  if (parts[1] === 'issue' && parts.length === 3 && !body) { const r = D.issues.find(x => x.id === +parts[2]);
+    return { issue: lmDemoRow(r), mold: D.molds.find(m => m.id === r.mold_id), photos: D.photos.filter(x => x.issue === r.id), previous: r.recur_of ? D.issues.find(x => x.id === r.recur_of) : null,
+      log: [{ at: r.occ_date + 'T09:00', what: '발생', note: '등록' }, ...(r.status !== '발생' ? [{ at: addDays(-2) + 'T15:00', what: `발생 → ${r.status}`, note: r.progress || '' }] : [])], guide: '' }; }
+  if (parts[1] === 'issue' && parts[2] === 'add') { const m = D.molds.find(x => x.id === +body.mold_id), id = ++D.seq.issue;
+    D.issues.push({ id, mold_id: m.id, car: m.car, vendor: m.vendor, part_no: m.part_no, part_name: m.part_name, recur_of: null, src_status: '', note: '', defect_type: '', ...body }); return { ok: true, id }; }
+  if (parts[1] === 'issue' && parts[3] === 'photo') { const id = ++D.seq.photo, ph = { id, issue: +parts[2], grp: body.grp, url: body.data, marked: '', marks: body.marks || [], w: 0, h: 0 };
+   
+    ph.w = body.w || 1600; ph.h = body.h || 1200; D.photos.push(ph); return { ok: true, photo: ph }; }
+  if (parts[1] === 'issue' && parts[3] === 'del') { D.issues = D.issues.filter(x => x.id !== +parts[2]); return { ok: true }; }
+  if (parts[1] === 'issue') { const r = D.issues.find(x => x.id === +parts[2]); const { note, ...v } = body; Object.assign(r, v); return { ok: true, issue: lmDemoRow(r) }; }
+  if (parts[1] === 'photo') { const ph = D.photos.find(x => x.id === +parts[2]);
+    if (parts[3] === 'del') D.photos = D.photos.filter(x => x !== ph); else if (parts[3] !== 'move' && ph) ph.marks = body.marks || [];
+    return { ok: true, photo: ph }; }
+  if (parts[1] === 'import') return { ok: true, kind: '예시', new: 0 };
+  return { ok: true, demo: true };
+}
+
 
 // ---------- 예시 모드용 처리 ----------
 const STAGE_EO = ['접수', '검토중', '수정요청', '수정중', '수정완료', '검증중', '완료', '수정불필요', '보류', '취소'];
@@ -538,6 +700,7 @@ function demoSummary() {
   for (const r of eoLate) prio.push({ kind: 'E.O', sev: 'crit', title: `${r.car} ${r.part_name}`, sub: r.change_desc, alert: eoDelay(r), go: '#eo', id: r.id, cars: cv(r.car) });
   for (const r of toLate) prio.push({ kind: 'T/O', sev: 'crit', title: `${r.part_name} · ${r.defect_type}`, sub: r.phenomenon, alert: toDelay(r), go: '#to', id: r.id, cars: cv(r.car) });
   for (const m of moldAl) prio.push({ kind: '금형 이관', sev: 'warn', title: `${m.mold_no} ${m.part_name} → ${m.dest}`, sub: moldAlerts(m)[0], alert: '확인 필요', go: '#mold', id: m.id, cars: cv(m.car) });
+  for (const x of lmDemoCars()) if (x.late || x.hi_open) prio.push({ kind: '현지 금형', sev: x.late ? 'crit' : 'warn', title: `${x.car} 현지 금형 문제점`, sub: `진행 ${x.open}건 · 중요도 상 ${x.hi_open}건 · 검증 T/O 필요 ${x.wait}건`, alert: x.late ? `수정 ${x.late}건 지연` : '중요도 상 진행', go: '#local', id: 0, cars: cv(x.car) });
   for (const m of todo) prio.push({ kind: '메일', sev: 'info', title: m.subject, sub: m.sender_name, alert: '회신 필요', go: '#mail', id: m.id, cars: mc(m) });
   const agenda = [];
   for (const r of D.reqs) if (r.status === '요청') agenda.push({ date: r.due_date, kind: '요청', text: `${r.vendor} 회신 기한`, src: 'req', sid: r.id, cars: cv(r.subject) });
@@ -545,7 +708,7 @@ function demoSummary() {
   for (const r of D.tos) if (r.status !== '종결') { if (r.due) agenda.push({ date: r.due, kind: 'T/O', text: `${r.part_name} ${r.defect_type} 대책`, src: 'to', sid: r.id, cars: cv(r.car) }); if (r.verify_due) agenda.push({ date: r.verify_due, kind: 'T/O', text: `${r.part_name} 효과 확인`, src: 'to', sid: r.id, cars: cv(r.car) }); }
   for (const m of D.molds) { if (m.ship.etd && !m.ship.atd) agenda.push({ date: m.ship.etd, kind: '선적', text: `${m.mold_no} ETD → ${m.dest}`, src: 'mold', sid: m.id, cars: cv(m.car) }); if (m.ship.eta && !m.ship.ata) agenda.push({ date: m.ship.eta, kind: '도착', text: `${m.mold_no} ETA ${m.ship.port_to}`, src: 'mold', sid: m.id, cars: cv(m.car) }); }
   return {
-    counts: { todo: todo.length, req_late: reqLate.length, req_open: D.reqs.filter(r => r.status === '요청').length, eo_late: eoLate.length, mail_progress: D.mails.filter(m => m.status === '진행중').length, mail_vendor: D.mails.filter(m => m.status === '업체검토중').length, eo_open: D.eos.filter(r => !['완료', '취소', '수정불필요'].includes(r.status)).length, to_late: toLate.length, to_open: D.tos.filter(r => r.status !== '종결').length, mold_alert: moldAl.length, mold_open: D.molds.filter(m => m.status !== '이관완료').length },
+    counts: { todo: todo.length, req_late: reqLate.length, req_open: D.reqs.filter(r => r.status === '요청').length, eo_late: eoLate.length, mail_progress: D.mails.filter(m => m.status === '진행중').length, mail_vendor: D.mails.filter(m => m.status === '업체검토중').length, eo_open: D.eos.filter(r => !['완료', '취소', '수정불필요'].includes(r.status)).length, to_late: toLate.length, to_open: D.tos.filter(r => r.status !== '종결').length, mold_alert: moldAl.length, lm_late: lmDemoCars().reduce((a, x) => a + x.late, 0), mold_open: D.molds.filter(m => m.status !== '이관완료').length },
     priority: prio, agenda: agenda.filter(a => days(a.date) >= -3 && days(a.date) <= 14).sort((a, b) => a.date.localeCompare(b.date)),
     recent: D.mails.slice(0, 5).map(m => ({ ...m, cars: mc(m) })), last_sync: D.last_sync,
     progress: D.mails.filter(m => ['진행중', '업체검토중'].includes(m.status)).map(m => ({ ...m, cars: mc(m) })),
@@ -662,6 +825,7 @@ async function demoApi(path, body) {
   if (base === 'molds') return D.molds.map(m => ({ ...m, alerts: moldAlerts(m) }));
   if (parts[0] === 'mold' && parts.length === 2 && !body) { const m = D.molds.find(x => x.id === +parts[1]); return { mold: { ...m, alerts: moldAlerts(m) }, log: [{ at: addDays(-12) + 'T09:00', what: '등록', note: '' }], mails: [], items: { 부품: 12, KD: 2, 원소재: 0 } }; }
   if (parts[0] === 'mold' && parts[2] === 'doc') { const m = D.molds.find(x => x.id === +parts[1]); m.docs[body.section] = [body.status, m.docs[body.section][1] || iso(TODAY)]; return { ok: true }; }
+  if (parts[0] === 'local') return lmDemoApi(base, parts, p, body);
   if (base === 'sync') return { added: 0, message: '예시 모드에서는 메일을 받지 않습니다' };
   if (parts[0] === 'ai' && parts[1] === 'review') {
     const k = 'review:' + parts[2];
@@ -760,8 +924,9 @@ const ICONS = {
   to: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
   mold: '<rect x="3" y="7" width="18" height="12" rx="1"/><path d="M7 7V4h10v3M3 12h18"/>',
   hist: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+  local: '<rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="12" cy="12.5" r="3.2"/><path d="M8 6l1.5-2h5L16 6"/>',
 };
-const NAV = [['today', '오늘'], ['mail', '메일함'], ['hist', '이력 정리'], ['req', '업체 요청'], ['eo', 'E.O 리스트'], ['to', 'T/O 문제점'], ['mold', '금형 이관']];
+const NAV = [['today', '오늘'], ['mail', '메일함'], ['hist', '이력 정리'], ['req', '업체 요청'], ['eo', 'E.O 리스트'], ['to', 'T/O 문제점'], ['local', '현지 금형'], ['mold', '금형 이관']];
 // 메일함 폴더: [주소, 이름, 필터, 건수 키]
 const FOLDERS = [['mail', '전체 메일', '', 'all'], ['mail-todo', '회신 필요', 'todo', 'todo'], ['mail-progress', '진행중', '@진행중', 'progress'],
   ['mail-vendor', '업체 검토중', '@업체검토중', 'vendor'], ['mail-done', '처리 완료', '@완료', 'done'], null,
@@ -816,7 +981,7 @@ function folderCount(f) {
   return f[3] in (mc.tags || {}) ? mc.tags[f[3]] : mc[f[3]];
 }
 function renderNav(counts = {}) {
-  const badge = { req: [counts.req_late, counts.req_late > 0], eo: [counts.eo_late, counts.eo_late > 0], to: [counts.to_late, counts.to_late > 0], mold: [counts.mold_alert, counts.mold_alert > 0] };
+  const badge = { req: [counts.req_late, counts.req_late > 0], eo: [counts.eo_late, counts.eo_late > 0], to: [counts.to_late, counts.to_late > 0], mold: [counts.mold_alert, counts.mold_alert > 0], local: [counts.lm_late, counts.lm_late > 0] };
   const cur = (location.hash || '#today').slice(1);
   $('#nav').innerHTML = NAV.map(([k, l]) => {
     const b = badge[k]; const n = b && b[0];
@@ -1680,8 +1845,366 @@ async function openMold(id) {
     ${claudeBox('/mold-update', '메일 반영')}`);
 }
 
+// ================= 화면: 현지 금형 문제점 =================
+// 차종 → 외주처 → 금형(갑지) → 문제점(을지). 사진 표시는 'DATA 수정 변경 검토서'와 같은 방식 (원본 위에 비율 좌표로 겹쳐 저장)
+const LM_CATS = ['습합', '취출', 'WELD LINE', 'SINK', '미성형', 'GAS', '기타'];
+const LM_IMP = { '상': 'crit', '중': 'warn', '하': '' };
+let lmState = { car: '', vendor: '', mode: 'master', stage: 'open', imp: '', cat: '', q: '' };
+const MCOL = { r: '#e8261c', b: '#1565d8' }, MLAB = { r: '수정부위', b: '리워크부위' };
+const r4 = n => Math.round(n * 10000) / 10000;
+function markLW(W, H) { return Math.max(3, Math.max(W, H) / 140); }
+function labelBox(text, fs) { let w = 0; for (const ch of text) w += ch.charCodeAt(0) > 0x2000 ? fs : fs * 0.62; return { w: w + fs * 1.1, h: fs * 1.7 }; }
+function parsePts(p) { return typeof p === 'string' ? p.split(';').filter(Boolean).map(s => { const [x, y] = s.split(','); return { x: +x, y: +y }; }) : (p || []); }
+function svgMarks(marks, W, H) {
+  const lw = markLW(W, H); let out = '', labels = '';
+  for (const m of (marks || [])) {
+    const R = MCOL[m.c] || MCOL.r, ax = m.a?.x * W, ay = m.a?.y * H, bx = m.b?.x * W, by = m.b?.y * H;
+    if (m.t === 'ellipse') out += `<ellipse cx="${(ax + bx) / 2}" cy="${(ay + by) / 2}" rx="${Math.abs(bx - ax) / 2}" ry="${Math.abs(by - ay) / 2}" fill="none" stroke="${R}" stroke-width="${lw}"/>`;
+    else if (m.t === 'rect') out += `<rect x="${Math.min(ax, bx)}" y="${Math.min(ay, by)}" width="${Math.abs(bx - ax)}" height="${Math.abs(by - ay)}" fill="none" stroke="${R}" stroke-width="${lw}" stroke-dasharray="${lw * 2.5} ${lw * 1.5}"/>`;
+    else if (m.t === 'pen') out += `<polyline points="${parsePts(m.p).map(p => `${p.x * W},${p.y * H}`).join(' ')}" fill="none" stroke="${R}" stroke-width="${lw}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    else if (m.t === 'arrow') {
+      const ang = Math.atan2(by - ay, bx - ax), h = lw * 4.2, hx = bx - h * 0.8 * Math.cos(ang), hy = by - h * 0.8 * Math.sin(ang);
+      out += `<line x1="${ax}" y1="${ay}" x2="${hx}" y2="${hy}" stroke="${R}" stroke-width="${lw * 1.15}" stroke-linecap="round"/><polygon points="${bx},${by} ${bx - h * Math.cos(ang - 0.42)},${by - h * Math.sin(ang - 0.42)} ${bx - h * Math.cos(ang + 0.42)},${by - h * Math.sin(ang + 0.42)}" fill="${R}"/>`;
+      if (m.label) { const fs = lw * 5.2, b = labelBox(m.label, fs);
+        labels += `<rect x="${ax - b.w / 2}" y="${ay - b.h / 2}" width="${b.w}" height="${b.h}" rx="${fs * 0.25}" fill="${R}" stroke="#fff" stroke-width="${lw * 0.5}"/><text x="${ax}" y="${ay}" fill="#fff" font-size="${fs}" font-weight="700" text-anchor="middle" dominant-baseline="central" font-family="Malgun Gothic,Apple SD Gothic Neo,sans-serif">${esc(m.label)}</text>`; }
+    }
+  }
+  return out + labels;
+}
+function drawMarks(ctx, marks, W, H) {
+  const lw = markLW(W, H), later = [];
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const m of (marks || [])) {
+    const ax = m.a?.x * W, ay = m.a?.y * H, bx = m.b?.x * W, by = m.b?.y * H, R = MCOL[m.c] || MCOL.r;
+    ctx.strokeStyle = R; ctx.fillStyle = R; ctx.lineWidth = lw; ctx.setLineDash([]); ctx.beginPath();
+    if (m.t === 'ellipse') { ctx.ellipse((ax + bx) / 2, (ay + by) / 2, Math.abs(bx - ax) / 2 || 1, Math.abs(by - ay) / 2 || 1, 0, 0, Math.PI * 2); ctx.stroke(); }
+    else if (m.t === 'rect') { ctx.setLineDash([lw * 2.5, lw * 1.5]); ctx.strokeRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay)); }
+    else if (m.t === 'pen') { parsePts(m.p).forEach((p, i) => i ? ctx.lineTo(p.x * W, p.y * H) : ctx.moveTo(p.x * W, p.y * H)); ctx.stroke(); }
+    else if (m.t === 'arrow') {
+      const ang = Math.atan2(by - ay, bx - ax), h = lw * 4.2;
+      ctx.lineWidth = lw * 1.15; ctx.moveTo(ax, ay); ctx.lineTo(bx - h * 0.8 * Math.cos(ang), by - h * 0.8 * Math.sin(ang)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx - h * Math.cos(ang - 0.42), by - h * Math.sin(ang - 0.42)); ctx.lineTo(bx - h * Math.cos(ang + 0.42), by - h * Math.sin(ang + 0.42)); ctx.closePath(); ctx.fill();
+      if (m.label) later.push({ x: ax, y: ay, t: m.label, R });
+    }
+  }
+  for (const l of later) {
+    const fs = lw * 5.2; ctx.font = `700 ${fs}px "Malgun Gothic","Apple SD Gothic Neo",sans-serif`;
+    const w = ctx.measureText(l.t).width + fs * 1.1, h = fs * 1.7;
+    ctx.fillStyle = l.R; ctx.strokeStyle = '#fff'; ctx.lineWidth = lw * 0.5; ctx.setLineDash([]); ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(l.x - w / 2, l.y - h / 2, w, h, fs * 0.25); else ctx.rect(l.x - w / 2, l.y - h / 2, w, h);
+    ctx.fill(); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(l.t, l.x, l.y + fs * 0.04);
+  }
+  ctx.restore();
+}
+function photoSVG(p, slice) {
+  const W = p.w || 1600, H = p.h || 1200;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid ${slice ? 'slice' : 'meet'}"><image href="${esc(p.url)}" x="0" y="0" width="${W}" height="${H}"/>${svgMarks(p.marks, W, H)}</svg>`;
+}
+const lmImp = (v) => v ? `<span class="chip ${LM_IMP[v] ?? ''}">중요도 ${esc(v)}</span>` : '';
+const lmFlags = (r) => `${r.delay ? `<span class="chip crit">${esc(r.delay)}</span>` : ''}${r.wait ? `<span class="chip warn">${esc(r.wait)}</span>` : ''}${r.recur_of ? `<span class="chip warn">재발 ← L${r.recur_of}</span>` : ''}`;
+const lmQ = () => `local?car=${encodeURIComponent(lmState.car)}&vendor=${encodeURIComponent(lmState.vendor)}`;
+
+async function viewLocal(V) {
+  const d = await api(lmQ());
+  lmState.car = d.car;
+  const car = d.cars.find(x => x.car === d.car);
+  V.className = 'view';
+  const head = `<div class="head"><div><h1>현지 금형 문제점</h1><div class="sub">차종 → 외주처 → 금형(갑지) → 문제점(을지) · 발생 → 원인분석 → 대책수립 → 대책적용 → 효과확인 → 종결</div></div>
+    <div class="chips"><button class="btn sm" id="lm-up" type="button">엑셀 · CSV 올리기</button>${d.car ? '<button class="btn sm" id="lm-ex" type="button">엑셀 내보내기</button>' : ''}</div></div>`;
+  if (!d.cars.length) {
+    V.innerHTML = head + `<section class="panel"><div class="empty" style="padding:36px 16px;display:grid;gap:10px;justify-items:center">
+      <b style="color:var(--fg)">아직 등록된 차종이 없습니다</b>
+      <span>차종의 <b>금형 리스트 엑셀</b>, 드라이브의 <b>외주처 문제점 엑셀</b>(갑지+을지+사진) 또는 <b>통합 문제점 리스트</b>를 올리면 차종이 만들어집니다.</span>
+      <button class="btn primary" id="lm-up2" type="button">엑셀 · CSV 올리기</button></div></section>`;
+    $('#lm-up', V).addEventListener('click', () => lmImport(''));
+    $('#lm-up2', V).addEventListener('click', () => lmImport(''));
+    return;
+  }
+  const vend = car.vendors, rows = d.issues;
+  let shown = lmState.stage === 'open' ? rows.filter(r => r.status !== '종결' && r.status !== '보류') : lmState.stage === 'wait' ? rows.filter(r => r.wait) :
+    lmState.stage === 'hi' ? rows.filter(r => r.importance === '상' && r.status !== '종결' && r.status !== '보류') : lmState.stage === 'late' ? rows.filter(r => r.delay) :
+      lmState.stage === 'all' ? rows : rows.filter(r => r.status === lmState.stage);
+  if (lmState.imp) shown = shown.filter(r => r.importance === lmState.imp);
+  if (lmState.cat) shown = shown.filter(r => r.category === lmState.cat);
+  if (lmState.q) { const q = lmState.q.toLowerCase(); shown = shown.filter(r => [r.part_no, r.part_name, r.problem, r.countermeasure, r.vendor].join(' ').toLowerCase().includes(q)); }
+  const kpi = (k, label, v, sub, sev) => `<button class="stage" type="button" data-kpi="${k}" aria-pressed="${lmState.mode === 'cards' && lmState.stage === k}"><div class="k">${label}</div><div class="v" ${sev ? `style="color:var(--${sev})"` : ''}>${v}</div>${sub ? `<div class="k">${sub}</div>` : ''}</button>`;
+  const master = `<section class="panel"><div class="table-wrap"><table class="t lm-master">
+    <thead><tr>${lmState.vendor ? '' : '<th>외주처</th>'}<th>품번</th><th>품명</th>${LM_CATS.map(c => `<th class="c">${c === 'WELD LINE' ? 'WELD' : c}</th>`).join('')}<th class="c">계</th><th class="c">진행</th><th>STATUS</th><th class="hide-sm">최근</th><th class="hide-sm">T/O</th></tr></thead>
+    <tbody>${d.molds.map(m => `<tr data-mold="${m.id}">${lmState.vendor ? '' : `<td>${esc(m.vendor)}</td>`}<td class="mono">${esc(m.part_no)}</td>
+      <td><b>${esc(m.part_name)}</b><div class="desc">${esc([m.item, m.mold_maker].filter(Boolean).join(' · '))}</div></td>
+      ${LM_CATS.map(c => `<td class="n${m.counts[c] ? '' : ' z'}">${m.counts[c] || '·'}</td>`).join('')}<td class="n"><b>${m.total || '·'}</b></td>
+      <td class="n">${m.open ? `<b style="color:var(--${m.hi_open ? 'crit' : 'fg'})">${m.open}</b>` : '·'}</td><td>${m.status === '-' ? '<span class="sub">-</span>' : pill(m.status)}${m.late ? ` <span class="chip crit">지연 ${m.late}</span>` : ''}</td>
+      <td class="hide-sm num">${md(m.last)}</td><td class="hide-sm">${esc(m.to_round)}</td></tr>`).join('') || `<tr><td colspan="14" class="empty">금형이 없습니다</td></tr>`}</tbody></table></div></section>`;
+  const cards = `<div class="lm-filter">
+      <select id="lm-st" aria-label="단계">${[['open', '진행 중'], ['hi', '중요도 상 진행'], ['late', '수정 지연'], ['wait', '검증 T/O 필요'], ['all', '전체'], ...STAGE_TO.map(s => [s, s])].map(([k, l]) => `<option value="${k}" ${lmState.stage === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <select id="lm-imp" aria-label="중요도"><option value="">중요도 전체</option>${['상', '중', '하'].map(x => `<option ${lmState.imp === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+      <select id="lm-cat" aria-label="유형"><option value="">유형 전체</option>${LM_CATS.map(x => `<option ${lmState.cat === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+      <input type="search" id="lm-q" placeholder="품번 · 품명 · 문제점 · 대책 검색" value="${esc(lmState.q)}"><span class="sub">${shown.length}건</span></div>
+    <div class="lm-cards">${shown.length ? shown.slice(0, 400).map(r => `<button class="lm-card" type="button" data-issue="${r.id}">
+      <div class="lm-thumb">${r.thumb ? photoSVG(r.thumb, true) : '사진 없음'}${r.photos > 1 ? `<span class="lm-cnt">${r.photos}</span>` : ''}</div>
+      <div class="lm-meta"><span class="lm-pn">${esc(r.part_no)} <span class="sub" style="font-family:var(--font);font-weight:400">L${r.id}</span></span><span class="lm-pname">${esc(r.part_name)} · ${esc(r.vendor)}</span>
+        <span class="lm-prob">${esc(r.problem)}</span>
+        <span class="lm-row"><span class="chip">${esc(r.category)}</span>${lmImp(r.importance)}${pill(r.status)}${lmFlags(r)}</span>
+        <span class="lm-row"><span class="num sub">${esc(r.occ_date)}</span>${r.due ? `<span class="num sub">→ 수정 ${md(r.due)}</span>` : ''}${r.to_result ? `<span class="chip ${r.to_result === 'OK' ? 'ok' : 'crit'}">T/O ${esc(r.to_result)}</span>` : ''}</span></div></button>`).join('') + (shown.length > 400 ? `<div class="empty">400건까지 보입니다. 검색이나 거르기로 줄여 주세요</div>` : '') : '<div class="empty">조건에 맞는 문제점이 없습니다</div>'}</div>`;
+  V.innerHTML = head + `
+    <div class="lm-cars" role="group" aria-label="차종">${d.cars.map(x => `<button class="btn sm${x.car === d.car ? ' primary' : ''}" type="button" data-car="${esc(x.car)}">${esc(x.car)} <span class="num" style="opacity:.8">${x.open}</span></button>`).join('')}
+      <button class="btn sm" type="button" id="lm-newcar">+ 새 차종</button></div>
+    <div class="stages" role="group" aria-label="요약">${kpi('all', '관리 금형', car.molds, `문제 있는 금형 ${car.molds_with_issue}`)}${kpi('open', '진행 중', car.open, `전체 ${car.issues}건`)}${kpi('hi', '중요도 상 진행', car.hi_open, '', car.hi_open ? 'crit' : '')}
+      ${kpi('late', '수정 지연', car.late, '수정 목표일 지남', car.late ? 'crit' : '')}${kpi('wait', '검증 T/O 필요', car.wait, '수정 후 결과 없음', car.wait ? 'warn' : '')}${kpi('종결', '종결률', car.close_rate + '%', `종결 ${car.closed}건`)}</div>
+    <div class="seg" role="tablist" aria-label="외주처"><button role="tab" type="button" data-vendor="" aria-selected="${!lmState.vendor}">전체 <span class="num sub">${car.open}</span></button>
+      ${vend.map(v => `<button role="tab" type="button" data-vendor="${esc(v.vendor)}" aria-selected="${lmState.vendor === v.vendor}">${esc(v.vendor)} <span class="num sub">${v.open}</span></button>`).join('')}</div>
+    <div class="seg" role="tablist" aria-label="보기" style="border:0;margin-bottom:10px">
+      <button role="tab" type="button" data-mode="master" aria-selected="${lmState.mode === 'master'}">갑지 · 금형별 (${d.molds.length})</button>
+      <button role="tab" type="button" data-mode="cards" aria-selected="${lmState.mode === 'cards'}">문제점 카드 (${rows.length})</button>
+      <span class="seg-link sub">${lmState.mode === 'master' ? '금형을 누르면 을지(문제점 · 수정 전/후 사진)' : '카드를 누르면 문제점 · 사진 · 대책'}</span></div>
+    ${lmState.mode === 'master' ? master : cards}`;
+  $('#lm-up', V).addEventListener('click', () => lmImport(d.car));
+  $('#lm-ex', V)?.addEventListener('click', async (e) => { e.target.disabled = true;
+    try { const r = await api('export/local', { car: d.car, vendor: lmState.vendor }); toast(LIVE ? `엑셀을 만들었습니다: ${r.path || ''}` : '예시 화면에서는 엑셀을 만들지 않습니다'); } catch (err) { toast('내보내기 실패: ' + err.message); } finally { e.target.disabled = false; } });
+  $('#lm-newcar', V).addEventListener('click', () => lmImport(''));
+  V.querySelectorAll('[data-car]').forEach(b => b.addEventListener('click', () => { lmState.car = b.dataset.car; lmState.vendor = ''; route(); }));
+  V.querySelectorAll('[data-vendor]').forEach(b => b.addEventListener('click', () => { lmState.vendor = b.dataset.vendor; route(); }));
+  V.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => { lmState.mode = b.dataset.mode; route(); }));
+  V.querySelectorAll('[data-kpi]').forEach(b => b.addEventListener('click', () => { lmState.mode = 'cards'; lmState.stage = b.dataset.kpi; route(); }));
+  V.querySelectorAll('tr[data-mold]').forEach(tr => tr.addEventListener('click', () => openLmMold(+tr.dataset.mold)));
+  V.querySelectorAll('[data-issue]').forEach(b => b.addEventListener('click', () => openLmIssue(+b.dataset.issue)));
+  for (const [id, k] of [['#lm-st', 'stage'], ['#lm-imp', 'imp'], ['#lm-cat', 'cat']]) $(id, V)?.addEventListener('change', (e) => { lmState[k] = e.target.value; route(); });
+  const qi = $('#lm-q', V); if (qi) { qi.addEventListener('change', () => { lmState.q = qi.value.trim(); route(); }); }
+  if (PENDING && PENDING.view === 'local') { const id = PENDING.id; PENDING = null; if (id) openLmIssue(id); }
+}
+
+// ----- 엑셀 · CSV 올리기 (차종 만들기 / 금형 리스트 / 외주처 엑셀 / 통합 리스트) -----
+function lmImport(car) {
+  drawer('엑셀 · CSV 올리기', `
+    <div class="sub">파일 종류는 자동으로 구분합니다. 같은 파일을 다시 올리면 바뀐 내용만 반영하고, 앱에서 고친 문제점은 덮어쓰지 않습니다.</div>
+    <dl class="kv"><dt>외주처 엑셀</dt><dd>드라이브의 외주처별 문제점 관리 파일 (갑지 MASTER + 금형별 을지). <b>을지의 수정 전/후 사진까지</b> 가져옵니다</dd>
+      <dt>통합 리스트</dt><dd>외주처 · 품번 · 품명 · 카테고리 · 발생 문제점 … 열이 있는 통합 문제점 리스트 (엑셀/CSV)</dd>
+      <dt>금형 리스트</dt><dd>신규 차종의 금형 목록 (외주처 · 품번 · 품명 · ITEM · 금형 제작 업체 · 중량 …)</dd></dl>
+    <div class="lm-form">
+      <label>차종<input id="li-car" value="${esc(car)}" placeholder="예: BC4t CUV" list="li-cars"></label>
+      <label>외주처 (비우면 파일 이름·제목에서)<input id="li-vendor" placeholder="예: ASHA-2"></label>
+      <label class="full">파일<input id="li-file" type="file" accept=".xlsx,.xlsm,.csv"></label></div>
+    <div class="edit-row"><button class="btn primary" id="li-go" type="button">올리기</button><span class="sub" id="li-msg"></span></div>`, (L) => {
+      $('#li-go', L).addEventListener('click', async () => {
+        const f = $('#li-file', L).files[0], carV = $('#li-car', L).value.trim();
+        if (!carV) return toast('차종을 입력해 주세요');
+        if (!f) return toast('파일을 골라 주세요');
+        const btn = $('#li-go', L); btn.disabled = true; $('#li-msg', L).textContent = '읽는 중… (사진이 많으면 1~2분 걸릴 수 있습니다)';
+        try {
+          const data = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(f); });
+          const r = await api('local/import', { car: carV, vendor: $('#li-vendor', L).value.trim(), name: f.name, data });
+          const t = { molds_new: '금형 신규', molds_updated: '금형 갱신', new: '문제점 신규', updated: '갱신', same: '변경 없음', kept: '앱 수정 유지', photos: '사진', sheets: '을지 시트', skipped: '건너뜀' };
+          $('#li-msg', L).textContent = `[${r.kind || '가져오기'}] ` + Object.entries(r).filter(([k]) => t[k]).map(([k, v]) => `${t[k]} ${v}`).join(' · ');
+          lmState.car = carV; lmState.vendor = ''; toast(LIVE ? '가져왔습니다' : '예시 화면이라 저장되지 않습니다'); route();
+        } catch (err) { $('#li-msg', L).textContent = '실패: ' + err.message; } finally { btn.disabled = false; }
+      });
+    });
+}
+
+// ----- 을지: 금형 1벌의 문제점 -----
+async function openLmMold(id) {
+  const d = await api('local/mold/' + id), m = d.mold;
+  const mini = (list) => list.length ? `<div class="lm-mini">${list.slice(0, 2).map(p => `<div class="lm-thumb sm">${photoSVG(p, true)}</div>`).join('')}${list.length > 2 ? `<span class="sub">+${list.length - 2}</span>` : ''}</div>` : '<span class="sub">-</span>';
+  drawer(`${esc(m.part_no)} · ${esc(m.part_name)}`, `
+    <div class="chips">${m.status && m.status !== '-' ? pill(m.status) : ''}<span class="chip">${esc(m.vendor)}</span>${m.item ? `<span class="chip">${esc(m.item)}</span>` : ''}${m.mold_maker ? `<span class="chip acc">금형 ${esc(m.mold_maker)}</span>` : ''}
+      ${LM_CATS.filter(c => m.counts && m.counts[c]).map(c => `<span class="chip">${c} ${m.counts[c]}</span>`).join('')}</div>
+    <dl class="kv"><dt>차종 · 외주처</dt><dd>${esc(m.car)} · ${esc(m.vendor)}</dd><dt>형식 · 중량</dt><dd>${esc([m.mold_type, m.weight].filter(Boolean).join(' · ') || '-')}</dd>
+      <dt>T/O · 담당</dt><dd>${esc([m.to_round, m.owner].filter(Boolean).join(' · ') || '-')}</dd>${m.note ? `<dt>비고</dt><dd>${esc(m.note)}</dd>` : ''}</dl>
+    <div class="edit-row"><button class="btn primary sm" id="lm-add" type="button">+ 문제점 추가</button><span class="sub">문제점 ${d.issues.length}건 · 행을 누르면 사진 · 대책을 고칩니다</span></div>
+    <div class="lm-sheets"><div class="lm-sheet head"><span>NO</span><span>문제점</span><span class="hide-sm">수정 전</span><span class="hide-sm">개선 대책</span><span class="hide-sm">수정 후</span><span>단계</span></div>
+    ${d.issues.map((r, i) => { const b = (r.photo_list || []).filter(p => p.grp === 'before'), a = (r.photo_list || []).filter(p => p.grp === 'after');
+      return `<div class="lm-sheet" role="button" tabindex="0" data-issue="${r.id}"><span class="num">${i + 1}</span>
+        <span><b>${esc(r.problem)}</b><span class="lm-row"><span class="chip">${esc(r.category)}</span>${lmImp(r.importance)}${r.mold_fix === 'O' ? '<span class="chip info">금형수정</span>' : ''}</span><span class="sub num">${esc(r.occ_date)}</span></span>
+        <span class="hide-sm">${mini(b)}</span><span class="hide-sm desc">${esc(r.countermeasure || '-')}</span><span class="hide-sm">${mini(a)}</span>
+        <span>${pill(r.status)}${lmFlags(r)}</span></div>`; }).join('') || '<div class="empty">문제점이 없습니다</div>'}</div>`, (L) => {
+      $('#lm-add', L).addEventListener('click', () => openLmIssue(0, m));
+      L.querySelectorAll('[data-issue]').forEach(el => { const go = () => openLmIssue(+el.dataset.issue); el.addEventListener('click', go); el.addEventListener('keydown', e => { if (e.key === 'Enter') go(); }); });
+    }, true);
+}
+
+// ----- 문제점 1건: 입력 + 수정 전/후 사진 + 표시 -----
+let lmCur = null;   // { id, mold, photos, activeGrp }
+async function openLmIssue(id, mold) {
+  let r, photos = [], prev = null, log = [], guide = '';
+  if (id) { const d = await api('local/issue/' + id); r = d.issue; photos = d.photos; prev = d.previous; log = d.log || []; guide = d.guide; mold = d.mold; }
+  else r = { id: 0, problem: '', category: '기타', importance: '', occ_date: iso(TODAY), owner: '', countermeasure: '', due: '', progress: '', mold_fix: '', to_after: '', to_result: '', status: '발생', note: '' };
+  lmCur = { id: r.id, mold, photos, activeGrp: 'before' };
+  const opt = (list, v) => list.map(x => Array.isArray(x) ? `<option value="${esc(x[0])}" ${x[0] === v ? 'selected' : ''}>${esc(x[1])}</option>` : `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  drawer(id ? `L${r.id} · ${esc(mold.part_no)} ${esc(mold.part_name)}` : `새 문제점 · ${esc(mold.part_no)} ${esc(mold.part_name)}`, `
+    ${id ? `<div class="chips">${pill(r.status)}${lmImp(r.importance)}${lmFlags(r)}${r.src_status ? `<span class="chip">양식 상태 ${esc(r.src_status)}</span>` : ''}<span class="chip">${esc(mold.vendor)}</span></div>` : ''}
+    <form class="lm-form" id="lm-form" autocomplete="off">
+      <label class="full">발생 문제점 (PROBLEM)<textarea id="f-problem" placeholder="발생 현상 · 부위 · 수치 (예: 측면 S/D 코아 단차 0.3mm & BURR)">${esc(r.problem)}</textarea></label>
+      <label>유형 (CATEGORY)<select id="f-category">${opt(LM_CATS, r.category)}</select></label>
+      <label>중요도<select id="f-importance">${opt([['', '-'], ['상', '상'], ['중', '중'], ['하', '하']], r.importance)}</select></label>
+      <label>발생일<input type="date" id="f-occ_date" value="${esc(r.occ_date)}"></label>
+      <label>담당 (사람 · 업체)<input id="f-owner" value="${esc(r.owner)}" placeholder="예: 금형업체 / 현지 담당"></label>
+      <label class="full">수리 · 개선 대책 (MOLD IMPROVEMENT)<textarea id="f-countermeasure" placeholder="예: 재습합 진행, 경사코아 구배 적용 + 랩핑">${esc(r.countermeasure)}</textarea></label>
+      <label>수정 목표일<input type="date" id="f-due" value="${esc(r.due)}"></label>
+      <label>금형수정 대상<select id="f-mold_fix">${opt([['', '-'], ['O', 'O (금형 수정)'], ['X', 'X']], r.mold_fix)}</select></label>
+      <label>수정 후 T/O<select id="f-to_after">${opt([['', '-'], ['O', 'O 실시'], ['X', 'X 미실시']], r.to_after)}</select></label>
+      <label>T/O 결과<select id="f-to_result">${opt([['', '-'], ['OK', 'OK'], ['NG', 'NG']], r.to_result)}</select></label>
+      <label class="full">진행 메모<input id="f-progress" value="${esc(r.progress)}" placeholder="예: 금형 수정 완료, T/O 요청 필요"></label>
+      <label>진행 단계<select id="f-status">${opt(STAGE_TO, r.status)}</select></label>
+      <label>메모 추가 (이력에 남음)<input id="f-note" placeholder="예: 7/22 T/O 결과 공유받음"></label>
+    </form>
+    <div class="lm-groups" id="lm-groups"></div>
+    <div class="edit-row lm-save"><button class="btn primary" id="lm-save" type="button">${id ? '저장' : '등록'}</button>${id ? '<button class="btn sm" id="lm-del" type="button" style="margin-left:auto;color:var(--crit)">삭제</button>' : ''}<span class="sub" id="lm-msg"></span></div>
+    ${prev ? `<div class="sect"><h3>이전 발생 L${prev.id} (${esc(prev.occ_date)})</h3><div class="case"><span><b>문제</b> ${esc(prev.problem)}</span><span><b>대책</b> ${esc(prev.countermeasure || '-')}</span><span><b>단계</b> ${esc(prev.status)} ${esc(prev.to_result || '')}</span></div></div>` : ''}
+    ${guide ? `<div class="sect"><h3>불량 유형 가이드</h3><details class="att"><summary>${esc(r.defect_type)} 원인 · 대책</summary><pre>${esc(guide)}</pre></details></div>` : ''}
+    ${log.length ? `<div class="sect"><h3>진행 이력</h3><ul class="timeline">${log.map(x => `<li><time>${esc((x.at || '').slice(5, 16).replace('T', ' '))}</time>${esc(x.what)} ${esc(x.note || '')}</li>`).join('')}</ul></div>` : ''}`, (L) => {
+      renderLmGroups(L);
+      $('#lm-save', L).addEventListener('click', () => saveLmIssue(L));
+      $('#lm-del', L)?.addEventListener('click', async () => { if (!confirm(`L${lmCur.id} 문제점과 사진을 지울까요?`)) return; await api(`local/issue/${lmCur.id}/del`, {}); $('#layer').innerHTML = ''; toast(LIVE ? '지웠습니다' : '예시 화면이라 지워지지 않습니다'); route(); });
+      setupLmDrop(L);
+    }, true);
+}
+function lmFields(L) {
+  const v = {};
+  for (const k of ['problem', 'category', 'importance', 'occ_date', 'owner', 'countermeasure', 'due', 'mold_fix', 'to_after', 'to_result', 'progress', 'status']) v[k] = $('#f-' + k, L).value.trim();
+  return v;
+}
+async function saveLmIssue(L, quiet) {
+  const v = lmFields(L), note = $('#f-note', L).value.trim();
+  if (!v.problem) { toast('문제점을 입력해 주세요'); return false; }
+  if (v.status === '종결' && v.to_result !== 'OK' && !quiet && !confirm('수정 후 T/O 결과(OK)가 없습니다. 그래도 종결할까요?')) return false;
+  try {
+    if (!lmCur.id) { const r = await api('local/issue/add', { mold_id: lmCur.mold.id, ...v }); lmCur.id = r.id; if (note) await api('local/issue/' + r.id, { note }); }
+    else await api('local/issue/' + lmCur.id, { ...v, note });
+    $('#f-note', L).value = '';
+    if (!quiet) { toast(LIVE ? `L${lmCur.id} 저장했습니다` : '예시 화면이라 다시 열면 원래대로입니다'); $('#layer').innerHTML = ''; route(); }
+    return true;
+  } catch (err) { toast('저장 실패: ' + err.message); return false; }
+}
+function renderLmGroups(L) {
+  const box = $('#lm-groups', L); if (!box) return;
+  box.innerHTML = Object.entries({ before: '수정 전 (문제 사진)', after: '수정 후 (개선 · 리워크 사진)' }).map(([g, label]) => {
+    const list = lmCur.photos.filter(p => p.grp === g);
+    return `<div class="lm-group${lmCur.activeGrp === g ? ' active' : ''}" data-grp="${g}">
+      <div class="lm-glab"><b>${label}</b><span>${lmCur.activeGrp === g ? 'Ctrl+V 붙여넣기 대상 · ' : ''}${list.length ? list.length + '장' : ''}</span></div>
+      <div class="lm-tiles">${list.map((p, i) => `<div class="lm-tile"><div class="lm-tim">${photoSVG(p)}${list.length > 1 ? `<span class="no">${i + 1}</span>` : ''}</div>
+        <div class="lm-tact"><button type="button" class="mk" data-act="mark" data-pid="${p.id}">○ 표시</button><button type="button" data-act="left" data-pid="${p.id}" ${i === 0 ? 'disabled' : ''} aria-label="앞으로">◀</button>
+        <button type="button" data-act="right" data-pid="${p.id}" ${i === list.length - 1 ? 'disabled' : ''} aria-label="뒤로">▶</button><button type="button" data-act="del" data-pid="${p.id}" aria-label="삭제">✕</button></div></div>`).join('')}
+        <div class="lm-tile"><div class="lm-add"><label class="btn sm">사진 촬영<input type="file" accept="image/*" capture="environment" data-up="${g}"></label>
+          <label class="btn sm">파일 · 앨범<input type="file" accept="image/*" multiple data-up="${g}"></label><span>끌어놓기 · Ctrl+V</span></div></div></div></div>`;
+  }).join('');
+}
+function setupLmDrop(L) {
+  const box = $('#lm-groups', L);
+  const grpOf = (el) => el?.closest?.('.lm-group');
+  box.addEventListener('pointerdown', (e) => { const g = grpOf(e.target); if (g && lmCur.activeGrp !== g.dataset.grp) { lmCur.activeGrp = g.dataset.grp; box.querySelectorAll('.lm-group').forEach(x => x.classList.toggle('active', x === g)); } });
+  box.addEventListener('change', (e) => { const inp = e.target.closest('[data-up]'); if (!inp) return; const files = [...inp.files]; inp.value = ''; lmAddFiles(L, inp.dataset.up, files); });
+  box.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const pid = +b.dataset.pid, p = lmCur.photos.find(x => x.id === pid); if (!p) return;
+    try {
+      if (b.dataset.act === 'del') { if (!confirm('사진을 지울까요?')) return; await api(`local/photo/${pid}/del`, {}); lmCur.photos = lmCur.photos.filter(x => x.id !== pid); }
+      else if (b.dataset.act === 'left' || b.dataset.act === 'right') {
+        await api(`local/photo/${pid}/move`, { step: b.dataset.act === 'left' ? -1 : 1 });
+        const g = lmCur.photos.filter(x => x.grp === p.grp), i = g.indexOf(p), j = i + (b.dataset.act === 'left' ? -1 : 1);
+        if (j >= 0 && j < g.length) { const a = lmCur.photos.indexOf(g[i]), c = lmCur.photos.indexOf(g[j]); [lmCur.photos[a], lmCur.photos[c]] = [lmCur.photos[c], lmCur.photos[a]]; }
+      } else if (b.dataset.act === 'mark') {
+        const img = await loadImg(p.url).catch(() => null); if (!img) return toast('사진을 불러오지 못했습니다');
+        const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0);
+        const marks = await annotate(c, p.marks || [], p.grp); if (!marks) return;
+        const r = await api(`local/photo/${pid}`, { marks, flat: marks.length ? flatten(c, marks) : '' });
+        Object.assign(p, r.photo || { marks });
+      }
+    } catch (err) { toast('실패: ' + err.message); }
+    renderLmGroups(L);
+  });
+  let depth = 0;
+  box.addEventListener('dragenter', (e) => { const g = grpOf(e.target); if (!g || ![...(e.dataTransfer?.types || [])].includes('Files')) return; e.preventDefault(); depth++; g.classList.add('drag'); });
+  box.addEventListener('dragover', (e) => { if (grpOf(e.target)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  box.addEventListener('dragleave', (e) => { const g = grpOf(e.target); if (g && --depth <= 0) { depth = 0; g.classList.remove('drag'); } });
+  box.addEventListener('drop', (e) => { const g = grpOf(e.target); if (!g) return; e.preventDefault(); depth = 0; g.classList.remove('drag'); lmCur.activeGrp = g.dataset.grp; lmAddFiles(L, g.dataset.grp, [...(e.dataTransfer?.files || [])]); });
+}
+document.addEventListener('paste', (e) => {
+  const L = $('#layer'); if (!lmCur || !$('#lm-groups', L) || document.querySelector('.lm-mk')) return;
+  const files = [...(e.clipboardData?.items || [])].filter(i => i.kind === 'file' && i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
+  if (!files.length) return;
+  e.preventDefault(); lmAddFiles(L, lmCur.activeGrp || 'before', files);
+});
+function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+async function shrink(file, max) {
+  const url = URL.createObjectURL(file);
+  try { const img = await loadImg(url); const r = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * r); c.height = Math.round(img.naturalHeight * r); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c; }
+  finally { URL.revokeObjectURL(url); }
+}
+function flatten(base, marks) { const c = document.createElement('canvas'); c.width = base.width; c.height = base.height; const x = c.getContext('2d'); x.drawImage(base, 0, 0); drawMarks(x, marks, c.width, c.height); return c.toDataURL('image/jpeg', 0.86); }
+async function lmAddFiles(L, grp, all) {
+  const files = all.filter(f => /^image\//.test(f.type));
+  if (!files.length) { if (all.length) toast('사진 파일만 넣을 수 있습니다'); return; }
+  if (!lmCur.id) { const ok = await saveLmIssue(L, true); if (!ok) return; }   // 새 문제점은 먼저 등록하고 사진을 붙인다
+  const msg = $('#lm-msg', L);
+  for (const f of files) {
+    try {
+      const base = await shrink(f, 1800);
+      let marks = [];
+      if (files.length === 1) { const m = await annotate(base, [], grp); if (m === null) return; marks = m; }
+      msg.textContent = '사진 올리는 중…';
+      const r = await api(`local/issue/${lmCur.id}/photo`, { grp, data: base.toDataURL('image/jpeg', 0.86), marks, flat: marks.length ? flatten(base, marks) : '', w: base.width, h: base.height });
+      if (r.photo) lmCur.photos.push(r.photo);
+    } catch (err) { toast('사진을 올리지 못했습니다: ' + err.message); }
+  }
+  msg.textContent = files.length > 1 ? `${files.length}장을 넣었습니다. '○ 표시'로 수정부위를 표시할 수 있습니다` : '';
+  renderLmGroups(L);
+}
+
+// ----- 표시 편집기: 동그라미+라벨 · 동그라미 · 화살표+라벨 · 사각 · 펜 / 수정부위(빨강) · 리워크부위(파랑) -----
+function annotate(base, initial, grp) {
+  return new Promise(resolve => {
+    const wrap = document.createElement('div'); wrap.className = 'lm-mk'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', '수정 부위 표시');
+    wrap.innerHTML = `<div class="bar"><span class="t">수정 부위 표시</span>
+      ${[['circleL', '◎ 동그라미+라벨'], ['circle', '○ 동그라미'], ['arrow', '➜ 화살표+라벨'], ['rect', '□ 사각'], ['pen', '펜']].map(([k, l]) => `<button class="btn sm tool" type="button" data-tool="${k}">${l}</button>`).join('')}
+      <span class="cols"><button class="btn sm col" type="button" data-col="r"><i style="background:${MCOL.r}"></i>수정부위</button><button class="btn sm col" type="button" data-col="b"><i style="background:${MCOL.b}"></i>리워크부위</button></span>
+      <label class="lbl">라벨<input id="mk-label"></label></div>
+      <div class="hint" id="mk-hint"></div><div class="stage"><canvas></canvas></div>
+      <div class="bar"><button class="btn sm" type="button" id="mk-undo">되돌리기</button><button class="btn sm" type="button" id="mk-clear">모두 지우기</button><span style="flex:1"></span>
+        <button class="btn sm" type="button" id="mk-cancel">취소</button><button class="btn sm primary" type="button" id="mk-done">적용</button></div>`;
+    document.body.appendChild(wrap);
+    const cv = $('canvas', wrap), ctx = cv.getContext('2d'); cv.width = base.width; cv.height = base.height;
+    const W = cv.width, H = cv.height, minWH = Math.min(W, H), DEF_R = minWH * 0.08;
+    let tool = 'circleL', marks = JSON.parse(JSON.stringify(initial || [])), drawing = null, col = grp === 'after' ? 'b' : 'r';
+    const HINTS = { circleL: '표시할 부위를 <b>톡 누르면</b> 동그라미와 라벨 화살표가 함께 그려집니다. 누른 채 끌면 크기를 조절합니다.', circle: '표시할 부위를 <b>톡 누르거나</b> 끌어서 동그라미를 그립니다.',
+      arrow: '라벨을 둘 자리에서 <b>수정 부위 쪽으로 끌어</b> 화살표를 그립니다.', rect: '끌어서 점선 사각형을 그립니다.', pen: '손가락 · 마우스로 자유롭게 그립니다.' };
+    const setTool = (t) => { tool = t; wrap.querySelectorAll('.tool').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === t)); $('#mk-hint', wrap).innerHTML = HINTS[t] + ' 원본 사진은 그대로 두고 표시만 겹쳐 저장합니다.'; };
+    const setCol = (c) => { const lb = $('#mk-label', wrap); if (!lb.value.trim() || lb.value.trim() === MLAB[col]) lb.value = MLAB[c]; col = c; wrap.style.setProperty('--mc', MCOL[c]); wrap.querySelectorAll('.col').forEach(b => b.setAttribute('aria-pressed', b.dataset.col === c)); };
+    $('#mk-label', wrap).value = MLAB[col]; setCol(col); setTool('circleL');
+    wrap.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+    wrap.querySelectorAll('.col').forEach(b => b.addEventListener('click', () => setCol(b.dataset.col)));
+    const draw = () => { ctx.drawImage(base, 0, 0); drawMarks(ctx, drawing ? [...marks, drawing] : marks, W, H); };
+    const pos = (e) => { const r = cv.getBoundingClientRect(); return { x: r4(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))), y: r4(Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))) }; };
+    const circleAt = (c, rpx) => ({ t: 'ellipse', a: { x: r4(c.x - rpx / W), y: r4(c.y - rpx / H) }, b: { x: r4(c.x + rpx / W), y: r4(c.y + rpx / H) } });
+    const autoArrow = (cx, cy, pw, ph) => { const dx = cx < 0.5 ? 1 : -1, dy = cy < 0.5 ? 1 : -1, dd = 0.17 + Math.max(pw, ph) / 2;
+      const tail = { x: r4(Math.min(0.88, Math.max(0.12, cx + dx * dd))), y: r4(Math.min(0.9, Math.max(0.1, cy + dy * dd * 0.75))) }, ang = Math.atan2(cy - tail.y, cx - tail.x);
+      return { t: 'arrow', a: tail, b: { x: r4(cx - Math.cos(ang) * pw / 2 * 1.04), y: r4(cy - Math.sin(ang) * ph / 2 * 1.04) } }; };
+    cv.onpointerdown = (e) => { cv.setPointerCapture(e.pointerId); const p = pos(e);
+      if (tool === 'circle' || tool === 'circleL') { drawing = { ...circleAt(p, DEF_R), c: col, _c: p }; draw(); return; }
+      drawing = tool === 'pen' ? { t: 'pen', p: [p], c: col } : { t: tool, a: p, b: p, c: col, ...(tool === 'arrow' ? { label: $('#mk-label', wrap).value.trim() } : {}) }; draw(); };
+    cv.onpointermove = (e) => { if (!drawing) return; const p = pos(e);
+      if (drawing._c) { const r = Math.hypot((p.x - drawing._c.x) * W, (p.y - drawing._c.y) * H); Object.assign(drawing, circleAt(drawing._c, Math.max(r, minWH * 0.02))); draw(); return; }
+      if (drawing.t === 'pen') { drawing.p.push(p); } else drawing.b = p; draw(); };
+    cv.onpointerup = cv.onpointercancel = () => { if (!drawing) return;
+      const d = drawing; drawing = null;
+      if (d.t === 'pen') { if (d.p.length > 1) marks.push({ t: 'pen', c: d.c, p: d.p.map(p => `${p.x},${p.y}`).join(';') }); }
+      else if (d._c) { const m = { t: 'ellipse', a: d.a, b: d.b, c: d.c }; marks.push(m);
+        if (tool === 'circleL') { const lab = $('#mk-label', wrap).value.trim(); marks.push({ ...autoArrow(d._c.x, d._c.y, Math.abs(d.b.x - d.a.x), Math.abs(d.b.y - d.a.y)), c: d.c, label: lab }); } }
+      else if (Math.hypot((d.b.x - d.a.x) * W, (d.b.y - d.a.y) * H) > minWH * 0.02) { const { _c, ...m } = d; marks.push(m); }
+      draw(); };
+    const close = (v) => { wrap.remove(); document.removeEventListener('keydown', esc1, true); resolve(v); };
+    const esc1 = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
+    document.addEventListener('keydown', esc1, true);
+    $('#mk-undo', wrap).onclick = () => { marks.pop(); draw(); };
+    $('#mk-clear', wrap).onclick = () => { marks = []; draw(); };
+    $('#mk-cancel', wrap).onclick = () => close(null);
+    $('#mk-done', wrap).onclick = () => close(marks);
+    draw();
+  });
+}
+
 // ================= 라우팅·시작 =================
-const VIEWS = { today: viewToday, mail: viewMail, hist: viewHist, req: viewReq, eo: viewEO, to: viewTO, mold: viewMold };
+const VIEWS = { today: viewToday, mail: viewMail, hist: viewHist, req: viewReq, eo: viewEO, to: viewTO, local: viewLocal, mold: viewMold };
 async function route() {
   const k = (location.hash || '#today').slice(1);
   let fn = VIEWS[k] || viewToday;
@@ -1736,7 +2259,7 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-11.2';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-12.1';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');

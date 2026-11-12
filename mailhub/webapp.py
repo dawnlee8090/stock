@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-11.2"
+APP_VERSION = "2026-11-12.1"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -34,6 +34,17 @@ SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
 
 def _iso(d: date) -> str:
     return d.isoformat()
+
+
+def _b64(v) -> bytes:
+    """'data:image/jpeg;base64,....' 또는 base64 문자열 → bytes"""
+    import base64
+    t = str(v or "")
+    if t.startswith("data:"):
+        t = t.split(",", 1)[1] if "," in t else ""
+    if not t:
+        raise ValueError("파일 내용이 없습니다")
+    return base64.b64decode(t)
 
 
 def _log_what(x) -> str:
@@ -52,12 +63,13 @@ class Data:
 
     def conn(self):
         c = db.connect(self.cfg["archive"]["db_path"])
-        from . import eo, eo_images, followup, mold, to
+        from . import eo, eo_images, followup, local, mold, to
         followup.ensure(c)
         eo.ensure(c)
         to.ensure(c)
         mold.ensure(c)
         eo_images.ensure(c)
+        local.ensure(c)
         return c
 
     # ---- 공통 ----
@@ -105,6 +117,14 @@ class Data:
         for m, a in mold_al:
             prio.append({"kind": "금형 이관", "sev": "warn", "title": f"{m['mold_no']} {m['part_name']} → {m['dest']}",
                          "sub": a[0], "alert": "확인 필요", "go": "#mold", "id": m["id"], "cars": car_of(m["car"])})
+        from . import local as LM
+        lm_cars = LM.cars(c)
+        for x in lm_cars:   # 현지 금형: 차종마다 한 줄 (지연·중요도 상·검증 대기)
+            if x["late"] or x["hi_open"]:
+                prio.append({"kind": "현지 금형", "sev": "crit" if x["late"] else "warn", "title": f"{x['car']} 현지 금형 문제점",
+                             "sub": f"진행 {x['open']}건 · 중요도 상 {x['hi_open']}건 · 검증 T/O 필요 {x['wait']}건",
+                             "alert": f"수정 {x['late']}건 지연" if x["late"] else "중요도 상 진행", "go": "#local",
+                             "id": 0, "cars": car_of(x["car"])})
         for r in todo_rows[:30]:
             prio.append({"kind": "메일", "sev": "info", "title": r["subject"], "sub": r["sender_name"],
                          "alert": "회신 필요", "go": "#mail", "id": r["id"], "cars": car_of(cars=r["cars"])})
@@ -140,7 +160,8 @@ class Data:
         return {
             "counts": {"todo": len(todo_rows), "req_late": len(req_late), "req_open": len(reqs), "eo_late": len(eo_late),
                        "eo_open": len(eos), "to_late": len(to_late), "to_open": len(tos), "mold_alert": len(mold_al),
-                       "mold_open": len(molds), "mail_progress": sum(1 for r in progress if r["status"] == "진행중"),
+                       "mold_open": len(molds), "lm_late": sum(x["late"] for x in lm_cars),
+                       "lm_open": sum(x["open"] for x in lm_cars), "mail_progress": sum(1 for r in progress if r["status"] == "진행중"),
                        "mail_vendor": sum(1 for r in progress if r["status"] == "업체검토중")},
             "priority": prio, "agenda": agenda, "last_sync": last,
             "recent": [self.mail_row(r) | {"cars": car_of(cars=r["cars"])} for r in recent],
@@ -499,6 +520,95 @@ class Data:
                 "similar": [{"score": s, "why": w, **dict(x)} for s, w, x in sim], "log": logs, "images": imgs,
                 "guide": guide_text(r["defect_type"]) if r["defect_type"] in GUIDE else ""}
 
+    # ---- 현지 금형 문제점 ----
+    def _photo(self, p) -> dict:
+        return {"id": p["id"], "grp": p["grp"], "url": self.img_url(p["path"]),
+                "marked": self.img_url(p["marked_path"]) if p["marked_path"] else "",
+                "marks": json.loads(p["marks"]) if p["marks"] else [], "w": p["w"], "h": p["h"]}
+
+    def _lm_row(self, r, thumb=None, n_photo: int = 0) -> dict:
+        from . import local as LM
+        return dict(r) | {"delay": LM.delay_of(r), "wait": LM.wait_check(r), "photos": n_photo,
+                          "thumb": self._photo(thumb) if thumb else None}
+
+    def local(self, c, q: dict) -> dict:
+        from . import local as LM
+        cars = LM.cars(c)
+        car = (q.get("car") or [""])[0] or (cars[0]["car"] if cars else "")
+        vendor = (q.get("vendor") or [""])[0]
+        ms = LM.molds(c, car, vendor or None) if car else []
+        rows = LM.issues(c, car, vendor or None) if car else []
+        thumbs, pc = LM.first_photos(c, [r["id"] for r in rows]), LM.photo_counts(c)
+        return {"cars": cars, "car": car, "vendor": vendor, "molds": ms, "cats": LM.CATS, "stages": LM.STATUSES,
+                "issues": [self._lm_row(r, thumbs.get(r["id"]), pc.get(r["id"], 0)) for r in rows]}
+
+    def local_mold(self, c, mid: int) -> dict:
+        from . import local as LM
+        m = LM.get_mold(c, mid)
+        if not m:
+            raise KeyError(f"금형 {mid} 이 없습니다")
+        ms = next((x for x in LM.molds(c, m["car"], m["vendor"]) if x["id"] == mid), dict(m))
+        out = []
+        for r in LM.issues(c, mold_id=mid):
+            out.append(self._lm_row(r) | {"photo_list": [self._photo(p) for p in LM.photos(c, r["id"])]})
+        return {"mold": ms, "issues": out}
+
+    def local_issue(self, c, iid: int) -> dict:
+        from . import local as LM
+        from .to_knowledge import GUIDE, guide_text
+        r = LM.get_issue(c, iid)
+        if not r:
+            raise KeyError(f"L{iid} 문제점이 없습니다")
+        prev = LM.get_issue(c, r["recur_of"]) if r["recur_of"] else None
+        logs = [{"at": x["at"], "what": _log_what(x), "note": x["note"]} for x in LM.log(c, iid)]
+        return {"issue": self._lm_row(r), "mold": dict(LM.get_mold(c, r["mold_id"]) or {}),
+                "photos": [self._photo(p) for p in LM.photos(c, iid)], "previous": dict(prev) if prev else None,
+                "log": logs, "guide": guide_text(r["defect_type"]) if r["defect_type"] in GUIDE else ""}
+
+    def local_post(self, c, path: list[str], body: dict) -> dict:
+        from . import local as LM
+        fields = {k: body[k] for k in LM.ISSUE_FIELDS if k in body}
+        if path[1] == "issue" and path[2] == "add":
+            iid = LM.add_issue(c, int(body["mold_id"]), **fields)
+            return {"ok": True, "id": iid}
+        if path[1] == "issue" and len(path) > 3 and path[3] == "photo":
+            pid = LM.save_photo(c, self.cfg, int(path[2]), _b64(body.get("data")), str(body.get("grp") or "before"),
+                                marks=body.get("marks") or None, flat=_b64(body.get("flat")) if body.get("flat") else None)
+            if not pid:
+                raise ValueError("같은 사진이 이미 있습니다")
+            p = c.execute("SELECT * FROM eo_images WHERE id=?", (pid,)).fetchone()
+            return {"ok": True, "photo": self._photo(p)}
+        if path[1] == "issue" and len(path) > 3 and path[3] == "del":
+            LM.delete_issue(c, self.cfg, int(path[2]))
+            return {"ok": True}
+        if path[1] == "issue":
+            r = LM.update_issue(c, int(path[2]), note=(body.get("note") or "").strip() or None, **fields)
+            return {"ok": True, "issue": self._lm_row(r)}
+        if path[1] == "photo":
+            pid = int(path[2])
+            act = path[3] if len(path) > 3 else ""
+            if act == "del":
+                LM.remove_photo(c, pid)
+            elif act == "move":
+                LM.move_photo(c, pid, int(body.get("step") or 1))
+            else:
+                LM.set_marks(c, self.cfg, pid, body.get("marks") or [], _b64(body.get("flat")) if body.get("flat") else None)
+            p = c.execute("SELECT * FROM eo_images WHERE id=?", (pid,)).fetchone()
+            return {"ok": True, "photo": self._photo(p) if p else None}
+        if path[1] == "mold" and path[2] == "add":
+            kw = {k: str(body.get(k) or "") for k in LM.MOLD_FIELDS}
+            mid, new = LM.upsert_mold(c, str(body.get("car") or ""), str(body.get("vendor") or ""), str(body.get("part_no") or ""), **kw)
+            c.commit()
+            return {"ok": True, "id": mid, "new": new}
+        if path[1] == "import":   # 엑셀/CSV 올리기: 외주처 엑셀(갑지+을지+사진) · 통합 문제점 리스트 · 금형 리스트 자동 구분
+            car = str(body.get("car") or "").strip()
+            if not car:
+                raise ValueError("차종을 입력해 주세요")
+            name, data = str(body.get("name") or "upload.xlsx"), _b64(body.get("data"))
+            vendor = str(body.get("vendor") or "").strip().upper() or LM.vendor_from_name(name)
+            return {"ok": True} | LM.import_any(c, self.cfg, car, name, data, vendor or None)
+        raise KeyError("/".join(path))
+
     # ---- 금형 이관 ----
     def _mold_dict(self, c, m) -> dict:
         from . import mold as M
@@ -604,6 +714,8 @@ class Data:
         if path[0] == "mold" and path[2] == "doc":
             M.set_doc(c, self.cfg, int(path[1]), str(body["section"]), status=str(body["status"]))
             return {"ok": True}
+        if path[0] == "local":
+            return self.local_post(c, [p for p in path if p != ""] + [""] * 2, body)
         if path[0] == "export":
             kind = path[1]
             out = Path(self.cfg["archive"]["db_path"]).parent
@@ -616,6 +728,10 @@ class Data:
             elif kind == "mold":
                 from . import mold_excel
                 p = mold_excel.build(c, M, M.listing(c, "all"), out / "MOLD_TRANSFER.xlsx")
+            elif kind == "local":   # 현지 금형: 외주처를 고르면 그 외주처 양식, 아니면 통합 리스트 + 외주처별
+                from . import local as LM
+                paths = LM.export(c, self.cfg, str(body.get("car") or ""), str(body.get("vendor") or "") or None)
+                p = paths[0] if body.get("vendor") else paths[0].parent
             else:
                 raise KeyError(kind)
             if os.name == "nt":
@@ -750,6 +866,12 @@ def make_handler(data: Data, port: int):
                         return self._json(data.tos(c))
                     if parts[0] == "to" and len(parts) == 2:
                         return self._json(data.to(c, int(parts[1])))
+                    if parts == ["local"]:
+                        return self._json(data.local(c, q))
+                    if parts[0] == "local" and len(parts) == 3 and parts[1] == "mold":
+                        return self._json(data.local_mold(c, int(parts[2])))
+                    if parts[0] == "local" and len(parts) == 3 and parts[1] == "issue":
+                        return self._json(data.local_issue(c, int(parts[2])))
                     if parts == ["molds"]:
                         return self._json(data.molds(c))
                     if parts[0] == "mold" and len(parts) == 2:

@@ -906,6 +906,84 @@ def cmd_open(args, cfg, conn):
     sys.exit("원본을 열 수 없습니다 (아웃룩에서 삭제되었고 .msg 사본도 없음). 'show' 로 내용은 확인 가능합니다.")
 
 
+def cmd_local(args, cfg, conn):
+    """현지 금형 문제점 (차종 → 외주처 → 금형 → 문제점, T/O 대장 단계)."""
+    from . import local as LM
+    LM.ensure(conn)
+    a = args.local_cmd
+    if a == "import":
+        p = Path(args.path)
+        if not p.is_file():
+            raise SystemExit(f"파일이 없습니다: {p}")
+        vendor = (args.vendor or LM.vendor_from_name(p.name) or "").upper() or None
+        res = LM.import_any(conn, cfg, args.car, p.name, p.read_bytes(), vendor)
+        _out(f"[{res.pop('kind')}] {p.name} → {args.car}{' / ' + vendor if vendor else ''}\n  " +
+             ", ".join(f"{k} {v}" for k, v in res.items()))
+        return
+    if a == "cars":
+        rows = LM.cars(conn)
+        if args.json:
+            _out(json.dumps(rows, ensure_ascii=False, indent=1))
+            return
+        for x in rows:
+            _out(f"{x['car']}: 금형 {x['molds']}벌 (문제 있는 금형 {x['molds_with_issue']}) · 문제점 {x['issues']}건 · 진행 {x['open']} · "
+                 f"중요도 상 진행 {x['hi_open']} · 수정 지연 {x['late']} · 검증 T/O 필요 {x['wait']} · 종결률 {x['close_rate']}%")
+            for v in x["vendors"]:
+                _out(f"  - {v['vendor']}: 금형 {v['molds']} · 문제점 {v['issues']} · 진행 {v['open']} · 중요도 상 {v['hi_open']}")
+        return
+    if a == "molds":
+        rows = LM.molds(conn, args.car, args.vendor)
+        if args.json:
+            _out(json.dumps(rows, ensure_ascii=False, indent=1))
+            return
+        for m in rows:
+            cnt = " ".join(f"{c}{m['counts'][c]}" for c in LM.CATS if m["counts"][c])
+            _out(f"{m['vendor']:<13} {m['part_no']:<16} {m['part_name'][:30]:<30} {m['status']:<5} 문제 {m['total']} (진행 {m['open']}) {cnt}")
+        return
+    if a == "list":
+        rows = LM.issues(conn, args.car, args.vendor, status=args.status, q=args.q, importance=args.importance,
+                         category=args.category)
+        if args.json:
+            _out(json.dumps([dict(r) | {"delay": LM.delay_of(r), "wait": LM.wait_check(r)} for r in rows], ensure_ascii=False, indent=1))
+            return
+        for r in rows[:args.limit]:
+            flag = " ".join(x for x in (LM.delay_of(r), LM.wait_check(r), f"재발←L{r['recur_of']}" if r["recur_of"] else "") if x)
+            _out(f"L{r['id']:<4} {r['vendor']:<12} {r['part_no']:<15} [{r['category']}] {r['importance'] or '-'} {r['status']:<4} "
+                 f"{r['problem'][:40]}{'  ' + flag if flag else ''}")
+        _out(f"({len(rows)}건)")
+        return
+    if a == "show":
+        r = LM.get_issue(conn, args.id)
+        if not r:
+            raise SystemExit(f"L{args.id} 이 없습니다")
+        ph = LM.photos(conn, args.id)
+        if args.json:
+            _out(json.dumps({"issue": dict(r), "photos": [dict(p) for p in ph], "log": [dict(x) for x in LM.log(conn, args.id)]},
+                            ensure_ascii=False, indent=1))
+            return
+        _out(f"L{r['id']} {r['car']} / {r['vendor']} / {r['part_no']} {r['part_name']}\n  [{r['category']}] {r['problem']}\n"
+             f"  상태 {r['status']} (양식: {r['src_status'] or '-'}) · 중요도 {r['importance'] or '-'} · 발생 {r['occ_date'] or '-'} · "
+             f"수정 목표 {r['due'] or '-'}\n  대책: {r['countermeasure'] or '-'}\n  진행: {r['progress'] or '-'} · 수정 후 T/O "
+             f"{r['to_after'] or '-'} {r['to_result']}\n  사진: 수정 전 {sum(1 for p in ph if p['grp'] == 'before')} · "
+             f"수정 후 {sum(1 for p in ph if p['grp'] == 'after')}")
+        for x in LM.log(conn, args.id):
+            _out(f"  {x['at'][:16]} {x['from_status'] or '등록'} → {x['to_status']} {x['note']}")
+        return
+    if a == "set":
+        kw = {k: getattr(args, k) for k in LM.ISSUE_FIELDS if getattr(args, k, None) is not None}
+        r = LM.update_issue(conn, args.id, note=args.note, **kw)
+        _out(f"L{r['id']} → {r['status']} · {r['problem'][:50]}")
+        return
+    if a == "export":
+        paths = LM.export(conn, cfg, args.car, args.vendor, Path(args.dir) if args.dir else None)
+        for p in paths:
+            _out(str(p))
+        if args.open:
+            from .winopen import open_file
+            open_file(str(paths[0] if args.vendor else paths[0].parent))
+        return
+
+
 def cmd_todo(args, cfg, conn):
     from datetime import timedelta
     since = "" if args.all else (args.since or (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d"))
@@ -1309,6 +1387,45 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--dest", help="이관 법인만")
     x.add_argument("--open", action="store_true")
     s.set_defaults(func=cmd_mold)
+
+    s = sp.add_parser("local", help="현지 금형 문제점 (차종별 외주처 갑지·을지, 사진, 엑셀 양식)")
+    ls = s.add_subparsers(dest="local_cmd", required=True)
+    x = ls.add_parser("import", help="엑셀/CSV 가져오기: 외주처 엑셀(갑지+을지+사진) · 통합 문제점 리스트 · 금형 리스트 (자동 구분)")
+    x.add_argument("path")
+    x.add_argument("--car", required=True, help="차종 (예: \"BC4t CUV\")")
+    x.add_argument("--vendor", help="외주처 (파일 이름 _CAR_외주처_REV 에서 자동)")
+    x = ls.add_parser("cars", help="차종별 요약")
+    x.add_argument("--json", action="store_true")
+    x = ls.add_parser("molds", help="갑지 (금형별 유형 건수 · STATUS)")
+    x.add_argument("--car")
+    x.add_argument("--vendor")
+    x.add_argument("--json", action="store_true")
+    x = ls.add_parser("list", help="문제점 목록")
+    x.add_argument("--car")
+    x.add_argument("--vendor")
+    x.add_argument("--status", default="open", help="open / all / wait(검증 T/O 필요) / 단계 이름")
+    x.add_argument("--importance", help="상/중/하")
+    x.add_argument("--category", help="습합/취출/WELD LINE/SINK/미성형/GAS/기타")
+    x.add_argument("--q", help="품번·품명·문제점·대책 검색")
+    x.add_argument("--limit", type=int, default=200)
+    x.add_argument("--json", action="store_true")
+    x = ls.add_parser("show", help="문제점 상세 (L번호)")
+    x.add_argument("id", type=int)
+    x.add_argument("--json", action="store_true")
+    x = ls.add_parser("set", help="문제점 갱신")
+    x.add_argument("id", type=int)
+    for f, h in (("status", "발생/원인분석/대책수립/대책적용/효과확인/종결/보류"), ("problem", "문제점"),
+                 ("category", "유형"), ("countermeasure", "개선 대책"), ("owner", "담당"), ("importance", "상/중/하"),
+                 ("mold_fix", "금형수정 대상 O/X"), ("occ_date", "발생일"), ("due", "수정 목표일"),
+                 ("to_after", "수정 후 T/O O/X"), ("to_result", "T/O 결과 OK/NG"), ("progress", "진행 메모")):
+        x.add_argument("--" + f.replace("_", "-"), dest=f, help=h)
+    x.add_argument("--note", help="메모 (이력에 남음)")
+    x = ls.add_parser("export", help="엑셀: --vendor 면 외주처 양식(갑지+을지+사진), 없으면 통합 리스트 + 외주처별 전부")
+    x.add_argument("--car", required=True)
+    x.add_argument("--vendor")
+    x.add_argument("--dir", help="저장 폴더 (기본 data/local/차종)")
+    x.add_argument("--open", action="store_true")
+    s.set_defaults(func=cmd_local)
 
     s = sp.add_parser("remind-sent", help="퇴근 전 알림: 보낸편지함 → 받은편지함 옮기기 (오늘 보낸 메일이 수집 안 됐으면 알림 창)")
     s.add_argument("--status", action="store_true", help="오늘 수집된 보낸 메일 수만 보기")

@@ -38,7 +38,8 @@ PPT_MAX_SLIDES = 10
 
 
 # 종류별: (번호 앞글자, 메일 연결 테이블, 연결 테이블의 항목 열)
-KINDS = {"eo": ("E", "eo_mails", "eo_id"), "to": ("T", "to_mails", "to_id")}
+KINDS = {"eo": ("E", "eo_mails", "eo_id"), "to": ("T", "to_mails", "to_id"),
+         "lm": ("L", "lm_mails", "issue_id")}   # lm = 현지 금형 문제점 (local.py)
 
 
 def ensure(conn) -> None:
@@ -46,7 +47,12 @@ def ensure(conn) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(eo_images)")}
     if "kind" not in cols:  # E.O 전용이던 이전 버전 → T/O 문제점 사진도 같이 저장
         conn.execute("ALTER TABLE eo_images ADD COLUMN kind TEXT DEFAULT 'eo'")
-        conn.commit()
+    # 현지 금형 문제점: 수정 전/후 칸(grp), 표시(marks, 비율 좌표 JSON), 표시를 그려 넣은 사본, 크기
+    for col, typ in (("grp", "TEXT DEFAULT ''"), ("marks", "TEXT DEFAULT ''"), ("marked_path", "TEXT DEFAULT ''"),
+                     ("w", "INTEGER DEFAULT 0"), ("h", "INTEGER DEFAULT 0")):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE eo_images ADD COLUMN {col} {typ}")
+    conn.commit()
 
 
 def img_dir(cfg: dict, eid: int, kind: str = "eo") -> Path:
