@@ -344,6 +344,23 @@ class PriorityAndMoveTest(unittest.TestCase):
         self.assertRaises(ValueError, L.from_mailhub, self.c, self.cfg, old)    # 두 번은 안 옮김
 
 
+class ShortcutTest(unittest.TestCase):
+    def test_shortcut_command(self):
+        import os
+        from localmold import shortcut
+        args, env = shortcut.command(Path("C:/work/stock"), start_menu=True)
+        self.assertEqual(args[0], "powershell")
+        script = base64.b64decode(args[-1]).decode("utf-16-le")
+        self.assertIn("CreateShortcut", script)
+        self.assertIn("GetFolderPath('Desktop')", script)
+        self.assertEqual((env["LM_NAME"], env["LM_START"]), ("현지 금형 육성 관리", "1"))
+        self.assertTrue(env["LM_BAT"].replace("\\", "/").endswith("scripts/localmold.bat"))
+        self.assertTrue(env["LM_ICO"].endswith("localmold.ico") and Path(env["LM_ICO"]).is_file())
+        self.assertTrue((shortcut.ROOT / "scripts" / "localmold.bat").is_file())
+        if os.name != "nt":
+            self.assertRaises(SystemExit, shortcut.make)
+
+
 class LocalApiTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -403,6 +420,8 @@ class LocalApiTest(unittest.TestCase):
         self.assertEqual(self.get("top?car=CUV&limit=3")["issues"][0]["id"], s["top"][0]["id"])
         self.assertEqual(self.get("find?q=" + urllib.parse.quote("싱크"))["issues"][0]["problem"], "리브 싱크")
         self.assertIn("localmold", self.get("ping")["app"])
+        ico = urllib.request.urlopen(self.base + "/favicon.ico")
+        self.assertEqual((ico.headers["Content-Type"], ico.read(4)), ("image/x-icon", b"\x00\x00\x01\x00"))
 
 
 if __name__ == "__main__":

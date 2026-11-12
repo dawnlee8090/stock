@@ -1,4 +1,5 @@
 <title>현지 금형 육성 관리</title>
+<link rel="icon" href="/favicon.ico">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -1086,7 +1087,7 @@ let searchAfterIME = false;   // 한글 조합 중 Enter
 $('#q').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.isComposing || e.keyCode === 229)) { searchAfterIME = true; e.preventDefault(); } });
 $('#q').addEventListener('compositionend', () => { if (searchAfterIME) { searchAfterIME = false; setTimeout(runSearch, 0); } });
 $('#up-btn').addEventListener('click', () => { const R = parseHash(); lmImport(R.k === 'car' ? R.a : ''); });
-const APP_VERSION = '2026-11-12.1';   // localmold/webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-12.2';   // localmold/webapp.py 의 APP_VERSION 과 같게
 function showFatal(msg) {
   const V = $('#view'); if (!V) return;
   V.className = 'view';

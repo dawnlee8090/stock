@@ -1,6 +1,7 @@
 """현지 금형 육성 관리 - 명령줄.
 
     python -m localmold app                         화면 (http://127.0.0.1:8766)
+    python -m localmold shortcut                    바탕화면 · 시작 메뉴에 앱 아이콘 만들기 (Windows)
     python -m localmold import <엑셀/CSV> --car ..  외주처 엑셀 · 통합 리스트 · 금형 리스트 가져오기 (자동 구분)
     python -m localmold cars | molds | list | show | set | top | snapshot | phone-import | export | from-mailhub
 """
@@ -129,6 +130,12 @@ def run(args, cfg, conn):
         res = LM.from_mailhub(conn, cfg, src)
         _out(f"업무 비서({src})에서 옮김: " + ", ".join(f"{k} {v}" for k, v in res.items()))
         return
+    if a == "shortcut":
+        from .shortcut import make
+        for path in make(start_menu=not args.desktop_only):
+            _out(f"만들었습니다: {path}")
+        _out("바탕화면의 '현지 금형 육성 관리' 아이콘을 더블클릭하면 앱이 열립니다 (작은 검은 창 '현지 금형'을 닫으면 꺼짐).")
+        return
     if a == "app":
         from .webapp import serve
         conn.close()
@@ -143,6 +150,8 @@ def build_parser() -> argparse.ArgumentParser:
     x = ls.add_parser("app", help="화면 열기 (이 PC 에서만)")
     x.add_argument("--port", type=int)
     x.add_argument("--no-window", action="store_true", help="창을 열지 않고 엔진만")
+    x = ls.add_parser("shortcut", help="바탕화면 · 시작 메뉴에 앱 아이콘 만들기 (Windows)")
+    x.add_argument("--desktop-only", action="store_true", help="시작 메뉴에는 만들지 않음")
     x = ls.add_parser("import", help="엑셀/CSV 가져오기: 외주처 엑셀(갑지+을지+사진) · 통합 문제점 리스트 · 금형 리스트 (자동 구분)")
     x.add_argument("path")
     x.add_argument("--car", required=True, help="차종 (예: \"BC4t CUV\")")

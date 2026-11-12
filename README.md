@@ -302,7 +302,8 @@ python -m mailhub mold export data\MOLD_TRANSFER.xlsx --open
 업무 비서가 복잡해지지 않도록 **따로 실행하는 앱**으로 분리했습니다. 실행 · 명령 · 화면은 [localmold/README.md](localmold/README.md) 를 보세요.
 
 ```powershell
-python -m localmold app            # http://127.0.0.1:8766 (업무 비서와 따로 켜고 끔, 바로가기 scripts\localmold.bat)
+python -m localmold app            # http://127.0.0.1:8766 (업무 비서와 따로 켜고 끔)
+python -m localmold shortcut       # 바탕화면 · 시작 메뉴에 '현지 금형 육성 관리' 앱 아이콘 (또는 scripts\현지금형_바탕화면_아이콘_만들기.bat)
 python -m localmold from-mailhub   # 업무 비서 안의 [현지 금형]에 넣어 둔 데이터를 처음 한 번 옮기기
 ```
 

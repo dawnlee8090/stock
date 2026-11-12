@@ -35,7 +35,7 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   차종 → 외주처 갑지 → 을지, T/O 대장 단계, L번호: `cars`, `top [--car ..] [--json]`(작업 우선순위 + 이유), `molds --car .. [--vendor ..]`,
   `list --car .. [--vendor --status open|all|wait|단계 --importance --category --q] [--json]`, `show <L번호> [--json]`,
   `import <엑셀/CSV> --car .. [--vendor ..]`(외주처 엑셀=갑지+을지+사진 / 통합 문제점 리스트 / 금형 리스트 자동 구분),
-  `set <L번호> --status .. --to-result OK|NG --note ..`, `export --car .. [--vendor ..] [--open]`, `from-mailhub`(예전 업무 비서 [현지 금형] 데이터 옮기기, 처음 한 번).
+  `set <L번호> --status .. --to-result OK|NG --note ..`, `export --car .. [--vendor ..] [--open]`, `from-mailhub`(예전 업무 비서 [현지 금형] 데이터 옮기기, 처음 한 번), `shortcut`(바탕화면 · 시작 메뉴 앱 아이콘, Windows).
   드라이브에서 받기는 `/local-sync`. 휴대폰 사진 접수(claude.ai 비공개 페이지) ↔ PC: `snapshot --car .. --out ..`(폰에서 고를 목록), `phone-import <받은 폴더>`(사진 들여오기). 절차는 `/local-sync` 4-1
 - 주제별 이력 정리: `/mail-history <주제>` (예: CONSOLE 문제점, 품번) - 이력표·문제점별 현황·미결·다음 조치, 근거 #id.
   앱 [이력 정리] 화면: 검색 + 같은 건(스레드) 메일을 건별·날짜순으로, 메일 클릭 = 원본 팝업, 업체 메일 초안(틀 / Claude 다듬기) → Outlook 창·업체 요청 등록
