@@ -176,7 +176,7 @@ label.f { display: grid; gap: 4px; font-size: 12px; color: var(--fg-2); font-wei
       <div class="adds">
         <label class="btn primary">사진 촬영<input type="file" id="cam" accept="image/*" capture="environment"></label>
         <label class="btn">앨범 · 파일<input type="file" id="alb" accept="image/*" multiple></label>
-        <span class="pname" style="align-self:center">PC: 끌어놓기 · Ctrl+V</span>
+        <span class="pname" style="align-self:center">PC: 끌어놓기 · Ctrl+V 는 바로 첨부</span>
       </div>
       <label class="f">메모 (선택)<input id="memo" placeholder="예: T2 사출품, 7번 캐비티"></label>
     </div>
@@ -397,17 +397,19 @@ async function shrink(file, max) {
     const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * r); c.height = Math.round(img.naturalHeight * r); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c; }
   finally { URL.revokeObjectURL(url); }
 }
-async function addFiles(files) {
+// direct = 끌어놓기 · Ctrl+V: 표시 화면 없이 바로 첨부 (표시는 사진의 '○ 표시'로 나중에). 촬영 · 앨범 한 장은 표시 화면부터
+async function addFiles(files, direct) {
   const imgs = [...files].filter(f => /^image\//.test(f.type));
   if (!imgs.length) { if (files.length) toast('사진 파일만 넣을 수 있습니다'); return; }
   for (const f of imgs) {
     try {
       const base = await shrink(f, 1800);
       let marks = [];
-      if (imgs.length === 1) { const m = await annotate(base, [], grp); if (m === null) return; marks = m; }
+      if (imgs.length === 1 && !direct) { const m = await annotate(base, [], grp); if (m === null) return; marks = m; }
       queue.push({ base, marks, grp, url: base.toDataURL('image/jpeg', 0.8) });
     } catch (e) { toast('사진을 읽지 못했습니다. 다른 사진으로 해 보세요'); }
   }
+  if (direct) toast(`${grp === 'after' ? '수정 후' : '수정 전'} 사진 ${imgs.length}장을 붙였습니다`);
   renderTiles(); updateSend();
 }
 function renderTiles() {
@@ -426,10 +428,10 @@ $('alb').onchange = (e) => { const f = [...e.target.files]; e.target.value = '';
 document.addEventListener('paste', (e) => {
   if ($('vUp').hidden || document.querySelector('.ov')) return;
   const f = [...(e.clipboardData?.items || [])].filter(i => i.kind === 'file' && i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
-  if (f.length) { e.preventDefault(); addFiles(f); }
+  if (f.length) { e.preventDefault(); addFiles(f, true); }
 });
-document.addEventListener('dragover', (e) => { if (!$('vUp').hidden) e.preventDefault(); });
-document.addEventListener('drop', (e) => { if ($('vUp').hidden) return; e.preventDefault(); addFiles([...(e.dataTransfer?.files || [])]); });
+document.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = $('vUp').hidden ? 'none' : 'copy'; });
+document.addEventListener('drop', (e) => { e.preventDefault(); if ($('vUp').hidden || document.querySelector('.ov')) return; addFiles([...(e.dataTransfer?.files || [])], true); });
 
 /* ---------- 올리기 ---------- */
 function ready() {

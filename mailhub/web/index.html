@@ -394,6 +394,8 @@ table.lm-master th.c { text-align: center; }
 .lm-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px;
   padding: 10px; cursor: pointer; text-align: left; font: inherit; color: inherit; align-items: start; }
 .lm-card:hover { border-color: var(--accent); }
+.lm-card.lm-drop, .lm-sheet.lm-drop { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-weak); }
+.lm-card.lm-busy, .lm-sheet.lm-busy { opacity: .6; pointer-events: none; }
 .lm-thumb { position: relative; width: 112px; aspect-ratio: 4 / 3; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
   display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--fg-3); flex: none; }
 .lm-thumb.sm { width: 64px; }
@@ -1957,7 +1959,7 @@ async function viewLocal(V) {
     <div class="seg" role="tablist" aria-label="보기" style="border:0;margin-bottom:10px">
       <button role="tab" type="button" data-mode="master" aria-selected="${lmState.mode === 'master'}">갑지 · 금형별 (${d.molds.length})</button>
       <button role="tab" type="button" data-mode="cards" aria-selected="${lmState.mode === 'cards'}">문제점 카드 (${rows.length})</button>
-      <span class="seg-link sub">${lmState.mode === 'master' ? '금형을 누르면 을지(문제점 · 수정 전/후 사진)' : '카드를 누르면 문제점 · 사진 · 대책'}</span></div>
+      <span class="seg-link sub">${lmState.mode === 'master' ? '금형을 누르면 을지(문제점 · 수정 전/후 사진)' : '카드를 누르면 문제점 · 사진 · 대책 · 사진을 카드에 끌어 놓으면 바로 첨부'}</span></div>
     ${lmState.mode === 'master' ? master : cards}`;
   $('#lm-up', V).addEventListener('click', () => lmImport(d.car));
   $('#lm-ex', V)?.addEventListener('click', async (e) => { e.target.disabled = true;
@@ -1969,6 +1971,7 @@ async function viewLocal(V) {
   V.querySelectorAll('[data-kpi]').forEach(b => b.addEventListener('click', () => { lmState.mode = 'cards'; lmState.stage = b.dataset.kpi; route(); }));
   V.querySelectorAll('tr[data-mold]').forEach(tr => tr.addEventListener('click', () => openLmMold(+tr.dataset.mold)));
   V.querySelectorAll('[data-issue]').forEach(b => b.addEventListener('click', () => openLmIssue(+b.dataset.issue)));
+  lmDropTargets(V, '.lm-card[data-issue]', () => route());
   for (const [id, k] of [['#lm-st', 'stage'], ['#lm-imp', 'imp'], ['#lm-cat', 'cat']]) $(id, V)?.addEventListener('change', (e) => { lmState[k] = e.target.value; route(); });
   const qi = $('#lm-q', V); if (qi) { qi.addEventListener('change', () => { lmState.q = qi.value.trim(); route(); }); }
   if (PENDING && PENDING.view === 'local') { const id = PENDING.id; PENDING = null; if (id) openLmIssue(id); }
@@ -2011,7 +2014,7 @@ async function openLmMold(id) {
       ${LM_CATS.filter(c => m.counts && m.counts[c]).map(c => `<span class="chip">${c} ${m.counts[c]}</span>`).join('')}</div>
     <dl class="kv"><dt>차종 · 외주처</dt><dd>${esc(m.car)} · ${esc(m.vendor)}</dd><dt>형식 · 중량</dt><dd>${esc([m.mold_type, m.weight].filter(Boolean).join(' · ') || '-')}</dd>
       <dt>T/O · 담당</dt><dd>${esc([m.to_round, m.owner].filter(Boolean).join(' · ') || '-')}</dd>${m.note ? `<dt>비고</dt><dd>${esc(m.note)}</dd>` : ''}</dl>
-    <div class="edit-row"><button class="btn primary sm" id="lm-add" type="button">+ 문제점 추가</button><span class="sub">문제점 ${d.issues.length}건 · 행을 누르면 사진 · 대책을 고칩니다</span></div>
+    <div class="edit-row"><button class="btn primary sm" id="lm-add" type="button">+ 문제점 추가</button><span class="sub">문제점 ${d.issues.length}건 · 행을 누르면 사진 · 대책을 고칩니다 · 사진을 행에 끌어 놓으면 수정 전 칸에 바로 첨부</span></div>
     <div class="lm-sheets"><div class="lm-sheet head"><span>NO</span><span>문제점</span><span class="hide-sm">수정 전</span><span class="hide-sm">개선 대책</span><span class="hide-sm">수정 후</span><span>단계</span></div>
     ${d.issues.map((r, i) => { const b = (r.photo_list || []).filter(p => p.grp === 'before'), a = (r.photo_list || []).filter(p => p.grp === 'after');
       return `<div class="lm-sheet" role="button" tabindex="0" data-issue="${r.id}"><span class="num">${i + 1}</span>
@@ -2020,6 +2023,7 @@ async function openLmMold(id) {
         <span>${pill(r.status)}${lmFlags(r)}</span></div>`; }).join('') || '<div class="empty">문제점이 없습니다</div>'}</div>`, (L) => {
       $('#lm-add', L).addEventListener('click', () => openLmIssue(0, m));
       L.querySelectorAll('[data-issue]').forEach(el => { const go = () => openLmIssue(+el.dataset.issue); el.addEventListener('click', go); el.addEventListener('keydown', e => { if (e.key === 'Enter') go(); }); });
+      lmDropTargets(L, '.lm-sheet[data-issue]', () => openLmMold(id));
     }, true);
 }
 
@@ -2086,7 +2090,7 @@ function renderLmGroups(L) {
         <div class="lm-tact"><button type="button" class="mk" data-act="mark" data-pid="${p.id}">○ 표시</button><button type="button" data-act="left" data-pid="${p.id}" ${i === 0 ? 'disabled' : ''} aria-label="앞으로">◀</button>
         <button type="button" data-act="right" data-pid="${p.id}" ${i === list.length - 1 ? 'disabled' : ''} aria-label="뒤로">▶</button><button type="button" data-act="del" data-pid="${p.id}" aria-label="삭제">✕</button></div></div>`).join('')}
         <div class="lm-tile"><div class="lm-add"><label class="btn sm">사진 촬영<input type="file" accept="image/*" capture="environment" data-up="${g}"></label>
-          <label class="btn sm">파일 · 앨범<input type="file" accept="image/*" multiple data-up="${g}"></label><span>끌어놓기 · Ctrl+V</span></div></div></div></div>`;
+          <label class="btn sm">파일 · 앨범<input type="file" accept="image/*" multiple data-up="${g}"></label><span>끌어놓기 · Ctrl+V = 바로 첨부</span></div></div></div></div>`;
   }).join('');
 }
 function setupLmDrop(L) {
@@ -2117,13 +2121,27 @@ function setupLmDrop(L) {
   box.addEventListener('dragenter', (e) => { const g = grpOf(e.target); if (!g || ![...(e.dataTransfer?.types || [])].includes('Files')) return; e.preventDefault(); depth++; g.classList.add('drag'); });
   box.addEventListener('dragover', (e) => { if (grpOf(e.target)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
   box.addEventListener('dragleave', (e) => { const g = grpOf(e.target); if (g && --depth <= 0) { depth = 0; g.classList.remove('drag'); } });
-  box.addEventListener('drop', (e) => { const g = grpOf(e.target); if (!g) return; e.preventDefault(); depth = 0; g.classList.remove('drag'); lmCur.activeGrp = g.dataset.grp; lmAddFiles(L, g.dataset.grp, [...(e.dataTransfer?.files || [])]); });
+  box.addEventListener('drop', (e) => { const g = grpOf(e.target); if (!g) return; e.preventDefault(); depth = 0; g.classList.remove('drag'); lmCur.activeGrp = g.dataset.grp; lmAddFiles(L, g.dataset.grp, [...(e.dataTransfer?.files || [])], true); });
 }
 document.addEventListener('paste', (e) => {
   const L = $('#layer'); if (!lmCur || !$('#lm-groups', L) || document.querySelector('.lm-mk')) return;
   const files = [...(e.clipboardData?.items || [])].filter(i => i.kind === 'file' && i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
   if (!files.length) return;
-  e.preventDefault(); lmAddFiles(L, lmCur.activeGrp || 'before', files);
+  e.preventDefault(); lmAddFiles(L, lmCur.activeGrp || 'before', files, true);
+});
+// 문제점 창 어디에 놓아도 (사진 칸 밖이면) 지금 고른 칸에 바로 첨부
+// 놓을 곳이 아닌 데 떨어뜨려도 브라우저가 사진을 열어 앱 화면을 벗어나지 않게 막는다
+const issueOpen = () => lmCur && $('#lm-groups', $('#layer')) && !document.querySelector('.lm-mk');
+document.addEventListener('dragover', (e) => {
+  if (e.defaultPrevented || ![...(e.dataTransfer?.types || [])].includes('Files')) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = issueOpen() ? 'copy' : 'none';
+});
+document.addEventListener('drop', (e) => {
+  if (e.defaultPrevented) return;
+  const files = [...(e.dataTransfer?.files || [])]; if (!files.length) return;
+  e.preventDefault();
+  if (issueOpen()) lmAddFiles($('#layer'), lmCur.activeGrp || 'before', files, true);
+  else if ((location.hash || '').startsWith('#local')) toast('사진은 문제점 카드 · 을지 행 · 문제점 창에 놓아 주세요');
 });
 function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
 async function shrink(file, max) {
@@ -2133,23 +2151,63 @@ async function shrink(file, max) {
   finally { URL.revokeObjectURL(url); }
 }
 function flatten(base, marks) { const c = document.createElement('canvas'); c.width = base.width; c.height = base.height; const x = c.getContext('2d'); x.drawImage(base, 0, 0); drawMarks(x, marks, c.width, c.height); return c.toDataURL('image/jpeg', 0.86); }
-async function lmAddFiles(L, grp, all) {
-  const files = all.filter(f => /^image\//.test(f.type));
-  if (!files.length) { if (all.length) toast('사진 파일만 넣을 수 있습니다'); return; }
-  if (!lmCur.id) { const ok = await saveLmIssue(L, true); if (!ok) return; }   // 새 문제점은 먼저 등록하고 사진을 붙인다
-  const msg = $('#lm-msg', L);
+const LM_GRP = { before: '수정 전', after: '수정 후' };
+const imageFiles = (list) => [...(list || [])].filter(f => /^image\//.test(f.type));
+// 사진 올리기 (표시 없이). 끌어놓기 · 붙여넣기 · 목록에 바로 놓기에서 쓴다
+async function lmUpload(iid, grp, files, onEach) {
+  const out = [];
   for (const f of files) {
     try {
       const base = await shrink(f, 1800);
-      let marks = [];
-      if (files.length === 1) { const m = await annotate(base, [], grp); if (m === null) return; marks = m; }
-      msg.textContent = '사진 올리는 중…';
-      const r = await api(`local/issue/${lmCur.id}/photo`, { grp, data: base.toDataURL('image/jpeg', 0.86), marks, flat: marks.length ? flatten(base, marks) : '', w: base.width, h: base.height });
-      if (r.photo) lmCur.photos.push(r.photo);
+      const r = await api(`local/issue/${iid}/photo`, { grp, data: base.toDataURL('image/jpeg', 0.86), marks: [], flat: '', w: base.width, h: base.height });
+      if (r.photo) { out.push(r.photo); onEach && onEach(r.photo); }
     } catch (err) { toast('사진을 올리지 못했습니다: ' + err.message); }
   }
-  msg.textContent = files.length > 1 ? `${files.length}장을 넣었습니다. '○ 표시'로 수정부위를 표시할 수 있습니다` : '';
+  return out;
+}
+// direct = 끌어놓기 · Ctrl+V: 표시 화면 없이 바로 첨부 (표시는 나중에 '○ 표시'). 촬영 · 파일 한 장은 표시 화면부터
+async function lmAddFiles(L, grp, all, direct) {
+  const files = imageFiles(all);
+  if (!files.length) { if (all.length) toast('사진 파일만 넣을 수 있습니다'); return; }
+  if (!lmCur.id) { const ok = await saveLmIssue(L, true); if (!ok) return; }   // 새 문제점은 먼저 등록하고 사진을 붙인다
+  const msg = $('#lm-msg', L);
+  if (direct || files.length > 1) {
+    msg.textContent = '사진 올리는 중…';
+    const got = await lmUpload(lmCur.id, grp, files, (p) => { lmCur.photos.push(p); renderLmGroups(L); });
+    msg.textContent = got.length ? `${LM_GRP[grp]} 칸에 ${got.length}장을 넣었습니다. '○ 표시'로 수정부위를 표시할 수 있습니다` : '';
+    if (got.length) toast(`${LM_GRP[grp]} 칸에 ${got.length}장 첨부`);
+    renderLmGroups(L);
+    return;
+  }
+  try {
+    const base = await shrink(files[0], 1800);
+    const marks = await annotate(base, [], grp); if (marks === null) return;
+    msg.textContent = '사진 올리는 중…';
+    const r = await api(`local/issue/${lmCur.id}/photo`, { grp, data: base.toDataURL('image/jpeg', 0.86), marks, flat: marks.length ? flatten(base, marks) : '', w: base.width, h: base.height });
+    if (r.photo) lmCur.photos.push(r.photo);
+    msg.textContent = '';
+  } catch (err) { toast('사진을 올리지 못했습니다: ' + err.message); }
   renderLmGroups(L);
+}
+// 목록(문제점 카드 · 을지 행)에 사진을 끌어 놓으면 그 문제점의 '수정 전' 칸에 바로 첨부
+function lmDropTargets(root, sel, done) {
+  root.__lmDrop = { sel, done };          // 화면을 다시 그려도 리스너는 한 번만 (두 번 올라가지 않게)
+  if (root.__lmDropBound) return;
+  root.__lmDropBound = true;
+  let over = null;
+  const tgt = (e) => e.target.closest?.(root.__lmDrop.sel);
+  const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+  root.addEventListener('dragover', (e) => { const t = tgt(e); if (!t || !hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+    if (over !== t) { over?.classList.remove('lm-drop'); over = t; t.classList.add('lm-drop'); } });
+  root.addEventListener('dragleave', (e) => { const t = tgt(e); if (t && !t.contains(e.relatedTarget)) { t.classList.remove('lm-drop'); if (over === t) over = null; } });
+  root.addEventListener('drop', async (e) => {
+    const t = tgt(e); if (!t) return; e.preventDefault(); e.stopPropagation(); t.classList.remove('lm-drop'); over = null;
+    const files = imageFiles(e.dataTransfer?.files); if (!files.length) return toast('사진 파일만 넣을 수 있습니다');
+    t.classList.add('lm-busy');
+    const got = await lmUpload(+t.dataset.issue, 'before', files);
+    t.classList.remove('lm-busy');
+    if (got.length) { toast(`L${t.dataset.issue} 수정 전 칸에 ${got.length}장 첨부`); root.__lmDrop.done && root.__lmDrop.done(); }
+  });
 }
 
 // ----- 표시 편집기: 동그라미+라벨 · 동그라미 · 화살표+라벨 · 사각 · 펜 / 수정부위(빨강) · 리워크부위(파랑) -----
@@ -2260,7 +2318,7 @@ async function refreshSummary() {
     const t = s.last_sync ? `마지막 수집 ${md(s.last_sync.slice(0, 10))} ${s.last_sync.slice(11, 16)}` : '마지막 수집 -';
     $('#last-sync').textContent = t; $('#sync-time').textContent = t; } catch { /* 요약 실패는 무시 */ }
 }
-const APP_VERSION = '2026-11-12.2';   // webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-12.3';   // webapp.py 의 APP_VERSION 과 같게
 // 화면에서 오류가 나면 빈 화면 대신 이유를 보여준다
 function showFatal(msg) {
   const V = $('#view');
