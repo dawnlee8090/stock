@@ -360,6 +360,17 @@ class ShortcutTest(unittest.TestCase):
         if os.name != "nt":
             self.assertRaises(SystemExit, shortcut.make)
 
+    def test_installer_bat_is_safe_for_cmd(self):
+        from localmold import shortcut
+        raw = (shortcut.ROOT / "scripts" / "현지금형_앱_설치.bat").read_bytes()
+        self.assertFalse(raw.startswith(b"\xef\xbb\xbf"))                  # BOM 있으면 첫 줄이 깨짐
+        self.assertNotIn(b"\n", raw.replace(b"\r\n", b""))                    # CRLF 만
+        text = raw.decode("utf-8")
+        cmd, ps = text[:text.rfind("#PS-START")], text[text.rfind("#PS-START"):]
+        self.assertTrue(cmd.isascii() and "exit /b" in cmd and "chcp 65001" in cmd)
+        self.assertIn("LastIndexOf('#PS-START')", cmd)
+        self.assertIn("-m localmold shortcut", ps)
+
 
 class LocalApiTest(unittest.TestCase):
     @classmethod
