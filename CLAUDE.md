@@ -33,6 +33,8 @@ E.O 변경, T/O 문제점, 금형 수정, 검사구, 금형 이관(현지 법인
   `mold set <M번호> --status ..`, `mold export data/MOLD_TRANSFER.xlsx`. 메일 반영 절차는 `/mold-update`
 - 주제별 이력 정리: `/mail-history <주제>` (예: CONSOLE 문제점, 품번) - 이력표·문제점별 현황·미결·다음 조치, 근거 #id.
   앱 [이력 정리] 화면: 검색 + 같은 건(스레드) 메일을 건별·날짜순으로, 메일 클릭 = 원본 팝업, 업체 메일 초안(틀 / Claude 다듬기) → Outlook 창·업체 요청 등록
+- 앱 메일함: 검색창 [상세 ▾] = 보낸사람·받는사람·제목·본문·첨부파일 이름·품번·제외어·기간·첨부 있음 (/api/mails?from=&to=&subj=&body=&attach=&part=&not=&since=&until=&has_attach=1).
+  원본 보기·메일 화면의 첨부 [열기]/[저장] = 저장된 .eml/.msg 또는 아웃룩(PST)에서 꺼냄 (mailhub/attfiles.py, data/attach_open/)
 - 결과가 적으면 동의어/영문 표기(E.O ↔ EO ↔ 설계변경, T/O ↔ TRY OUT ↔ 트라이)와 품번으로 다시 검색한다.
 
 - 앱 화면: `python -m mailhub app` (mailhub/web/index.html + mailhub/webapp.py, 127.0.0.1 전용). 화면이나 API 를 바꾸면 두 파일의

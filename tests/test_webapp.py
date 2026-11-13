@@ -383,3 +383,55 @@ class RelatedMailTest(unittest.TestCase):
             self.assertEqual([(x["id"], x["part_no"]) for x in r["parts"]], [(p, "84650-NX100")])
             self.assertEqual(data.mail_related(c, b)["parts"], [])            # 품번 없는 메일
             c.close()
+
+
+class AdvancedSearchAttachTest(unittest.TestCase):
+    """상세 검색(보낸사람·받는사람·제목·본문·첨부·기간) + 원본 보기 첨부 열기/저장."""
+
+    def test_advanced_search_and_attachments(self):
+        from email.message import EmailMessage
+        from mailhub import attfiles
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t)
+            cfg = load_config(d / "none.toml")
+            cfg["archive"]["db_path"] = str(d / "m.db")
+            c = db.connect(cfg["archive"]["db_path"])
+            msg = EmailMessage()
+            msg["Subject"], msg["From"] = "콘솔 측정 결과", "한영수 <ys.han@mold.co.kr>"
+            msg.set_content("유격 측정 결과 송부드립니다")
+            msg.add_attachment(b"PK-data", maintype="application", subtype="octet-stream", filename="측정결과.xlsx")
+            msg.add_attachment(b"img", maintype="image", subtype="png", filename="image001.png")
+            eml = d / "a.eml"
+            eml.write_bytes(bytes(msg))
+            ins = lambda k, **r: db.insert_mail(c, k, r)
+            a = ins("1", subject="콘솔 측정 결과", sender_name="한영수", sender_email="ys.han@mold.co.kr", to_addr="나 <me@corp.com>",
+                    body="유격 측정 결과 송부드립니다", attachments="측정결과.xlsx", sent_at="2026-11-02T10:00:00", file_path=str(eml))
+            b = ins("2", subject="범퍼 일정 공유", sender_name="김철수", sender_email="cs.kim@oem.com", to_addr="한영수 <ys.han@mold.co.kr>",
+                    cc_addr="나 <me@corp.com>", body="콘솔 일정은 다음 주", sent_at="2026-10-01T10:00:00")
+            c.commit()
+            data = Data(cfg)
+            ids = lambda **q: [x["id"] for x in data.mails(c, {k: [v] for k, v in q.items()})]
+            self.assertEqual(ids(**{"from": "ys.han"}), [a])                 # 보낸사람 주소
+            self.assertEqual(ids(**{"from": "김철수"}), [b])                  # 보낸사람 이름
+            self.assertEqual(ids(to="ys.han"), [b])                          # 받는사람
+            self.assertEqual(ids(subj="콘솔"), [a])                           # 제목에만 (b 는 본문에만 '콘솔')
+            self.assertEqual(ids(body="콘솔 일정"), [b])                      # 본문에만
+            self.assertEqual(ids(body="측정 결과"), [a])                      # 3글자 미만 단어 섞여도
+            self.assertEqual(ids(attach="측정결과"), [a])
+            self.assertEqual(ids(has_attach="1"), [a])
+            self.assertEqual(ids(since="2026-11-01"), [a])
+            self.assertEqual(ids(until="2026-10-31"), [b])
+            self.assertEqual(ids(q="콘솔", **{"not": "일정"}), [a])            # 제외 단어
+            self.assertEqual(ids(q="콘솔", to="me@corp"), [a, b])
+            # 첨부: 저장된 .eml 에서 꺼내기 (본문 그림은 따로 표시)
+            lst = attfiles.listing(c, a)
+            self.assertEqual(lst["source"], "eml")
+            self.assertEqual([(x["name"], x["inline"]) for x in lst["items"]], [("측정결과.xlsx", False), ("image001.png", True)])
+            self.assertEqual(attfiles.get(c, a, 0), ("측정결과.xlsx", b"PK-data"))
+            self.assertIn("저장했습니다", data.post(c, ["mail", str(a), "attach", "0"], {})["message"])
+            self.assertTrue((d / "attach_open" / str(a) / "측정결과.xlsx").exists())
+            self.assertEqual(attfiles.listing(c, b)["items"], [])            # 파일 없는 메일은 사유와 함께 빈 목록
+            self.assertTrue(attfiles.listing(c, b)["message"])
+            with self.assertRaises(KeyError):
+                attfiles.get(c, a, 5)
+            c.close()

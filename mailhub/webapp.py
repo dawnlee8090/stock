@@ -25,7 +25,7 @@ from .config import load_config
 WEB = Path(__file__).parent / "web" / "index.html"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-11.2"
+APP_VERSION = "2026-11-13.1"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -240,12 +240,14 @@ class Data:
         off = max(int((q.get("offset") or ["0"])[0]), 0)   # 목록 '더 보기' (150건씩)
         d = (q.get("dir") or [""])[0]   # sent = 보낸 메일만, recv = 받은 메일만 (검색 결과·전체 메일 필터)
         dk = {"mine": True} if d == "sent" else ({"received": True} if d == "recv" else {})
+        dk.update(self._adv(q))   # 상세 검색 조건
+        query = " ".join([query, *("-" + w for w in self._words((q.get("not") or [""])[0]))]).strip()
         status = (q.get("status") or [""])[0]
         car = (q.get("car") or [""])[0]
         tag = (q.get("tag") or [None])[0]
         auto = self.autoway_senders()
         if (q.get("special") or [""])[0] == "sent":      # 보낸 메일 (그룹웨어 보낸편지함 → 받은편지함으로 옮겨 수집한 것 포함)
-            rows = search(c, query, mine=True, limit=limit, offset=off, sort="date")
+            rows = search(c, query, mine=True, **self._adv(q), limit=limit, offset=off, sort="date")
         elif (q.get("special") or [""])[0] == "autoway":   # 오토웨이 접수 (RPABOT)
             rows = search(c, query, **dk, senders_any=auto, limit=limit, offset=off, sort="date")
         elif car:      # 차종 폴더 (+ 분류)
@@ -261,6 +263,28 @@ class Data:
         else:
             rows = search(c, query, **dk, tag=(q.get("tag") or [None])[0], limit=limit, offset=off, sort="date")   # 검색도 최근 메일이 맨 위
         return [self.mail_row(r, query) for r in rows]
+
+    @staticmethod
+    def _words(v: str) -> list[str]:
+        from .search import split_terms
+        return [w.lstrip("-") for w in split_terms(v or "") if w.strip("-")]
+
+    @staticmethod
+    def _adv(q: dict) -> dict:
+        """상세 검색 칸 → search() 조건. from=보낸사람(이름·주소), to=받는사람·참조, subj=제목, body=본문·첨부 내용,
+        attach=첨부파일 이름, part=품번, since/until=기간(YYYY-MM-DD), has_attach=1"""
+        g = lambda k: ((q.get(k) or [""])[0] or "").strip()[:200]
+        out = {}
+        for k, arg in (("from", "sender"), ("to", "to"), ("subj", "subject_q"), ("body", "body_q"),
+                       ("attach", "attach_name"), ("part", "part_no")):
+            if g(k):
+                out[arg] = g(k)
+        for k in ("since", "until"):
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", g(k)):
+                out[k] = g(k)
+        if g("has_attach") == "1":
+            out["has_attach"] = True
+        return out
 
     def autoway_senders(self) -> list[str]:
         """오토웨이 접수 메일 보낸사람 (기본: RPABOT). config [folders] autoway_senders"""
@@ -407,7 +431,26 @@ class Data:
                             doc = doc.replace(f"cid:{cid}", f"data:{sub.get_content_type()};base64,{data}")
                 else:
                     doc = f"<pre>{_html.escape(content)}</pre>"
-        elif r["entry_id"] and os.name == "nt":
+        elif fp.lower().endswith(".msg") and os.path.exists(fp):   # 아웃룩에서 백업한 .msg - 서식 그대로
+            try:
+                import extract_msg
+                mm = extract_msg.openMsg(fp)
+                try:
+                    hb = mm.htmlBody
+                    if hb:
+                        doc = hb.decode("utf-8", "replace") if isinstance(hb, bytes) else str(hb)
+                        for a in mm.attachments:   # 본문 그림(cid:) → data URI
+                            cid = (getattr(a, "cid", None) or getattr(a, "contentId", None) or "").strip("<> ")
+                            data = getattr(a, "data", None)
+                            if cid and isinstance(data, bytes):
+                                ext = (getattr(a, "longFilename", "") or "").rsplit(".", 1)[-1].lower()
+                                mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif"}.get(ext, "image/png")
+                                doc = doc.replace(f"cid:{cid}", f"data:{mime};base64,{base64.b64encode(data).decode()}")
+                finally:
+                    mm.close()
+            except Exception:
+                doc = ""
+        if not doc and r["entry_id"] and os.name == "nt":
             try:
                 import win32com.client  # type: ignore
                 ns = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
@@ -559,6 +602,9 @@ class Data:
             c.execute("UPDATE mails SET status=? WHERE id=?", (st, int(path[1])))
             c.commit()
             return {"ok": True}
+        if path[0] == "mail" and path[2] == "attach":   # 첨부를 이 PC 의 기본 프로그램으로 열기
+            from . import attfiles
+            return {"ok": True, "message": attfiles.open_attachment(c, self.cfg, int(path[1]), int(path[3]))}
         if path[0] == "mail" and path[2] == "open":
             r = c.execute("SELECT entry_id, store_id, file_path FROM mails WHERE id=?", (int(path[1]),)).fetchone()
             if r and r["entry_id"]:
@@ -735,6 +781,22 @@ def make_handler(data: Data, port: int):
                         self.send_header("X-Content-Type-Options", "nosniff")
                         self.end_headers()
                         self.wfile.write(body)
+                        return
+                    if parts[0] == "mail" and len(parts) == 3 and parts[2] == "attachments":   # 원본 보기의 첨부 목록
+                        from . import attfiles
+                        return self._json(attfiles.listing(c, int(parts[1])))
+                    if parts[0] == "mail" and len(parts) == 4 and parts[2] == "attach":       # 첨부 저장(내려받기)
+                        from . import attfiles
+                        name, blob = attfiles.get(c, int(parts[1]), int(parts[3]))
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/octet-stream")
+                        ascii_name = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("_") or "attachment"
+                        self.send_header("Content-Disposition",
+                                         f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''" + quote(name, safe=""))
+                        self.send_header("X-Content-Type-Options", "nosniff")
+                        self.send_header("Content-Length", str(len(blob)))
+                        self.end_headers()
+                        self.wfile.write(blob)
                         return
                     if parts[0] == "mail" and len(parts) == 3 and parts[2] == "related":
                         return self._json(data.mail_related(c, int(parts[1])))
