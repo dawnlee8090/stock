@@ -10,3 +10,4 @@ data/
 config.toml
 __pycache__/
 .venv/
+localmold.toml
