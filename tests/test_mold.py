@@ -74,7 +74,9 @@ class MoldTest(unittest.TestCase):
     def test_full_flow(self):
         t = date(2026, 11, 2)
         mid = M.add(self.conn, mold_no="(예시)MD-001", car="BC4t CUV", part_no="86511-BN200", part_name="FR BUMPER UPR",
-                    mold_vendor="(예시)금형A", dest="멕시코", local_molder="(예시)현지성형")
+                    mold_vendor="(예시)금형A", dest="멕시코", local_molder="(예시)현지성형", today=t)
+        # 등록일을 t 로 고정: sync 는 등록일 이후 메일만 연결하므로 실제 날짜에 따라 결과가 바뀌면 안 됨
+        self.assertEqual(M.get(self.conn, mid)["created_at"][:10], "2026-11-02")
         self.assertEqual([d["status"] for d in M.docs(self.conn, mid)], ["미접수"] * 6)
         # 사양서 메일 → 첨부 보관 + 자동 '접수' + 메일 날짜
         m1 = make_mail(self.d, self.conn, "spec", "MD-001 금형 사양서 송부",

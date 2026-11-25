@@ -101,9 +101,11 @@ def add(conn, status: str = "이관준비", mail_id: int | None = None, today: d
         raise ValueError("금형번호, 품번, 품명 중 하나는 넣어 주세요")
     if vals["target_date"]:
         vals["target_date"] = parse_due(vals["target_date"], today)
+    # today 를 주면 그 날짜로 등록 (sync 는 등록일 이후 메일만 연결하므로 테스트·과거 건 등록 시 기준일 고정)
+    created = f"{today.isoformat()}T00:00:00" if today else _now()
     cur = conn.execute(f"INSERT INTO molds ({', '.join(MOLD_FIELDS)}, status, created_at, updated_at) "
                        f"VALUES ({', '.join('?' * len(MOLD_FIELDS))}, ?, ?, ?)",
-                       (*[vals[f] for f in MOLD_FIELDS], status, _now(), _now()))
+                       (*[vals[f] for f in MOLD_FIELDS], status, created, created))
     mid = cur.lastrowid
     for sec in SECTIONS:
         conn.execute("INSERT OR IGNORE INTO mold_docs (mold_id, section, updated_at) VALUES (?,?,?)", (mid, sec, _now()))
