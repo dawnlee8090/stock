@@ -294,6 +294,18 @@ def make_handler(data: Data, port: int):
     return H
 
 
+def alert(text: str, log=print) -> None:
+    """바탕화면 아이콘은 최소화 창으로 켜지므로, 켜지 못한 이유는 메모장으로 보여 준다 (Windows)."""
+    log(text)
+    if os.name == "nt":
+        try:
+            p = Path(os.environ.get("TEMP") or ".") / "localmold_check.txt"
+            p.write_text(text + "\n", encoding="utf-8")
+            os.startfile(str(p))  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+
 def _running(port: int) -> dict | None:
     import urllib.request
     try:
@@ -330,12 +342,14 @@ def serve(cfg_path: str | None = None, port: int | None = None, open_window: boo
         except OSError:
             info = _running(port) or {}
             if info and info.get("app") != "localmold":
-                log(f"{port} 번 주소를 다른 프로그램이 쓰고 있습니다. localmold.toml 에 port = 8767 처럼 다른 번호를 적어 주세요.")
+                alert(f"[현지 금형 육성 관리] {port} 번 주소를 다른 프로그램이 쓰고 있어 켜지 못했습니다.\n"
+                      f"업무 비서 폴더에 localmold.toml 파일을 만들고 port = 8767 처럼 다른 번호를 적어 주세요.", log)
                 return
             running = info.get("version")
             if running == APP_VERSION or attempt == 1:
                 if running and running != APP_VERSION:
-                    log("예전 버전 엔진이 켜져 있어 끄지 못했습니다. 작은 검은 창 '현지 금형'을 닫고 다시 실행하세요.")
+                    alert("[현지 금형 육성 관리] 예전 버전 엔진이 켜져 있어 끄지 못했습니다.\n"
+                          "작업 표시줄의 작은 검은 창 '현지 금형'을 닫고 다시 실행하세요.", log)
                 else:
                     log(f"현지 금형 앱이 이미 실행 중입니다: {url}")
                 if open_window:

@@ -137,9 +137,15 @@ def run(args, cfg, conn):
         _out("바탕화면의 '현지 금형 육성 관리' 아이콘을 더블클릭하면 앱이 열립니다 (작은 검은 창 '현지 금형'을 닫으면 꺼짐).")
         return
     if a == "app":
-        from .webapp import serve
+        from .webapp import alert, serve
         conn.close()
-        serve(args.config, port=args.port or cfg["port"], open_window=not args.no_window, log=_out)
+        try:
+            serve(args.config, port=args.port or cfg["port"], open_window=not args.no_window, log=_out)
+        except Exception:   # 최소화 창으로 켜진 경우에도 이유가 보이게
+            import traceback
+            alert("[현지 금형 육성 관리] 앱 엔진이 멈췄습니다. 아래 내용을 캡처해서 Claude 에게 보내 주세요.\n\n"
+                  + traceback.format_exc(), _out)
+            raise SystemExit(1)
         return
 
 

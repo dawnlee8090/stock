@@ -26,9 +26,19 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
            sort: str = "date", limit: int = 50, mine: bool = False,
            to: str | None = None, cars: list[str] | None = None, senders_any: list[str] | None = None,
            exclude_senders: list[str] | None = None, like_only: bool = False, offset: int = 0,
-           received: bool = False) -> list[sqlite3.Row]:
+           received: bool = False, subject_q: str = "", body_q: str = "") -> list[sqlite3.Row]:
     where, params = [], []
     use_fts = False
+    # 상세 검색: 제목에만 / 본문(+첨부 내용)에만 있는 단어. 3글자 이상은 색인의 해당 칸, 짧으면 LIKE
+    for text, fcols, lcols in ((subject_q, "subject", ["subject"]), (body_q, "{body att_text}", ["body", "att_text"])):
+        for t in split_terms(text):
+            if len(t) >= 3 and not like_only:
+                use_fts = True
+                where.append("mails_fts MATCH ?")
+                params.append(fcols + ' : "' + t.replace('"', '""') + '"')
+            else:
+                where.append("(" + " OR ".join(f"m.{c} LIKE ?" for c in lcols) + ")")
+                params += [f"%{t}%"] * len(lcols)
     for raw in split_terms(query):
         neg = raw.startswith("-") and len(raw) > 1
         t = raw[1:] if neg else raw
@@ -115,7 +125,7 @@ def search(conn: sqlite3.Connection, query: str = "", sender: str | None = None,
                       attach_name=attach_name, subject_only=subject_only, needs_action=needs_action, status=status,
                       part_no=part_no, sort="date", limit=limit, mine=mine, to=to, cars=cars,
                       senders_any=senders_any, exclude_senders=exclude_senders, like_only=True, offset=offset,
-                      received=received)
+                      received=received, subject_q=subject_q, body_q=body_q)
     return rows
 
 
