@@ -17,7 +17,7 @@ exit /b 0
 >> "%LM_MSG%" echo 폴더: %CD%
 >> "%LM_MSG%" echo.
 >> "%LM_MSG%" echo 업무 비서 폴더를 다른 브랜치로 바꾸면 현지 금형 앱 파일이 빠집니다.
->> "%LM_MSG%" echo 해결: 받아 둔 현지금형_앱_설치.bat 를 다시 더블클릭하세요. 브랜치를 바꿀지 물으면 Y.
+>> "%LM_MSG%" echo 해결: 받아 둔 현지금형_앱_설치.bat 를 다시 더블클릭하세요. 브랜치를 바꿀지 묻는 창에서 [예].
 >> "%LM_MSG%" echo 또는 이 폴더에서: git checkout claude/awesome-planck-4zwz73 다음 git pull
 start "" notepad "%LM_MSG%"
 exit /b 1

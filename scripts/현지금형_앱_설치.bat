@@ -9,20 +9,56 @@ exit /b
 
 #PS-START
 # 현지 금형 육성 관리 - 바탕화면 앱 설치 (아래는 PowerShell)
-# 1) 업무 비서(stock) 폴더 찾기: 이 파일 위치 → 바탕화면 '업무 비서' 바로가기 → 흔한 위치 → 직접 고르기
-# 2) 현지 금형 앱 파일이 없으면 최신 파일 받기 (git pull, 필요하면 브랜치 바꾸기는 물어보고)
+# 1) 업무 비서(stock) 폴더 찾기: 이 파일 위치 → 바탕화면 · 시작 메뉴 · 작업 표시줄의 업무 비서 바로가기 → 흔한 위치 → 직접 고르기
+# 2) 현지 금형 앱 파일이 없으면 최신 브랜치로 바꾸기 ([예]/[아니오] 창으로 물음. 한글 입력 상태와 상관없음)
 # 3) python -m localmold shortcut 으로 바탕화면 · 시작 메뉴 아이콘을 만들고 앱 열기
+# 진행 기록은 %TEMP%\localmold_install_log.txt. 중간에 멈추면 이유를 창으로 알리고 기록을 메모장으로 연다.
 $BRANCH = 'claude/awesome-planck-4zwz73'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
+Add-Type -AssemblyName System.Windows.Forms
 
+$LOG = Join-Path $env:TEMP 'localmold_install_log.txt'
+Set-Content -LiteralPath $LOG -Value ('현지 금형 앱 설치 기록 ' + (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) -Encoding UTF8
+
+function Say([string]$t) {
+    Write-Host $t
+    Add-Content -LiteralPath $LOG -Value $t -Encoding UTF8
+}
+function Show-Box([string]$text, [string]$buttons, [string]$icon) {
+    $owner = New-Object System.Windows.Forms.Form
+    $owner.TopMost = $true
+    $r = [System.Windows.Forms.MessageBox]::Show($owner, $text, '현지 금형 앱 설치', $buttons, $icon)
+    $owner.Dispose()
+    return $r
+}
+function Ask([string]$text) {
+    Say "[질문] $text"
+    $yes = ((Show-Box $text 'YesNo' 'Question') -eq [System.Windows.Forms.DialogResult]::Yes)
+    if ($yes) { Say '  → 예' } else { Say '  → 아니오' }
+    return $yes
+}
+function Fail([string]$text) {
+    Say ''
+    Say "[중단] $text"
+    [void](Show-Box ($text + "`n`n진행 기록을 메모장으로 엽니다. 캡처해서 Claude 에게 보내 주세요.") 'OK' 'Warning')
+    Start-Process -FilePath 'notepad.exe' -ArgumentList ('"' + $LOG + '"')
+    exit 1
+}
+function Invoke-Git([string[]]$gitArgs) {
+    Say ('> git ' + ($gitArgs -join ' '))
+    $out = & git -C $root @gitArgs 2>&1 | ForEach-Object { "$_" }
+    $code = $LASTEXITCODE
+    if ($out) { Say (($out | Out-String).TrimEnd()) }
+    return $code
+}
 function Test-Root([string]$d) {
     if (-not $d) { return $false }
     return (Test-Path -LiteralPath (Join-Path $d 'mailhub\__main__.py'))
 }
 
-Write-Host ''
-Write-Host '=== 현지 금형 육성 관리 - 바탕화면 앱 설치 ==='
-Write-Host ''
+Say ''
+Say '=== 현지 금형 육성 관리 - 바탕화면 앱 설치 ==='
+Say ''
 
 # ---- 1) 폴더 찾기 ----
 $cands = New-Object System.Collections.ArrayList
@@ -53,8 +89,7 @@ $root = $null
 foreach ($c in $cands) { if (Test-Root $c) { $root = (Resolve-Path -LiteralPath $c).Path; break } }
 
 if (-not $root) {
-    Write-Host '업무 비서 폴더를 찾지 못했습니다. 열리는 창에서 업무 비서(mailhub)가 들어 있는 폴더를 골라 주세요 (예: stock).'
-    Add-Type -AssemblyName System.Windows.Forms
+    Say '업무 비서 폴더를 찾지 못했습니다. 폴더를 고르는 창을 엽니다.'
     $owner = New-Object System.Windows.Forms.Form
     $owner.TopMost = $true
     $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -66,67 +101,55 @@ if (-not $root) {
     }
     $owner.Dispose()
 }
-if (-not $root) {
-    Write-Host '[중단] 업무 비서 폴더(안에 mailhub 폴더가 있는 곳)를 찾지 못했습니다.'
-    Write-Host '       이 파일을 업무 비서 폴더(stock) 안에 넣고 다시 더블클릭해 주세요.'
-    exit 1
-}
-Write-Host "업무 비서 폴더: $root"
+if (-not $root) { Fail '업무 비서 폴더(안에 mailhub 폴더가 있는 곳)를 찾지 못했습니다. 이 파일을 업무 비서 폴더(stock) 안에 넣고 다시 더블클릭해 주세요.' }
+Say "업무 비서 폴더: $root"
 Set-Location -LiteralPath $root
 
-# ---- 2) 현지 금형 앱 파일 확인 · 최신 받기 ----
+# ---- 2) 현지 금형 앱 파일 확인 · 최신 브랜치로 ----
 $ready = { Test-Path -LiteralPath (Join-Path $root 'localmold\shortcut.py') }
-$hasGit = [bool](Get-Command git -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath (Join-Path $root '.git'))
 if (-not (& $ready)) {
-    if (-not $hasGit) {
-        Write-Host '[중단] 현지 금형 앱 파일이 없고, 이 폴더는 git 으로 받은 폴더가 아니어서 자동으로 받을 수 없습니다.'
-        Write-Host "       최신 파일(브랜치 $BRANCH)을 받아 이 폴더에 넣은 뒤 다시 실행해 주세요."
-        exit 1
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Fail 'git 이 없어 최신 파일을 받을 수 없습니다. 업무 비서를 받을 때 쓴 방법으로 최신 파일을 받아 주세요.' }
+    if (-not (Test-Path -LiteralPath (Join-Path $root '.git'))) { Fail '이 폴더는 git 으로 받은 폴더가 아니어서 자동으로 받을 수 없습니다.' }
+    $cur = ((& git -C $root rev-parse --abbrev-ref HEAD 2>&1) | Out-String).Trim()
+    Say "지금 브랜치: $cur"
+    if ($cur -ne $BRANCH) {
+        $q = "지금 브랜치($cur)에는 현지 금형 앱이 없습니다.`n`n앱이 있는 최신 브랜치로 바꿀까요?`n$BRANCH`n(업무 비서의 최신 기능도 모두 들어 있습니다)"
+        if (-not (Ask $q)) { Fail '브랜치를 바꾸지 않아 설치를 멈췄습니다.' }
     }
-    Write-Host '현지 금형 앱 파일이 없어 최신 파일을 받습니다 (git pull)...'
-    git -C $root pull
-    if (-not (& $ready)) {
-        $cur = (git -C $root rev-parse --abbrev-ref HEAD).Trim()
-        Write-Host ''
-        Write-Host "지금 브랜치($cur)에는 현지 금형 앱이 없습니다. 앱이 있는 브랜치는 $BRANCH 입니다."
-        Write-Host '(업무 비서의 지금까지 기능도 모두 들어 있는 최신 브랜치입니다)'
-        $ans = Read-Host '이 브랜치로 바꿀까요? (Y/N)'
-        if ($ans -match '^[Yy]') {
-            git -C $root fetch origin $BRANCH
-            git -C $root checkout $BRANCH
-            git -C $root pull
+    if ((Invoke-Git @('fetch', 'origin', $BRANCH)) -ne 0) { Fail 'GitHub 에서 최신 파일을 받지 못했습니다. 인터넷 연결과 GitHub 로그인을 확인해 주세요.' }
+    if ($cur -ne $BRANCH) {
+        if ((Invoke-Git @('checkout', $BRANCH)) -ne 0) {
+            $chg = ((& git -C $root status --short 2>&1) | Select-Object -First 15 | Out-String).Trim()
+            Say "PC 에서 바뀐 파일:`n$chg"
+            $q = "PC 에서 고친 파일이 있어 브랜치를 바꾸지 못했습니다:`n`n$chg`n`n고친 내용을 잠시 보관(git stash)하고 계속할까요?`n(나중에 git stash pop 으로 되돌릴 수 있습니다)"
+            if (-not $chg -or -not (Ask $q)) { Fail '브랜치를 바꾸지 못했습니다.' }
+            if ((Invoke-Git @('stash', 'push', '-u', '-m', 'localmold-install')) -ne 0) { Fail '고친 파일을 보관하지 못했습니다.' }
+            if ((Invoke-Git @('checkout', $BRANCH)) -ne 0) { Fail '브랜치를 바꾸지 못했습니다.' }
         }
     }
-    if (-not (& $ready)) {
-        Write-Host '[중단] 현지 금형 앱 파일을 받지 못했습니다. 위의 git 메시지를 캡처해서 Claude 에게 보내 주세요.'
-        Write-Host '       (고친 파일이 있어 브랜치를 못 바꾼 경우가 많습니다)'
-        exit 1
-    }
+    if ((Invoke-Git @('merge', '--ff-only', "origin/$BRANCH")) -ne 0) { Say '(최신으로 맞추지 못했지만 계속합니다)' }
+    if (-not (& $ready)) { Fail '브랜치는 바꿨지만 현지 금형 앱 파일이 보이지 않습니다.' }
+    Say '현지 금형 앱 파일 준비 완료'
 }
 
 # ---- 3) 아이콘 만들기 · 앱 열기 ----
-$py = $null
-if (Get-Command python -ErrorAction SilentlyContinue) { $py = @('python') }
-elseif (Get-Command py -ErrorAction SilentlyContinue) { $py = @('py', '-3') }
-if (-not $py) {
-    Write-Host '[중단] python 을 찾지 못했습니다. 업무 비서를 실행하는 PC 에서 다시 실행해 주세요.'
-    exit 1
-}
-$exe = $py[0]
+$exe = $null
 $pyArgs = @()
-if ($py.Count -gt 1) { $pyArgs += $py[1..($py.Count - 1)] }
-& $exe @pyArgs -m localmold shortcut
-if ($LASTEXITCODE -ne 0) {
-    Write-Host '[중단] 아이콘을 만들지 못했습니다. 위 메시지를 캡처해서 Claude 에게 보내 주세요.'
-    exit 1
-}
+if (Get-Command python -ErrorAction SilentlyContinue) { $exe = 'python' }
+elseif (Get-Command py -ErrorAction SilentlyContinue) { $exe = 'py'; $pyArgs = @('-3') }
+if (-not $exe) { Fail 'python 을 찾지 못했습니다. 업무 비서를 실행하는 PC 에서 다시 실행해 주세요.' }
+$env:PYTHONIOENCODING = 'utf-8'
+Say "> $exe -m localmold shortcut"
+$out = & $exe @pyArgs -m localmold shortcut 2>&1 | ForEach-Object { "$_" }
+$code = $LASTEXITCODE
+if ($out) { Say (($out | Out-String).TrimEnd()) }
+if ($code -ne 0) { Fail '바탕화면 아이콘을 만들지 못했습니다.' }
+
 $lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) '현지 금형 육성 관리.lnk'
-Write-Host ''
-Write-Host '완료: 바탕화면 · 시작 메뉴에 [현지 금형 육성 관리] 아이콘을 만들었습니다.'
-if (Test-Path -LiteralPath $lnk) {
-    Write-Host '앱을 엽니다... (작업 표시줄의 작은 검은 창 [현지 금형]을 닫으면 앱이 꺼집니다)'
-    Start-Process -FilePath $lnk
-}
-Write-Host ''
-Write-Host '업무 비서의 [현지 금형]에 넣어 둔 자료가 있으면, 처음 한 번 아래 명령으로 옮기세요:'
-Write-Host '    python -m localmold from-mailhub'
+Say ''
+Say '완료: 바탕화면 · 시작 메뉴에 [현지 금형 육성 관리] 아이콘을 만들었습니다.'
+[void](Show-Box "바탕화면 · 시작 메뉴에 [현지 금형 육성 관리] 아이콘을 만들었습니다.`n`n[확인]을 누르면 앱을 엽니다.`n(끌 때는 작업 표시줄의 작은 검은 창 [현지 금형]을 닫으세요)" 'OK' 'Information')
+if (Test-Path -LiteralPath $lnk) { Start-Process -FilePath $lnk }
+Say ''
+Say '업무 비서의 [현지 금형]에 넣어 둔 자료가 있으면, 처음 한 번 아래 명령으로 옮기세요:'
+Say '    python -m localmold from-mailhub'

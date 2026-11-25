@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import re
 import tempfile
 import threading
 import unittest
@@ -370,6 +371,15 @@ class ShortcutTest(unittest.TestCase):
         self.assertTrue(cmd.isascii() and "exit /b" in cmd and "chcp 65001" in cmd)
         self.assertIn("LastIndexOf('#PS-START')", cmd)
         self.assertIn("-m localmold shortcut", ps)
+        self.assertNotIn("Read-Host", ps)                 # 한글 입력 상태에서 Y 가 'ㅛ' 로 들어가 실패 → 예/아니오 창으로
+        self.assertIn("MessageBox", ps)
+        self.assertIsNone(re.search(r"\$[A-Za-z_]\w*[가-힣]", ps))  # "$cur에는" 처럼 변수 이름에 한글이 붙으면 안 됨
+
+    def test_launcher_bat_is_crlf(self):
+        from localmold import shortcut
+        raw = (shortcut.ROOT / "scripts" / "localmold.bat").read_bytes()
+        self.assertNotIn(b"\n", raw.replace(b"\r\n", b""))
+        self.assertIn(b"localmold_check.txt", raw)
 
 
 class LocalApiTest(unittest.TestCase):
