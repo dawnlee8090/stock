@@ -345,6 +345,105 @@ class PriorityAndMoveTest(unittest.TestCase):
         self.assertRaises(ValueError, L.from_mailhub, self.c, self.cfg, old)    # 두 번은 안 옮김
 
 
+class MasterListTest(unittest.TestCase):
+    """금형 마스터리스트 (표지 시트 + 'P/No · P/NAME · Prod. Supplier' 머리글, 묶음 품번, 같은 품번 여러 금형 줄). 가상 품번."""
+    HEAD = ["No", "Group name", "OUT-LINE", "P/No", "P/NAME", "L/RHD", "% rate", "IN / OUT sourcing", "Prod. Supplier",
+            "RISK LEVEL", "Mold type", "Finishing", "Q-ty\nmold", "CV mold", "M/C Ton\n(MOLD MAKER)", "Mold maker",
+            "Mold maker [SUB]", "MOLD NUMBER", "material MS SPEC", "Remark", "ASSET NO MOLD", "MOLD Delivery"]
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.d = Path(self.tmp.name)
+        self.cfg = mkcfg(self.d)
+        self.c = L.connect(self.cfg["db_path"])
+
+    def tearDown(self):
+        self.c.close()
+        self.tmp.cleanup()
+
+    def _book(self) -> bytes:
+        import openpyxl
+        wb = openpyxl.Workbook()
+        wb.active.title = "소싱 현황"                          # 그림만 있는 표지 시트 (표 없음)
+        wb.active["A1"] = "요약"
+        ws = wb.create_sheet("PLANT")
+        ws.append(["-"] * 5)
+        ws.append([" ▣ ZZ9e - MANUFACTURING ITEM"])
+        ws.append(["-"] * 5)
+        ws.append(self.HEAD)
+        ws.append(["no", "Group name", "OUT-LINE", "P/No", "P/NAME"] + ["-"] * 17)   # 머리글 두 번째 줄
+        R = lambda no, grp, pn, name, sup, typ, maker, sub, asset, ton="-": [
+            no, grp, "-", pn, name, "L/RHD", 1, "IN", sup, "B", typ, "-", 1, "1/1", ton, maker, sub, "-", "MS213", "-", asset, 2]
+        ws.append(R(1, "DR TRIM", "12301/2-AB000", "FRT TRIM ASSY", "ALPHA PLANT", "ASSY", "-", "-", "-"))
+        ws.append(R(2, "DR TRIM", "12370/80-AB010", "PNL-FR TRIM\n[INJ]", "BETA\nSUB", "INJ", "MAKER-A", "SUB-A", "A1", 900))
+        ws.append(R(3, "DR TRIM", "12370/80-AB010", "PNL-FR TRIM [IMG]", "GAMMA", "IMG", "MAKER-B", "SUB-B", "A2"))
+        ws.append(R(4, "DR TRIM", "12370/80-AB010", "PNL-FR TRIM [IMG]", "GAMMA", "TRIM", "MAKER-C", "MAKER-C", "A3"))
+        ws.append(R(5, "CONSOLE", "14650-AB000/10/20", "COVER-CONSOLE UPR", "ALPHA PLANT", "INJ", "MAKER-D", "SUB-D", "A4"))
+        ws.append(R(6, "CONSOLE", "15500/10-AB000", "BRKT-CONSOLE", "ALPHA PLANT", "INJ", "MAKER-D", "SUB-D", "A5"))
+        ws.append(["-"] * 22)
+        old = wb.create_sheet("old")                            # 숨긴 예전 시트 (고르지 않음)
+        old.append(["P/No", "P/NAME", "Prod. Supplier", "Mold type"])
+        for i in range(30):
+            old.append([f"99{i:03d}-ZZ000", "OLD", "OLD PLANT", "INJ"])
+        old.sheet_state = "hidden"
+        b = io.BytesIO()
+        wb.save(b)
+        return b.getvalue()
+
+    def test_expand_part_nos(self):
+        E = L.expand_part_nos
+        self.assertEqual(E("12370/80-AB000"), ["12370-AB000", "12380-AB000"])
+        self.assertEqual(E("12301/2-AB000"), ["12301-AB000", "12302-AB000"])
+        self.assertEqual(E("123C3/4-AB000"), ["123C3-AB000", "123C4-AB000"])
+        self.assertEqual(E("14650-AB000/10/20"), ["14650-AB000", "14650-AB010", "14650-AB020"])
+        self.assertEqual(E("18610-AB000/100"), ["18610-AB000", "18610-AB100"])
+        self.assertEqual(E("16811/2-AB000/300"), ["16811-AB000", "16812-AB000", "16811-AB300", "16812-AB300"])
+        self.assertEqual(E("15732-AB100\n15742-AB200"), ["15732-AB100", "15742-AB200"])
+        self.assertEqual(E("P12710/20-AB000"), ["P12710-AB000", "P12720-AB000", "12710-AB000", "12720-AB000"])
+        self.assertEqual(E("86511BNGA0"), ["86511-BNGA0"])
+        self.assertEqual(E("-"), [])
+
+    def test_car_from(self):
+        self.assertEqual(L.car_from([["-"], [" ▣ ZZ9e - MANUFACTURING ITEM"]], "x.xlsx"), "ZZ9e")
+        self.assertEqual(L.car_from(None, "AB1t CUV_CAR_ASHA-2_REV.1.xlsx"), "AB1t CUV")
+        self.assertEqual(L.car_from([], "ZZ9e 금형 마스터리스트.xlsx"), "ZZ9e")
+        self.assertEqual(L.car_from([], "마스터.xlsx"), "")
+
+    def test_master_import(self):
+        # 문제점 리스트로 먼저 생긴 금형 (마스터에서는 15500/10-AB000 으로 묶여 있음)
+        pre, _ = L.upsert_mold(self.c, "ZZ9e", "ALPHA PLANT", "15510-AB000", part_name="BRKT")
+        self.c.commit()
+        data = self._book()
+        r = L.import_any(self.c, self.cfg, "", "master.xlsx", data)
+        self.assertEqual((r["kind"], r["car"], r["sheet"]), ("금형 리스트", "ZZ9e", "PLANT"))
+        self.assertEqual((r["rows"], r["merged"], r["new"], r["updated"], r["vendors"]), (6, 1, 4, 1, 3))
+        ms = {(m["vendor"], m["part_no"]): m for m in L.molds(self.c, "ZZ9e")}
+        self.assertNotIn(("OLD PLANT", "99000-ZZ000"), ms)                     # 숨긴 시트는 읽지 않음
+        g = ms[("GAMMA", "12370-AB010")]
+        self.assertEqual((g["mold_type"], g["asset_no"], g["mold_maker"], g["pn_label"]),
+                         ("IMG / TRIM", "A2 / A3", "MAKER-B / MAKER-C", "12370/80-AB010"))
+        self.assertEqual(g["part_nos"], "12370-AB010,12380-AB010")
+        b = ms[("BETA SUB", "12370-AB010")]                                    # 줄바꿈 외주처 · 품명 정리
+        self.assertEqual((b["part_name"], b["ton"], b["item"], b["maker_sub"], b["lrhd"]), ("PNL-FR TRIM [INJ]", "900", "DR TRIM", "SUB-A", "L/RHD"))
+        self.assertEqual(ms[("ALPHA PLANT", "12301-AB000")]["mold_maker"], "")   # '-' 는 빈 값
+        self.assertEqual(ms[("ALPHA PLANT", "15510-AB000")]["id"], pre)          # 먼저 있던 금형에 정보만 채움
+        self.assertEqual(ms[("ALPHA PLANT", "15510-AB000")]["pn_label"], "15500/10-AB000")
+        again = L.import_any(self.c, self.cfg, "ZZ9e", "master.xlsx", data)       # 다시 올리면 변경 없음
+        self.assertEqual((again["new"], again["updated"], again["same"]), (0, 0, 5))
+        # 문제점 리스트의 RH · 사양 품번은 마스터 금형으로 연결
+        rows = [["외주처", "품번", "품명", "카테고리", "발생 문제점", "발생일정"],
+                ["GAMMA", "12380-AB010", "PNL", "습합", "RH 측 BURR", "11/20"],
+                ["ALPHA PLANT", "14650-AB020", "COVER", "SINK", "보스 싱크", "11/21"],
+                ["ALPHA PLANT", "12301/2-AB000", "TRIM", "기타", "조립 단차", "11/22"]]
+        st = L.import_issues(self.c, "ZZ9e", rows, today=TODAY)
+        self.assertEqual(st["new"], 3)
+        by = {r["problem"]: r["mold_id"] for r in L.issues(self.c, "ZZ9e")}
+        self.assertEqual(by["RH 측 BURR"], g["id"])
+        self.assertEqual(by["보스 싱크"], ms[("ALPHA PLANT", "14650-AB000")]["id"])
+        self.assertEqual(by["조립 단차"], ms[("ALPHA PLANT", "12301-AB000")]["id"])
+        self.assertEqual(len(L.molds(self.c, "ZZ9e")), 5)                    # 문제점으로 금형이 늘지 않음
+
+
 class ShortcutTest(unittest.TestCase):
     def test_shortcut_command(self):
         import os

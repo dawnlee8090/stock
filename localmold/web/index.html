@@ -175,7 +175,7 @@ table.t td.c { text-align: center; }
 .drawer-h { display: flex; align-items: flex-start; gap: 10px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
 .drawer-h h2 { font-size: 16px; line-height: 1.4; flex: 1; }
 .drawer-b { overflow-y: auto; padding: 16px 20px 28px; display: grid; gap: 18px; }
-.kv { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 12px; font-size: 13px; margin: 0; }
+.kv { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 6px 12px; font-size: 13px; margin: 0; }
 .kv dt { color: var(--fg-3); } .kv dd { margin: 0; overflow-wrap: anywhere; }
 .sect h3 { font-size: 12px; letter-spacing: .05em; color: var(--fg-3); margin: 0 0 8px; font-weight: 600; }
 .timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); display: grid; gap: 10px; }
@@ -408,6 +408,8 @@ function buildLocalDemo() {
   const ring = (x, y, c = 'r', label = '수정부위') => [{ t: 'ellipse', a: { x: x - 0.06, y: y - 0.08 }, b: { x: x + 0.06, y: y + 0.08 }, c }, { t: 'arrow', a: { x: Math.min(0.85, x + 0.22), y: Math.min(0.88, y + 0.2) }, b: { x: x + 0.045, y: y + 0.06 }, c, label }];
   const photos = [P(1, 1, 'before', ring(0.3, 0.42)), P(2, 1, 'before', ring(0.62, 0.5)), P(3, 2, 'before', ring(0.45, 0.6)), P(4, 4, 'before', ring(0.7, 0.4)),
     P(5, 6, 'before', ring(0.36, 0.52)), P(6, 6, 'after', ring(0.36, 0.52, 'b', '리워크부위')), P(7, 7, 'before', ring(0.55, 0.45)), P(8, 10, 'before', ring(0.5, 0.7))];
+  Object.assign(molds[3], { pn_label: '84611/21-NX000', part_nos: '84611-NX000,84621-NX000', maker_sub: '대성정밀', mold_no: 'DS-2611', asset_no: '84611-NX000-A0101F02',
+    ton: '850', cav: '1/1', material: 'PP-TD20', lrhd: 'L/RHD', sourcing: 'IN', risk: 'B', delivery: '2' });
   return { molds, issues, photos, seq: { issue: 100, photo: 100 } };
 }
 const lmDemoDelay = (r) => ['발생', '원인분석', '대책수립'].includes(r.status) && r.due && r.due < iso(TODAY) ? `수정 ${-days(r.due)}일 지연` : '';
@@ -573,7 +575,7 @@ async function viewCar(V, S, carName, vendor) {
   const kpi = (k, label, v, sub, sev) => `<button class="stage" type="button" data-kpi="${k}" aria-pressed="${lmState.mode === 'cards' && lmState.stage === k}"><div class="k">${label}</div><div class="v" ${sev ? `style="color:var(--${sev})"` : ''}>${v}</div>${sub ? `<div class="k">${sub}</div>` : ''}</button>`;
   const master = `<section class="panel"><div class="table-wrap"><table class="t lm-master">
     <thead><tr>${lmState.vendor ? '' : '<th>외주처</th>'}<th>품번</th><th>품명</th>${LM_CATS.map(c => `<th class="c">${c === 'WELD LINE' ? 'WELD' : c}</th>`).join('')}<th class="c">계</th><th class="c">진행</th><th>STATUS</th><th class="hide-sm">최근</th><th class="hide-sm">T/O</th></tr></thead>
-    <tbody>${d.molds.map(m => `<tr data-mold="${m.id}">${lmState.vendor ? '' : `<td>${esc(m.vendor)}</td>`}<td class="mono">${esc(m.part_no)}</td>
+    <tbody>${d.molds.map(m => `<tr data-mold="${m.id}">${lmState.vendor ? '' : `<td>${esc(m.vendor)}</td>`}<td class="mono" title="${esc((m.part_nos || '').replace(/,/g, ', '))}">${esc(m.pn_label || m.part_no)}</td>
       <td><b>${esc(m.part_name)}</b><div class="desc">${esc([m.item, m.mold_maker].filter(Boolean).join(' · '))}</div></td>
       ${LM_CATS.map(c => `<td class="n${m.counts[c] ? '' : ' z'}">${m.counts[c] || '·'}</td>`).join('')}<td class="n"><b>${m.total || '·'}</b></td>
       <td class="n">${m.open ? `<b style="color:var(--${m.hi_open ? 'crit' : 'fg'})">${m.open}</b>` : '·'}</td><td>${m.status === '-' ? '<span class="sub">-</span>' : pill(m.status)}${m.late ? ` <span class="chip crit">지연 ${m.late}</span>` : ''}</td>
@@ -612,26 +614,42 @@ function lmImport(car) {
     <div class="sub">파일 종류는 자동으로 구분합니다. 같은 파일을 다시 올리면 바뀐 내용만 반영하고, 앱에서 고친 문제점은 덮어쓰지 않습니다.</div>
     <dl class="kv"><dt>외주처 엑셀</dt><dd>드라이브의 외주처별 문제점 관리 파일 (갑지 MASTER + 금형별 을지). <b>을지의 수정 전/후 사진까지</b> 가져옵니다</dd>
       <dt>통합 리스트</dt><dd>외주처 · 품번 · 품명 · 카테고리 · 발생 문제점 … 열이 있는 통합 문제점 리스트 (엑셀/CSV)</dd>
-      <dt>금형 리스트</dt><dd>신규 차종의 금형 목록 (외주처 · 품번 · 품명 · ITEM · 금형 제작 업체 · 중량 …)</dd></dl>
+      <dt>금형 리스트</dt><dd>신규 차종의 금형 목록 · <b>금형 마스터리스트</b> (P/No · P/NAME · Prod. Supplier · Group name · Mold type · Mold maker · 자산 번호 …).
+        표가 있는 시트를 찾아 읽고, 묶음 품번(12370/80-AB000)은 풀어서 연결하며, 같은 품번의 여러 금형 줄은 한 금형으로 합칩니다</dd></dl>
     <div class="lm-form">
-      <label>차종<input id="li-car" value="${esc(car)}" placeholder="예: BC4t CUV" list="li-cars"></label>
+      <label>차종 (비우면 파일 제목 · 이름에서)<input id="li-car" value="${esc(car)}" placeholder="예: AB1e, BC4t CUV" list="li-cars"></label>
       <label>외주처 (비우면 파일 이름·제목에서)<input id="li-vendor" placeholder="예: ASHA-2"></label>
       <label class="full">파일<input id="li-file" type="file" accept=".xlsx,.xlsm,.csv"></label></div>
     <div class="edit-row"><button class="btn primary" id="li-go" type="button">올리기</button><span class="sub" id="li-msg"></span></div>`, (L) => {
       $('#li-go', L).addEventListener('click', async () => {
         const f = $('#li-file', L).files[0], carV = $('#li-car', L).value.trim();
-        if (!carV) return toast('차종을 입력해 주세요');
         if (!f) return toast('파일을 골라 주세요');
         const btn = $('#li-go', L); btn.disabled = true; $('#li-msg', L).textContent = '읽는 중… (사진이 많으면 1~2분 걸릴 수 있습니다)';
         try {
           const data = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(f); });
           const r = await api('import', { car: carV, vendor: $('#li-vendor', L).value.trim(), name: f.name, data });
-          const t = { molds_new: '금형 신규', molds_updated: '금형 갱신', new: '문제점 신규', updated: '갱신', same: '변경 없음', kept: '앱 수정 유지', photos: '사진', sheets: '을지 시트', skipped: '건너뜀' };
-          $('#li-msg', L).textContent = `[${r.kind || '가져오기'}] ` + Object.entries(r).filter(([k]) => t[k]).map(([k, v]) => `${t[k]} ${v}`).join(' · ');
-          toast(LIVE ? '가져왔습니다' : '예시 화면이라 저장되지 않습니다'); const h = carHash(carV); if (location.hash === h) route(); else location.hash = h;
+          const isMold = r.kind === '금형 리스트';
+          const t = { car: '차종', sheet: '시트', rows: '줄', vendors: '외주처', molds_new: '금형 신규', molds_updated: '금형 갱신', new: isMold ? '금형 신규' : '문제점 신규', updated: '갱신', same: '변경 없음',
+            merged: '같은 품번 줄 합침', kept: '앱 수정 유지', photos: '사진', sheets: '을지 시트', skipped: '건너뜀' };
+          $('#li-msg', L).textContent = `[${r.kind || '가져오기'}] ` + Object.entries(r).filter(([k, v]) => t[k] && v !== '' && v !== 0 || k === 'new').map(([k, v]) => `${t[k]} ${v}`).join(' · ');
+          toast(LIVE ? '가져왔습니다 · 결과는 이 창에' : '예시 화면이라 저장되지 않습니다');
+          // 결과를 읽을 수 있게 창은 열어 두고, 뒤 화면만 그 차종으로 바꾼다
+          const h = carHash(r.car || carV || lmState.car); if (location.hash !== h) history.replaceState(null, '', h); route(true);
         } catch (err) { $('#li-msg', L).textContent = '실패: ' + err.message; } finally { btn.disabled = false; }
       });
     });
+}
+
+// 금형 마스터리스트에서 가져온 기본 정보 (있는 칸만)
+function lmMasterKV(m) {
+  const row = (k, v) => v ? `<dt>${k}</dt><dd>${esc(v)}</dd>` : '';
+  const pns = (m.part_nos || '').split(',').filter(Boolean);
+  return row('마스터 품번', m.pn_label ? `${m.pn_label}${pns.length > 1 ? `  →  ${pns.join(', ')}` : ''}` : '')
+    + row('협력 제작사', [m.mold_maker && m.maker_sub && m.maker_sub !== m.mold_maker ? m.maker_sub : ''].filter(Boolean).join(''))
+    + row('금형 · 자산 번호', [m.mold_no, m.asset_no].filter(Boolean).join('  |  '))
+    + row('톤수 · CAV · 재질', [m.ton && `${m.ton}T`, m.cav, m.material].filter(Boolean).join(' · '))
+    + row('구분', [m.lrhd, m.sourcing && `${m.sourcing} 소싱`, m.risk && `RISK ${m.risk}`].filter(Boolean).join(' · '))
+    + row('금형 납품', m.delivery);
 }
 
 // ----- 을지: 금형 1벌의 문제점 -----
@@ -642,7 +660,8 @@ async function openLmMold(id) {
     <div class="chips">${m.status && m.status !== '-' ? pill(m.status) : ''}<span class="chip">${esc(m.vendor)}</span>${m.item ? `<span class="chip">${esc(m.item)}</span>` : ''}${m.mold_maker ? `<span class="chip acc">금형 ${esc(m.mold_maker)}</span>` : ''}
       ${LM_CATS.filter(c => m.counts && m.counts[c]).map(c => `<span class="chip">${c} ${m.counts[c]}</span>`).join('')}</div>
     <dl class="kv"><dt>차종 · 외주처</dt><dd>${esc(m.car)} · ${esc(m.vendor)}</dd><dt>형식 · 중량</dt><dd>${esc([m.mold_type, m.weight].filter(Boolean).join(' · ') || '-')}</dd>
-      <dt>T/O · 담당</dt><dd>${esc([m.to_round, m.owner].filter(Boolean).join(' · ') || '-')}</dd>${m.note ? `<dt>비고</dt><dd>${esc(m.note)}</dd>` : ''}</dl>
+      <dt>T/O · 담당</dt><dd>${esc([m.to_round, m.owner].filter(Boolean).join(' · ') || '-')}</dd>${m.note ? `<dt>비고</dt><dd>${esc(m.note)}</dd>` : ''}
+      ${lmMasterKV(m)}</dl>
     <div class="edit-row"><button class="btn primary sm" id="lm-add" type="button">+ 문제점 추가</button><span class="sub">문제점 ${d.issues.length}건 · 행을 누르면 사진 · 대책을 고칩니다 · 사진을 행에 끌어 놓으면 수정 전 칸에 바로 첨부</span></div>
     <div class="lm-sheets"><div class="lm-sheet head"><span>NO</span><span>문제점</span><span class="hide-sm">수정 전</span><span class="hide-sm">개선 대책</span><span class="hide-sm">수정 후</span><span>단계</span></div>
     ${d.issues.map((r, i) => { const b = (r.photo_list || []).filter(p => p.grp === 'before'), a = (r.photo_list || []).filter(p => p.grp === 'after');
@@ -1066,9 +1085,9 @@ async function viewPhone(V, S) {
 
 // ================= 라우팅·시작 =================
 let SUMMARY = null;
-async function route() {
+async function route(keepLayer) {
   const R = parseHash();
-  $('#layer').innerHTML = '';
+  if (keepLayer !== true) $('#layer').innerHTML = '';
   const V = $('#view');
   try {
     SUMMARY = await api('summary');
@@ -1087,7 +1106,7 @@ let searchAfterIME = false;   // 한글 조합 중 Enter
 $('#q').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.isComposing || e.keyCode === 229)) { searchAfterIME = true; e.preventDefault(); } });
 $('#q').addEventListener('compositionend', () => { if (searchAfterIME) { searchAfterIME = false; setTimeout(runSearch, 0); } });
 $('#up-btn').addEventListener('click', () => { const R = parseHash(); lmImport(R.k === 'car' ? R.a : ''); });
-const APP_VERSION = '2026-11-12.2';   // localmold/webapp.py 의 APP_VERSION 과 같게
+const APP_VERSION = '2026-11-25.1';   // localmold/webapp.py 의 APP_VERSION 과 같게
 function showFatal(msg) {
   const V = $('#view'); if (!V) return;
   V.className = 'view';

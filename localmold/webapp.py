@@ -22,7 +22,7 @@ WEB = Path(__file__).parent / "web" / "index.html"
 ICON = Path(__file__).parent / "web" / "localmold.ico"
 # 화면(index.html 의 APP_VERSION)과 같이 올린다. 다르면 화면이 '앱을 다시 켜 주세요' 안내를 띄우고,
 # 새로 실행할 때 예전 엔진이 켜져 있으면 끄고 새로 시작한다.
-APP_VERSION = "2026-11-12.2"
+APP_VERSION = "2026-11-25.1"
 SKELETON_HEAD = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
                  '<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
@@ -181,9 +181,7 @@ class Data:
             c.commit()
             return {"ok": True, "id": mid, "new": new}
         if path[0] == "import":   # 엑셀/CSV 올리기: 외주처 엑셀(갑지+을지+사진) · 통합 문제점 리스트 · 금형 리스트 자동 구분
-            car = str(body.get("car") or "").strip()
-            if not car:
-                raise ValueError("차종을 입력해 주세요")
+            car = str(body.get("car") or "").strip()          # 비우면 파일 제목 줄 · 이름에서 읽음
             name, data = str(body.get("name") or "upload.xlsx"), _b64(body.get("data"))
             vendor = str(body.get("vendor") or "").strip().upper() or LM.vendor_from_name(name)
             return {"ok": True} | LM.import_any(c, self.cfg, car, name, data, vendor or None)

@@ -56,6 +56,7 @@ python -m localmold from-mailhub
 python -m localmold import "D:\자료\BC4t CUV_CAR_ASHA-2_REV.1 (매크로).xlsx" --car "BC4t CUV"   # 외주처 엑셀 (갑지 + 을지 + 사진)
 python -m localmold import "D:\자료\통합 금형 문제점 전체 관리 리스트_V4.csv" --car "BC4t CUV"   # 통합 문제점 리스트
 python -m localmold import "D:\자료\NX5 금형 리스트.xlsx" --car "NX5 CUV"                        # 신규 차종 금형 리스트
+python -m localmold import "D:\자료\AB1e 금형 마스터리스트.xlsx"                                 # 금형 마스터리스트 (차종은 제목 줄에서)
 
 python -m localmold cars                                   # 차종별 요약 (외주처별 포함)
 python -m localmold top --car "BC4t CUV" --limit 20        # 작업 우선순위 (이유 포함)
@@ -67,6 +68,15 @@ python -m localmold export --car "BC4t CUV" --vendor ASHA-2 --open   # 외주처
 python -m localmold export --car "BC4t CUV" --open                   # 통합 리스트 + 외주처별 전부
 ```
 
+- **금형 마스터리스트** (P/No · P/NAME · Prod. Supplier · Group name · Mold type · Mold maker · Mold maker [SUB] · MOLD NUMBER ·
+  ASSET NO · M/C Ton · CV · material · L/RHD · IN/OUT · RISK · MOLD Delivery …):
+  - 표가 있는 시트를 찾아 읽습니다 (그림만 있는 표지 시트 · 숨긴 시트는 건너뜀). 차종을 비우면 제목 줄(`▣ AB1e - MANUFACTURING ITEM`)이나 파일 이름에서 읽습니다.
+  - 묶음 품번은 풀어서 대표 품번(앞 품번)으로 등록합니다: `12370/80-AB000` → 12370-AB000 · 12380-AB000,
+    `14650-AB000/10/20` → AB000 · AB010 · AB020, 줄바꿈으로 두 품번. 갑지에는 원래 표기를 보여 주고,
+    문제점 리스트 · 폰에서 RH · 사양 품번으로 들어와도 같은 금형으로 연결됩니다.
+  - 같은 외주처 · 같은 품번이 여러 줄(IMG 1차 · 2차 · TRIM 금형 등)이면 한 금형으로 합치고 값은 ` / ` 로 잇습니다.
+  - 외주처는 `Prod. Supplier` 그대로 (줄바꿈 · 띄어쓰기만 정리). 금형 상세(을지)에 마스터 정보(협력 제작사 · 금형/자산 번호 · 톤 · CAV · 재질 · 구분 · 납품)가 나옵니다.
+  - 다시 올리면 바뀐 칸만 고칩니다 (결과: 금형 신규 · 갱신 · 변경 없음 · 같은 품번 줄 합침).
 - 양식 상태 → 단계: 검토 중 → 원인분석, 개선 중 → 대책수립(진행 메모에 '수정 완료'가 있으면 대책적용), AQL 협의 → 효과확인,
   관망 → 보류, 개선 완 → 수정 후 T/O 가 OK 면 종결 · 아니면 효과확인(검증 필요), T/O NG → 대책수립. 원래 상태는 `양식 상태`로 남습니다.
 - 외주처 이름은 파일 이름(`_CAR_외주처_REV`)이나 갑지 제목(`MOLD ISSUE LIST — 외주처`)에서 읽습니다.

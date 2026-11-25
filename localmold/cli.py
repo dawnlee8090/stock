@@ -27,8 +27,9 @@ def run(args, cfg, conn):
         if not p.is_file():
             raise SystemExit(f"파일이 없습니다: {p}")
         vendor = (args.vendor or LM.vendor_from_name(p.name) or "").upper() or None
-        res = LM.import_any(conn, cfg, args.car, p.name, p.read_bytes(), vendor)
-        _out(f"[{res.pop('kind')}] {p.name} → {args.car}{' / ' + vendor if vendor else ''}\n  " +
+        res = LM.import_any(conn, cfg, args.car or "", p.name, p.read_bytes(), vendor)
+        kind, car, sheet = res.pop("kind"), res.pop("car", args.car), res.pop("sheet", "")
+        _out(f"[{kind}] {p.name}{' (시트 ' + sheet + ')' if sheet else ''} → {car}{' / ' + vendor if vendor else ''}\n  " +
              ", ".join(f"{k} {v}" for k, v in res.items()))
         return
     if a == "cars":
@@ -160,7 +161,7 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--desktop-only", action="store_true", help="시작 메뉴에는 만들지 않음")
     x = ls.add_parser("import", help="엑셀/CSV 가져오기: 외주처 엑셀(갑지+을지+사진) · 통합 문제점 리스트 · 금형 리스트 (자동 구분)")
     x.add_argument("path")
-    x.add_argument("--car", required=True, help="차종 (예: \"BC4t CUV\")")
+    x.add_argument("--car", help="차종 (예: \"BC4t CUV\"). 비우면 파일 제목 줄(▣ AB1e - …) · 파일 이름에서 읽음")
     x.add_argument("--vendor", help="외주처 (파일 이름 _CAR_외주처_REV 에서 자동)")
     x = ls.add_parser("cars", help="차종별 요약")
     x.add_argument("--json", action="store_true")

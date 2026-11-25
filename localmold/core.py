@@ -42,6 +42,18 @@ CREATE TABLE IF NOT EXISTS lm_molds (
     owner       TEXT DEFAULT '',   -- Responsible
     note        TEXT DEFAULT '',
     src         TEXT DEFAULT '',
+    pn_label    TEXT DEFAULT '',   -- 마스터의 원래 품번 표기 (12370/80-AB000 처럼 LH/RH 묶음)
+    part_nos    TEXT DEFAULT '',   -- 묶음을 푼 품번 전체 (쉼표). 문제점 리스트의 RH 품번도 이 금형으로 연결
+    maker_sub   TEXT DEFAULT '',   -- 금형 제작 (협력 · SUB)
+    mold_no     TEXT DEFAULT '',   -- 금형 번호
+    asset_no    TEXT DEFAULT '',   -- 자산 번호
+    lrhd        TEXT DEFAULT '',   -- L/RHD
+    sourcing    TEXT DEFAULT '',   -- IN / OUT
+    risk        TEXT DEFAULT '',   -- RISK LEVEL
+    material    TEXT DEFAULT '',   -- 재질 (MS SPEC)
+    ton         TEXT DEFAULT '',   -- 성형기 톤수
+    cav         TEXT DEFAULT '',   -- CAVITY
+    delivery    TEXT DEFAULT '',   -- 금형 납품 (차수)
     created_at  TEXT,
     updated_at  TEXT,
     UNIQUE (car, vendor, part_no)
@@ -105,7 +117,9 @@ CREATE INDEX IF NOT EXISTS idx_lm_photos_issue ON lm_photos(issue_id);
 CATS = ["습합", "취출", "WELD LINE", "SINK", "미성형", "GAS", "기타"]
 IMPORTANCE = ["상", "중", "하"]
 OPEN_STAGES = [s for s in STATUSES if s not in ("종결", "보류")]
-MOLD_FIELDS = ["part_name", "item", "mold_type", "mold_maker", "weight", "to_round", "owner", "note"]
+MASTER_FIELDS = ["pn_label", "part_nos", "maker_sub", "mold_no", "asset_no", "lrhd", "sourcing", "risk", "material",
+                 "ton", "cav", "delivery"]
+MOLD_FIELDS = ["part_name", "item", "mold_type", "mold_maker", "weight", "to_round", "owner", "note", *MASTER_FIELDS]
 ISSUE_FIELDS = ["category", "defect_type", "problem", "countermeasure", "owner", "importance", "mold_fix", "occ_date",
                 "due", "to_after", "to_result", "progress", "remark", "status"]
 DATE_FIELDS = {"occ_date", "due"}
@@ -126,6 +140,10 @@ def connect(db_path) -> sqlite3.Connection:
 
 def ensure(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    have = {r[1] for r in conn.execute("PRAGMA table_info(lm_molds)")}
+    for col in MASTER_FIELDS:                     # 예전 DB 에 마스터리스트 칸 추가
+        if col not in have:
+            conn.execute(f"ALTER TABLE lm_molds ADD COLUMN {col} TEXT DEFAULT ''")
 
 
 def _now() -> str:
@@ -148,16 +166,69 @@ def is_part_no(s) -> bool:
     return not t.startswith("=") and bool(re.search(r"\d{3}[0-9A-Z]{2}-?[0-9A-Z]{3,}", t))
 
 
+_PN_TOKEN = re.compile(r"[A-Z]?\d{3}[0-9A-Z]{2}(?:/[0-9A-Z]{1,3})*-[0-9A-Z]{4,6}(?:/[0-9A-Z]{1,4})*")
+
+
+def expand_part_nos(text) -> list[str]:
+    """마스터리스트의 묶음 품번을 하나씩: 앞 품번이 대표 (LH · 기본 사양).
+    12370/80-AB000 → 12370-AB000, 12380-AB000 (뒷자리 바꾸기)
+    14650-AB000/10/20 → 14650-AB000, 14650-AB010, 14650-AB020 (사양 뒷자리)
+    16811/2-AB000/300 → 16811-AB000, 16812-AB000, 16811-AB300, 16812-AB300
+    줄바꿈으로 여러 품번, 앞 글자 붙은 품번(P12710-…)은 글자 뺀 품번도 같이."""
+    t = str(text or "").upper().replace("–", "-").replace("—", "-")
+    t = re.sub(r"\s*/\s*", "/", re.sub(r"\s*-\s*", "-", t))
+    out: list[str] = []
+    extra: list[str] = []
+    for tok in _PN_TOKEN.findall(t):
+        head, tail = tok.split("-", 1)
+        hs, ts = head.split("/"), tail.split("/")
+        heads = [hs[0]] + [hs[0][:len(hs[0]) - len(x)] + x for x in hs[1:] if len(x) <= len(hs[0])]
+        tails = [ts[0]] + [ts[0][:len(ts[0]) - len(x)] + x for x in ts[1:] if len(x) <= len(ts[0])]
+        for tl in tails:
+            for hd in heads:
+                pn = f"{hd}-{tl}"
+                if pn not in out:
+                    out.append(pn)
+                if hd[0].isalpha() and hd[1:4].isdigit() and f"{hd[1:]}-{tl}" not in extra:
+                    extra.append(f"{hd[1:]}-{tl}")
+    if not out:
+        f = fmt_part_no(t)
+        if is_part_no(f):
+            out.append(f)
+    return out + [x for x in extra if x not in out]
+
+
 def vendor_from_name(name: str) -> str:
     """'BC4t CUV_CAR_NAPLAS_REV.1 (매크로).xlsx' → 'NAPLAS'."""
     m = re.search(r"_CAR_\s*(.+?)\s*_REV", name or "", re.I)
     return m.group(1).strip().upper() if m else ""
 
 
+def norm_vendor(v) -> str:
+    """외주처 이름: 줄바꿈 · 겹친 띄어쓰기 정리, 대문자. '-' 는 빈 값."""
+    t = re.sub(r"\s+", " ", str(v or "")).strip().upper()
+    return "" if t in ("-", "—", "N/A") else t
+
+
+def car_from(rows: list[list] | None, name: str = "") -> str:
+    """차종 자동 인식: 제목 줄 '▣ AB1e - MANUFACTURING ITEM' → AB1e, 파일 이름 'BC4t CUV_CAR_…' → BC4t CUV,
+    'AB1e 금형 마스터리스트.xlsx' → AB1e."""
+    for row in (rows or [])[:4]:
+        for v in row:
+            m = re.search(r"▣\s*([^\s▣][^\n]*?)\s*[-–]\s*(?:MANUFACTURING|MOLD|금형)", str(v or ""), re.I)
+            if m:
+                return m.group(1).strip()
+    m = re.search(r"^(.+?)_CAR_", name or "", re.I)
+    if m:
+        return m.group(1).strip()
+    m = re.match(r"\s*([A-Za-z]{1,3}\d[A-Za-z0-9]{0,4})(?=[\s_.-]|$)", Path(name or "").stem)
+    return m.group(1) if m else ""
+
+
 def match_vendor(conn, car: str, vendor: str) -> str:
     """양식 제목의 오타(예: ASAH-5 ↔ ASHA-5)는 이미 있는 외주처 이름으로 맞춘다."""
     import difflib
-    v = (vendor or "").strip().upper()
+    v = norm_vendor(vendor)
     if not v:
         return v
     have = [r[0] for r in conn.execute("SELECT DISTINCT vendor FROM lm_molds WHERE car=? UNION "
@@ -281,25 +352,60 @@ def wait_check(r) -> str:
 
 
 # ---------------- 금형 ----------------
-def upsert_mold(conn, car: str, vendor: str, part_no: str, src: str = "", overwrite: bool = True, **kw) -> tuple[int, bool]:
-    """(번호, 새로 만들었는지). 빈 값은 기존 값을 지우지 않는다."""
+def _alias_mold(conn, car: str, vendor: str, part_no: str, cands: list[str], master: bool):
+    """다른 품번으로 이미 있는 금형. master=True(마스터리스트 가져오기)면 문제점 · 폰에서 먼저 만든 금형이나
+    전에 이 마스터 줄로 채운 금형만 (마스터의 서로 다른 줄끼리 합치지 않게), 아니면 마스터에 묶인 품번(part_nos)까지 본다."""
+    for pn in cands:
+        q, a = "SELECT * FROM lm_molds WHERE car=? AND vendor=? AND part_no=?", [car, vendor, pn]
+        if master:
+            q += " AND (part_nos='' OR (',' || part_nos || ',') LIKE ?)"
+            a.append(f"%,{part_no},%")
+        r = conn.execute(q, a).fetchone()
+        if r:
+            return r
+    if master:
+        return None
+    for pn in [part_no, *cands]:
+        r = conn.execute("SELECT * FROM lm_molds WHERE car=? AND vendor=? AND part_nos != '' AND (',' || part_nos || ',') LIKE ?",
+                         (car, vendor, f"%,{pn},%")).fetchone()
+        if r:
+            return r
+    return None
+
+
+def upsert_mold(conn, car: str, vendor: str, part_no: str, src: str = "", overwrite: bool = True, master: bool = False,
+                **kw) -> tuple[int, bool]:
+    """(번호, 새로 만들었는지). 빈 값은 기존 값을 지우지 않는다.
+    품번이 같은 금형이 없으면 묶음 품번(12380-AB000 ↔ 12370/80-AB000)으로 찾는다."""
     ensure(conn)
-    car, vendor, part_no = (car or "").strip(), (vendor or "").strip().upper(), fmt_part_no(part_no)
+    mid, how = _upsert_mold_ex(conn, car, vendor, part_no, src, overwrite, master, **kw)
+    return mid, how == "new"
+
+
+def _upsert_mold_ex(conn, car: str, vendor: str, part_no: str, src: str = "", overwrite: bool = True, master: bool = False,
+                    **kw) -> tuple[int, str]:
+    """(번호, 'new' | 'updated' | 'same'). 표 준비(ensure)는 부르는 쪽에서 (줄마다 하면 느림)"""
+    car, vendor, part_no = (car or "").strip(), norm_vendor(vendor), fmt_part_no(part_no)
     if not (car and part_no):
         raise ValueError("차종과 품번이 필요합니다")
     row = conn.execute("SELECT * FROM lm_molds WHERE car=? AND vendor=? AND part_no=?", (car, vendor, part_no)).fetchone()
+    if not row:
+        cands = [x for x in expand_part_nos(part_no) + str(kw.get("part_nos") or "").split(",") if x and x != part_no]
+        row = _alias_mold(conn, car, vendor, part_no, list(dict.fromkeys(cands)), master)
     vals = {f: str(kw.get(f) or "").strip() for f in MOLD_FIELDS if kw.get(f) not in (None, "")}
+    if row and vals.get("part_nos"):                      # 묶음 품번은 합친다
+        vals["part_nos"] = ",".join(dict.fromkeys([x for x in (row["part_nos"] or "").split(",") + vals["part_nos"].split(",") if x]))
     if row:
-        sets = {k: v for k, v in vals.items() if overwrite or not row[k]}
+        sets = {k: v for k, v in vals.items() if (overwrite or not row[k]) and v != row[k]}
         if sets:
             sets["updated_at"] = _now()
             conn.execute(f"UPDATE lm_molds SET {', '.join(f'{k}=?' for k in sets)} WHERE id=?", (*sets.values(), row["id"]))
-        return row["id"], False
+        return row["id"], ("updated" if sets else "same")
     cur = conn.execute(
         f"INSERT INTO lm_molds (car, vendor, part_no, {', '.join(MOLD_FIELDS)}, src, created_at, updated_at) "
         f"VALUES (?,?,?,{','.join('?' * len(MOLD_FIELDS))},?,?,?)",
         (car, vendor, part_no, *[vals.get(f, "") for f in MOLD_FIELDS], src, _now(), _now()))
-    return cur.lastrowid, True
+    return cur.lastrowid, "new"
 
 
 def get_mold(conn, mid: int):
@@ -645,12 +751,22 @@ def _hkey(h) -> str:
 
 
 MOLD_HEADERS = {
-    "vendor": ["외주처", "성형처", "vendor", "supplier"],
-    "part_no": ["partno", "품번"],
-    "part_name": ["partname", "품명"],
-    "item": ["item", "아이템", "구분"],
+    "vendor": ["외주처", "성형처", "prod.supplier", "productionsupplier", "생산업체", "양산업체", "양산처", "vendor", "supplier"],
+    "part_no": ["partno", "p/no", "p/n", "partnumber", "품번"],
+    "part_name": ["partname", "p/name", "품명"],
+    "item": ["item", "아이템", "구분", "groupname"],
     "mold_type": ["moldtype", "성형방식", "금형구분"],
     "mold_maker": ["kr업체", "금형제작업체", "금형제작사", "금형업체", "moldmaker"],
+    "maker_sub": ["moldmaker[sub]", "moldmakersub", "협력제작사", "서브제작사"],
+    "mold_no": ["moldnumber", "moldnumbers", "moldno", "금형번호"],
+    "asset_no": ["assetnomold", "assetno", "자산번호"],
+    "lrhd": ["l/rhd", "lhd/rhd"],
+    "sourcing": ["in/outsourcing", "sourcing", "소싱"],
+    "risk": ["risklevel", "risk", "리스크"],
+    "material": ["materialmsspec", "material", "재질", "원재료"],
+    "ton": ["m/cton", "tonnage", "톤수"],
+    "cav": ["cvmold", "cavity", "cav", "캐비티"],
+    "delivery": ["molddelivery", "금형납품", "납품차수"],
     "weight": ["중량", "weight"],
     "to_round": ["t/o현황", "t/o차수", "t/o", "to현황"],
     "owner": ["responsible", "담당", "담당자"],
@@ -738,7 +854,10 @@ def _weight(text: str) -> str:
 
 
 def import_molds(conn, car: str, rows: list[list], vendor: str | None = None, src: str = "") -> dict:
-    """금형 리스트(엑셀) 또는 외주처 갑지(MASTER) → 금형 등록·갱신. 바뀐 칸만 고친다."""
+    """금형 리스트 · 금형 마스터리스트(엑셀) 또는 외주처 갑지(MASTER) → 금형 등록 · 갱신. 바뀐 칸만 고친다.
+    마스터리스트처럼 품번이 묶여 있으면(12370/80-AB000, 14650-AB000/10/20) 풀어서 대표 품번으로 등록하고
+    (나머지 품번으로 들어오는 문제점도 이 금형으로 연결), 같은 외주처 · 같은 품번이 여러 줄이면
+    (IMG 1차 · 2차 · TRIM 금형 등) 한 금형으로 합쳐 값을 ' / ' 로 잇는다."""
     ensure(conn)
     hi, cols = _find_header(rows, MOLD_HEADERS, "part_no")
     # 직접 적은 외주처도 이미 있는 이름에 맞춘다 (SAFEDEMO ↔ SAFE DEMO, ASAH-5 ↔ ASHA-5)
@@ -746,22 +865,50 @@ def import_molds(conn, car: str, rows: list[list], vendor: str | None = None, sr
     if "vendor" not in cols and not vendor_default:
         raise ValueError("외주처 열이 없습니다. --vendor 로 외주처를 지정해 주세요")
     alt_pn = [i for i, h in enumerate(rows[hi]) if _hkey(h).startswith("partno") and i != cols["part_no"]]
-    stats = {"new": 0, "updated": 0, "skipped": 0}
+    head_pn = _hkey(rows[hi][cols["part_no"]])
+    stats = {"new": 0, "updated": 0, "same": 0, "skipped": 0, "rows": 0}
+    groups: dict[tuple, dict] = {}
+    clean = lambda x: "" if str(x).strip() in ("-", "—", "?", "N/A") else re.sub(r"\s+", " ", str(x)).strip()
     for row in rows[hi + 1:]:
-        pn = str(_cell(row, cols["part_no"]))
-        if not is_part_no(pn):        # 품번이 비면 하이퍼링크 열 값으로
-            pn = next((str(_cell(row, i)) for i in alt_pn if is_part_no(_cell(row, i))), "")
+        raw = str(_cell(row, cols["part_no"]))
+        if raw and _hkey(raw) == head_pn:           # 머리글이 두 줄인 양식
+            continue
+        alias: list[str] = []
+        if is_part_no(raw) and "/" not in raw and "\n" not in raw:
+            pn = raw                                # 보통 품번 (예전 양식 그대로)
+        else:
+            exp = expand_part_nos(raw)
+            if exp:
+                pn = exp[0]
+                alias = exp if (len(exp) > 1 or fmt_part_no(raw) != exp[0]) else []
+            else:                                   # 품번이 비면 하이퍼링크 열 값으로
+                pn = next((str(_cell(row, i)) for i in alt_pn if is_part_no(_cell(row, i))), "")
         if not is_part_no(pn):
             stats["skipped"] += 1 if sum(1 for x in row if str(x or "").strip() not in ("", "-")) > 1 else 0
             continue
-        v = (str(_cell(row, cols.get("vendor"))) or vendor_default).upper()
-        kw = {f: str(_cell(row, cols.get(f))) for f in MOLD_FIELDS if f in cols}
+        # 표에 적힌 외주처는 그대로 (ALPHA PLAST ↔ ALPHA PLAST TECHNO 처럼 비슷한 다른 업체가 있음)
+        v = norm_vendor(clean(_cell(row, cols.get("vendor")))) or vendor_default or "미정"
+        kw = {f: clean(_cell(row, cols.get(f))) for f in MOLD_FIELDS if f in cols}
         if "weight" not in cols:
             w = _weight(" ".join(str(x or "") for x in row[cols["part_no"] + 1:]))
             if w:
                 kw["weight"] = w
-        _, new = upsert_mold(conn, car, v, pn, src=src, **kw)
-        stats["new" if new else "updated"] += 1
+        if alias:
+            kw["pn_label"] = re.sub(r"\s*\n\s*", " / ", raw.strip())
+            kw["part_nos"] = ",".join(alias)
+        g = groups.setdefault((v, fmt_part_no(pn)), {"pn": pn, "master": bool(alias), "vals": {}})
+        for f, x in kw.items():
+            if x:
+                parts = x.split(",") if f == "part_nos" else [x]
+                lst = g["vals"].setdefault(f, [])
+                lst += [p for p in parts if p not in lst]
+        stats["rows"] += 1
+    for (v, _), g in groups.items():
+        kw = {f: ("," if f == "part_nos" else " / ").join(x) for f, x in g["vals"].items()}
+        _, how = _upsert_mold_ex(conn, car, v, g["pn"], src=src, master=g["master"], **kw)
+        stats[how] += 1
+    stats["merged"] = stats["rows"] - len(groups)
+    stats["vendors"] = len({v for v, _ in groups})
     conn.commit()
     return stats
 
@@ -812,7 +959,9 @@ def import_issues(conn, car: str, rows: list[list], vendor: str | None = None, t
     seen: dict = {}
     for row in rows[hi + 1:]:
         pn, prob = str(_cell(row, cols["part_no"])), str(_cell(row, cols["problem"]))
-        v = (str(_cell(row, cols.get("vendor"))) or vendor or "").upper()
+        if not is_part_no(pn) and expand_part_nos(pn):
+            pn = expand_part_nos(pn)[0]
+        v = norm_vendor(_cell(row, cols.get("vendor"))) or norm_vendor(vendor)
         if not (is_part_no(pn) and prob and prob not in ("-", "↑")):
             stats["skipped"] += 1 if any(str(x or "").strip() for x in row) else 0
             continue
@@ -984,29 +1133,82 @@ def phone_import(conn, cfg: dict, uploads: list[dict], base: Path, today: date |
     return res
 
 
+def _pick_sheet(data: bytes, wb=None) -> tuple[str | None, str | None]:
+    """엑셀에서 표가 있는 시트 고르기 (그림만 있는 표지 · 요약 시트는 건너뜀).
+    보이는 시트 먼저, 문제점 리스트 > 금형 리스트, 줄이 많은 시트. → (시트 이름, 'issues' | 'molds')"""
+    import openpyxl
+    own = wb is None
+    if own:
+        wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    best, best_score = (None, None), None
+    try:
+        for ws in wb.worksheets:
+            head = [list(r) for r in ws.iter_rows(min_row=1, max_row=15, values_only=True)]
+            kind = None
+            try:
+                _, c = _find_header(head, ISSUE_HEADERS, "problem")
+                kind = "issues" if "part_no" in c else None
+            except ValueError:
+                pass
+            if not kind:
+                try:
+                    _find_header(head, MOLD_HEADERS, "part_no")
+                    kind = "molds"
+                except ValueError:
+                    continue
+            n = ws.max_row or sum(1 for _ in ws.iter_rows(values_only=True))
+            score = (ws.sheet_state == "visible", kind == "issues", n)
+            if best_score is None or score > best_score:
+                best, best_score = (ws.title, kind), score
+    finally:
+        if own:
+            wb.close()
+    return best
+
+
 def import_any(conn, cfg: dict, car: str, name: str, data: bytes, vendor: str | None = None,
                today: date | None = None) -> dict:
-    """올린 파일 종류를 알아서 구분: 외주처 엑셀(을지 시트 있음) → 통합 문제점 리스트(문제점 열) → 금형 리스트."""
+    """올린 파일 종류를 알아서 구분: 외주처 엑셀(을지 시트 있음) → 통합 문제점 리스트(문제점 열) → 금형 리스트 · 마스터리스트.
+    엑셀은 표가 있는 시트를 찾아 읽는다. 차종을 비우면 제목 줄(▣ AB1e - MANUFACTURING ITEM)이나 파일 이름에서 읽는다."""
+    car = (car or "").strip()
     if name.lower().endswith((".xlsx", ".xlsm")):
         import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-        is_wb = False
-        for ws in wb.worksheets[:60]:
-            if ws.title.strip() in ("양식", "STATUS_기준"):
-                continue
-            head = [list(r) for r in ws.iter_rows(min_row=1, max_row=8, values_only=True)]
-            if any(_hkey(x) == "problem" for r in head for x in r):
-                is_wb = True
-                break
-        wb.close()
+        wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)   # 큰 파일은 여는 데 오래 걸려 한 번만
+        try:
+            is_wb = False
+            for ws in wb.worksheets[:60]:
+                if ws.title.strip() in ("양식", "STATUS_기준"):
+                    continue
+                head = [list(r) for r in ws.iter_rows(min_row=1, max_row=8, values_only=True)]
+                if any(_hkey(x) == "problem" for r in head for x in r):
+                    is_wb = True
+                    break
+            sheet, kind = (None, None) if is_wb else _pick_sheet(data, wb)
+            rows = [list(r) for r in wb[sheet].iter_rows(values_only=True)] if sheet else []
+        finally:
+            wb.close()
         if is_wb:
-            return {"kind": "외주처 엑셀"} | import_workbook(conn, cfg, car, data, vendor, today, src=name)
+            car = car or car_from(None, name)
+            if not car:
+                raise ValueError("차종을 입력해 주세요 (파일 이름에서 차종을 읽지 못했습니다)")
+            return {"kind": "외주처 엑셀", "car": car} | import_workbook(conn, cfg, car, data, vendor, today, src=name)
+        if not sheet:
+            raise ValueError("품번 · 품명 열이 있는 표를 찾지 못했습니다 (모든 시트의 위쪽 15줄을 확인했습니다)")
+        car = car or car_from(rows, name)
+        if not car:
+            raise ValueError("차종을 입력해 주세요 (파일에서 차종을 읽지 못했습니다)")
+        if kind == "issues":
+            return {"kind": "문제점 리스트", "car": car, "sheet": sheet} | import_issues(conn, car, rows, vendor, today, src=name)
+        return {"kind": "금형 리스트", "car": car, "sheet": sheet} | import_molds(conn, car, rows, vendor, src=name)
     rows = read_rows(name, data)
+    car = car or car_from(rows, name)
+    if not car:
+        raise ValueError("차종을 입력해 주세요 (파일에서 차종을 읽지 못했습니다)")
     try:
         _find_header(rows, ISSUE_HEADERS, "problem")
     except ValueError:
-        return {"kind": "금형 리스트"} | import_molds(conn, car, rows, vendor, src=name)
-    return {"kind": "문제점 리스트"} | import_issues(conn, car, rows, vendor, today, src=name)
+        return {"kind": "금형 리스트", "car": car} | import_molds(conn, car, rows, vendor, src=name)
+    return {"kind": "문제점 리스트", "car": car} | import_issues(conn, car, rows, vendor, today, src=name)
 
 
 # ---------------- 엑셀 (양식 그대로 내보내기) ----------------
